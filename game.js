@@ -215,11 +215,47 @@ const MOON_SITES=[
 ];
 function moonSite(S){ if(!S||S.levelId!=="l2"||!S.site) return null; return byId(MOON_SITES,S.site)||null; }
 
+/* ── Mars landing-site candidates (MOLA bake v1, same contract as §MOON_SITES) ──
+   Coordinates: real landing record (Jezero JPL Mars 2020 press kit; Gale
+   Bradbury Landing; InSight Elysium — see SOURCES.md §14). Gameplay figures
+   (slope/hazard/sun/earth/sci/travKm/hazardDv) are BALANCED ABSTRACTIONS in
+   the house style: they order the sites correctly (benign↔rugged,
+   dust-dimmed sun, Earth low so relay matters) without claiming survey
+   precision. Only Mars-body levels (l3/sbx) read them; S.site null or
+   elsewhere = zero effect, so old saves derive byte-identical margins. */
+const MARS_SITES=[
+ {id:"elysium",n:"Elysium Planitia",lat:"4.50°N",lon:"135.62°E",
+  d:"InSight flat volcanic plain. Benign and boring — easy landing, long drive to interesting science.",
+  slope:2,hazard:0.08,sun:0.65,earth:0.5,sci:1.00,travKm:8,hazardDv:0.00,
+  fx:"No divert reserve · solar ×0.86 (dust) · +$3.2M traverse reserve · science ×1.00"},
+ {id:"gale",n:"Gale Crater · Bradbury Landing",lat:"4.59°S",lon:"137.44°E",
+  d:"Curiosity crater-floor stratigraphy below Aeolis Mons — moderate ground, rich layered science.",
+  slope:6,hazard:0.30,sun:0.65,earth:0.5,sci:1.20,travKm:18,hazardDv:0.04,
+  fx:"+0.04 km/s divert reserve · solar ×0.86 (dust) · +$7.2M traverse reserve · science ×1.20"},
+ {id:"jezero",n:"Jezero Crater Delta",lat:"18.44°N",lon:"77.45°E",
+  d:"Perseverance ancient delta: biosignature hunt on broken delta-front ground with relief shade.",
+  slope:9,hazard:0.50,sun:0.60,earth:0.5,sci:1.35,travKm:12,hazardDv:0.10,
+  fx:"+0.10 km/s divert reserve · solar ×0.84 (dust + relief shade) · +$4.8M traverse reserve · science ×1.35"}
+];
+function marsSite(S){ if(!S||(S.levelId!=="l3"&&S.levelId!=="sbx")||!S.site) return null; return byId(MARS_SITES,S.site)||null; }
+/* Unified landing-site lookup (body-agnostic landing chain; lunar and Mars
+   lists have disjoint ids so order is irrelevant). */
+function landSite(S){ return moonSite(S)||marsSite(S); }
+/* Patch-grid lookup across both bakes (same schema/encoding; file absent =
+   null, never throws — keeps ?no3d/file:// safe when a bake is missing). */
+function surfPatchFor(siteId){
+  try{
+    if(typeof SURFACE_PATCHES!=="undefined"&&SURFACE_PATCHES.sites&&SURFACE_PATCHES.sites[siteId]) return SURFACE_PATCHES.sites[siteId];
+    if(typeof MARS_PATCHES!=="undefined"&&MARS_PATCHES.sites&&MARS_PATCHES.sites[siteId]) return MARS_PATCHES.sites[siteId];
+  }catch(e){}
+  return null;
+}
+
 /* ── L2 rover kit catalogs (Phase 2) ──
    Baselines: Apollo LRV (rigid 4-wheel), MER/MSL rocker-bogie, VIPER/MSL-class
    active suspension + drill/caching payloads (see SOURCES.md §12). Figures are
    BALANCED ABSTRACTIONS (house style): mass/draw/cost classes that order
-   correctly, capability thresholds the site table is tuned against. L2 only. */
+   correctly, capability thresholds the site table is tuned against. Landing levels only (l2 + Mars l3/sbx). */
 const ROVER_MOB=[
  {id:"rm1",n:"Rigid 4-wheel chassis (LRV class)",m:80,c:40,slope:12,grip:0.3,
   d:"Apollo-LRV-class rigid suspension. Fine on mare, marginal on rims.",her:"LRV class",p:SRC.techport},
@@ -252,7 +288,7 @@ const ROVER_PAY=[
  {id:"ry3",n:"Drill + sample cache (MSL class)",m:110,draw:120,sci:1.70,c:210,
   d:"Subsurface access and caching. The heavy science option.",her:"MSL/ExoMars class",p:SRC.techport}
 ];
-function roverKit(S){ if(!S||S.levelId!=="l2"||!S.rover) return null;
+function roverKit(S){ if(!S||(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx")||!S.rover) return null;
   const r=S.rover, rm=byId(ROVER_MOB,r.mob), rp=byId(ROVER_PWR,r.pwr),
         rc=byId(ROVER_COM,r.com), ry=byId(ROVER_PAY,r.pay);
   return (rm&&rp&&rc&&ry)?{rm,rp,rc,ry}:null; }
@@ -289,10 +325,10 @@ const LEVELS = [
   lvs:["f9","av401","av551"], dsnHrs:14, dose:0.3,
   par:{mass:1900,power:520,cost:400}},
 
- {id:"l2", num:2, name:"Quiet Side", sub:"Lunar polar orbiter",
-  real:"Modelled on Lunar Reconnaissance Orbiter and the CLPS deliveries.",
-  brief:"A polar orbiter at the Moon. Translunar injection is nearly free in C3 terms, but you have to stop when you arrive — and half of every orbit you are behind the Moon with no line of sight to Earth. Data you cannot downlink is data you did not collect.",
-  newMech:"Delta-v budget. Propellant is mass you must launch.",
+ {id:"l2", num:2, name:"Quiet Side", sub:"Lunar polar orbiter & CLPS surface delivery",
+  real:"Modelled on Lunar Reconnaissance Orbiter and NASA CLPS commercial surface deliveries.",
+  brief:"A dual lunar polar orbiter and commercial surface delivery mission. Translunar injection is nearly free in C3 terms, but you must capture into orbit, survey the landing zone, and commit powered descent to land safely on rugged polar terrain. Data you cannot downlink is data you did not collect.",
+  newMech:"Delta-v budget and powered lunar descent.",
   body:"moon", mode:"fixedC3", c3:-1.9, tof:5, capM:800, years:2, linkAu:0.02, dataScale:1, storeMb:160000,
   objs:["o_mmap","o_ice","o_int","o_rad","o_geo"], req:2,
   parts:["ctx","hires","therm","vnir","grns","alt","seis","rad","uso","mag"],
@@ -570,8 +606,9 @@ function derive(S){
   /* Phase-1 rover-forward: the chosen lunar site holds a terminal divert
      reserve for rugged ground. Flows through Tsiolkovsky like every other
      line item — mass consequence, no special cases. */
-  const site = moonSite(S);
+  const site = landSite(S);
   if(site&&site.hazardDv>0) dv.push(["Terminal divert reserve ("+site.n+")",site.hazardDv]);
+  if(L.body==="moon"&&S.rover&&S.site) dv.push(["Powered descent & landing guidance",0.35]);
   if(L.mode==="leo"){ dv.length=0; dv.push(["Orbit maintenance & de-orbit",0.22]); }
   const dvTotal = dv.reduce((s,x)=>s+x[1],0);
 
@@ -834,13 +871,199 @@ function renderHUD(){
     const cls = x.m<0 ? "over" : x.m<0.15 ? "caution" : "";
     const sig = x.m<0 ? "CRIT" : x.m<0.15 ? "WARN" : "NOMINAL";
     return `<button class="rail ${cls}" data-rail="${r.k}" aria-label="${r.nm} margin ${pct(x.m)}">
-      <span class="sig">${sig}</span>
-      <span class="rl"><span class="nm">${r.nm}</span><span class="mg">${x.m<0?"OVER":"margin "+(x.m*100).toFixed(0)+"%"}</span></span>
-      <span class="vl">${fmt(x.v)} <small>/ ${fmt(x.cap)} ${x.u}</small></span>
-      <span class="bar"><i style="width:${frac*100}%"></i></span>
+      <div class="rl">
+        <span class="nm">${r.nm}</span>
+        <div class="status-slot">
+          <span class="sig">${sig}</span>
+          <span class="mg">${x.m<0?"OVER":"margin "+(x.m*100).toFixed(0)+"%"}</span>
+        </div>
+      </div>
+      <div class="vl" id="rail-vl-${r.k}"><span class="val-txt">${fmt(x.v)}</span> <small>/ ${fmt(x.cap)} ${x.u}</small></div>
+      <div class="bar"><i style="width:${frac*100}%"></i></div>
     </button>`;
   }).join("")+`</div>`;
 }
+
+function renderDock(){
+  const dock=el("dock");
+  if(!dock) return;
+  if(!["brief","build","launch"].includes(S.screen)||!S.levelId){
+    dock.classList.add("hidden");
+    return;
+  }
+  dock.classList.remove("hidden");
+  const L=byId(LEVELS,S.levelId), D=derive(S);
+  let backAct="home", backLabel="← MISSIONS";
+  let statusHtml="", primaryAct="", primaryLabel="", primaryDisabled=false;
+
+  if(S.screen==="brief"){
+    backAct="select"; backLabel="← MISSIONS";
+    const req=L?L.req:2;
+    const selCount=S.objectives.length;
+    const isSurface=(L&&(L.body==="moon"||L.body==="mars"));
+    const hasSite=!isSurface||!!S.site;
+    const objMet=selCount>=req;
+    primaryAct="tobuild"; primaryLabel="BUILD THE SPACECRAFT →";
+
+    if(!objMet && !hasSite){
+      const rem=req-selCount;
+      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select ${rem} more objective${rem>1?"s":""} &amp; Landing Site</span>`;
+      primaryDisabled=true;
+    } else if(!objMet){
+      const rem=req-selCount;
+      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select ${rem} more objective${rem>1?"s":""}</span>`;
+      primaryDisabled=true;
+    } else if(!hasSite){
+      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select a Landing Site</span>`;
+      primaryDisabled=true;
+    } else {
+      const stObj=isSurface?(byId(MOON_SITES,S.site)||byId(MARS_SITES,S.site)):null;
+      statusHtml=`<span class="dock-status-chip ready">✓ OBJECTIVES READY (${selCount}/${req})${stObj?` · SITE: ${stObj.n}`:""}</span>`;
+      primaryDisabled=false;
+    }
+  } else if(S.screen==="build"){
+    if(S.bstep==="payload"){
+      backAct="tobrief"; backLabel="← FORMULATE";
+      primaryAct="bstep-systems"; primaryLabel="CONFIGURE SYSTEMS →";
+      const total=S.objectives.length;
+      const covered=S.objectives.filter(o=>objMet(S,o)).length;
+      if(S.instruments.length===0){
+        statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select at least 1 instrument (${covered}/${total} objectives covered)</span>`;
+        primaryDisabled=true;
+      } else if(covered<total){
+        statusHtml=`<span class="dock-status-chip warn">⚠ PARTIAL: ${covered} of ${total} objectives covered (${S.instruments.length} mounted)</span>`;
+        primaryDisabled=false;
+      } else {
+        statusHtml=`<span class="dock-status-chip ready">✓ ALL OBJECTIVES COVERED (${covered}/${total}) · ${S.instruments.length} Instruments Mounted</span>`;
+        primaryDisabled=false;
+      }
+    } else if(S.bstep==="systems"){
+      backAct="bstep-payload"; backLabel="← PAYLOAD";
+      primaryAct="bstep-review"; primaryLabel="REVIEW READINESS →";
+      const overRails=RAILDEF.filter(r=>D.margins[r.k]<0).map(r=>r.nm);
+      const retFrac=D.genMbPerDay>0?Math.min(1,D.downMbPerDay/D.genMbPerDay):1;
+      if(overRails.length>0){
+        statusHtml=`<span class="dock-status-chip crit">✕ OVER BUDGET: ${overRails.join(", ")}</span>`;
+      } else if(retFrac<0.5){
+        statusHtml=`<span class="dock-status-chip warn">⚠ COMMS BOTTLENECK: Downlink returns ${(retFrac*100).toFixed(0)}% of generated data</span>`;
+      } else {
+        statusHtml=`<span class="dock-status-chip ready">✓ BUS SYSTEMS CONFIGURED · ΔV ${D.dvTotal.toFixed(2)} km/s</span>`;
+      }
+      primaryDisabled=false;
+    } else if(S.bstep==="review"){
+      backAct="bstep-systems"; backLabel="← SYSTEMS";
+      primaryAct="tolaunch"; primaryLabel="PROCEED TO LAUNCH PAD →";
+      const overRails=RAILDEF.filter(r=>D.margins[r.k]<0).map(r=>r.nm);
+      const readyObj=S.objectives.every(o=>objMet(S,o));
+      if(overRails.length>0){
+        statusHtml=`<span class="dock-status-chip crit">✕ CANNOT CERTIFY: Over ${overRails.join(", ")} budget</span>`;
+        primaryDisabled=true;
+      } else if(!readyObj){
+        statusHtml=`<span class="dock-status-chip warn">⚠ WARNING: Objectives uncovered by instruments</span>`;
+        primaryDisabled=false;
+      } else {
+        const warnRails=RAILDEF.filter(r=>D.margins[r.k]<0.15).map(r=>r.nm);
+        if(warnRails.length>0){
+          statusHtml=`<span class="dock-status-chip warn">⚠ READY (with warnings): Tight margins on ${warnRails.join(", ")} (&lt;15%)</span>`;
+        } else {
+          statusHtml=`<span class="dock-status-chip ready">✓ VEHICLE CERTIFIED FOR FLIGHT</span>`;
+        }
+        primaryDisabled=false;
+      }
+    }
+  } else if(S.screen==="launch"){
+    backAct="tobuild"; backLabel="← BUILD REVIEW";
+    primaryAct="fly";
+    const overMass=D.margins.mass<0, overCost=D.margins.cost<0;
+    if(!S.launch||!S.launch.lv){
+      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select a Launch Vehicle</span>`;
+      primaryLabel="SELECT VEHICLE";
+      primaryDisabled=true;
+    } else if(overMass||overCost){
+      statusHtml=`<span class="dock-status-chip crit">✕ NO-GO: ${overMass?"MASS EXCEEDS CAPABILITY":"COST EXCEEDS BUDGET"}</span>`;
+      primaryLabel="VEHICLE INSUFFICIENT";
+      primaryDisabled=true;
+    } else {
+      const lvObj=byId(LV,S.launch.lv);
+      statusHtml=`<span class="dock-status-chip ready">✓ GO FOR LAUNCH · ${lvObj?lvObj.n:S.launch.lv} · Mass Margin ${(D.margins.mass*100).toFixed(0)}%</span>`;
+      primaryLabel="COMMIT TO LAUNCH 🚀";
+      primaryDisabled=false;
+    }
+  }
+
+  dock.innerHTML=`
+    <div class="dock-left">
+      <button class="dock-btn-back" data-act="${backAct}">${backLabel}</button>
+    </div>
+    <div class="dock-center">
+      ${statusHtml}
+    </div>
+    <div class="dock-right">
+      <button class="dock-btn-primary" data-act="${primaryAct}" ${primaryDisabled?"disabled":""}>${primaryLabel}</button>
+    </div>
+  `;
+}
+
+function clearRailDeltas(){
+  document.querySelectorAll(".delta-ghost").forEach(e=>e.remove());
+}
+
+function previewRailDeltas(target){
+  if(!["build","launch"].includes(S.screen)||!S.levelId) return;
+  const btn=target.closest("[data-act]");
+  if(!btn) return;
+  const act=btn.dataset.act, id=btn.dataset.id, k=btn.dataset.k;
+  if(!["instr","part","power","prop","shield","comms","dsn","rover","lv"].includes(act)) return;
+
+  const pS={...S, instruments:[...S.instruments]};
+  if(S.rover) pS.rover={...S.rover};
+  if(act==="instr"){
+    if(pS.instruments.includes(id)) pS.instruments=pS.instruments.filter(x=>x!==id);
+    else pS.instruments=[...pS.instruments, id];
+  } else if(act==="power"){
+    pS.power=id;
+  } else if(act==="prop"){
+    pS.prop=id;
+  } else if(act==="shield"){
+    pS.shield=id;
+  } else if(act==="comms"){
+    pS.comms=id;
+  } else if(act==="dsn"){
+    pS.dsn=id;
+  } else if(act==="rover"&&k){
+    if(!pS.rover) pS.rover={mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"};
+    pS.rover[k]=id;
+  } else if(act==="lv"){
+    pS.lv=id;
+    if(!pS.launch) pS.launch={lv:id,c3:0,vinf:0,tof:0,tDep:0,i:0,j:0};
+    else pS.launch={...pS.launch, lv:id};
+  } else {
+    return;
+  }
+
+  const curD=derive(S), curR=railValues(curD);
+  const pD=derive(pS), pR=railValues(pD);
+
+  RAILDEF.forEach(r=>{
+    const a=curR[r.k], b=pR[r.k];
+    const diff=b.v-a.v;
+    const vlEl=document.getElementById("rail-vl-"+r.k);
+    if(!vlEl) return;
+    const existing=vlEl.querySelector(".delta-ghost");
+    if(Math.abs(diff)>0.005 || Math.abs(b.m-a.m)>0.005){
+      const better=b.m>a.m;
+      const crit=b.m<0;
+      const cls=crit?"ghost-crit":(better?"ghost-better":"ghost-worse");
+      const sign=diff>=0?"+":"\u2212";
+      const ghostHtml=`<span class="delta-ghost ${cls}">\u2192 ${fmt(b.v)} ${b.u} (${sign}${fmt(Math.abs(diff),Math.abs(diff)<10?1:0)})</span>`;
+      if(existing) existing.outerHTML=ghostHtml;
+      else vlEl.insertAdjacentHTML("beforeend",ghostHtml);
+    } else {
+      if(existing) existing.remove();
+    }
+  });
+}
+
 
 let lastRails=null;
 function cascade(prev){
@@ -899,6 +1122,9 @@ function render(){
   else s.classList.remove("noanim");
   lastScreen=S.screen;
   renderHUD();
+  renderDock();
+  const telemEl=el("telem");
+  if(telemEl) telemEl.classList.toggle("ticker-hidden", S.screen==="ops");
   if(S.screen==="build"){ drawBay(); lastRails=railValues(derive(S)); if(window.M3D)M3D.sync(); }
   if(S.screen==="launch"){ initLaunch(); }
   if(S.screen==="ops"){ initOps(); }
@@ -907,6 +1133,11 @@ function render(){
   try{ if(window.BriefView)BriefView.sync(); }catch(e){}
   try{
     document.body.classList.toggle("ops-active", S.screen==="ops");
+    document.body.classList.toggle("title-active", S.screen==="title");
+    document.body.classList.toggle("select-active", S.screen==="select");
+    document.body.classList.toggle("brief-active", S.screen==="brief");
+    document.body.classList.toggle("build-active", S.screen==="build");
+    document.body.classList.toggle("launch-active", S.screen==="launch");
     if(window.OpsView&&OpsView.sync) OpsView.sync();
     else if(S.screen!=="ops"&&window.OpsView&&OpsView.stop) OpsView.stop();
     if(window.OpsView&&OpsView.showFinal) OpsView.showFinal();
@@ -938,65 +1169,57 @@ function go(screen){
 /* ── TITLE ── */
 function scrTitle(){
   const d=DSN_SNAP[Math.floor(Math.random()*DSN_SNAP.length)];
-  return `<div class="title-screen">
+  return `<div class="title-screen cinematic">
   <div class="earth-wrap" aria-hidden="true"><canvas id="earthCanvas"></canvas><div class="earth-fallback"></div></div>
   <div class="title-copy">
     <div class="mark-lg">MARGIN</div>
-    <div class="underscore"><i></i></div>
     <div class="tagline">EVERY GRAM, EVERY WATT, EVERY BIT</div>
-    <p class="lede">Designing a space mission is a fight over margin. Add a better camera and you gain
-    science &mdash; and lose eighteen kilograms, which costs you array area, which costs you propellant,
-    which costs you two years of cruise, which costs you the transmitter you needed to send any of it home.
-    <br><br>Pick a real NASA science objective. Build the spacecraft. Choose a launch window off a real
-    Lambert solution. Then fly it, and live with what you built.</p>
-    <div class="dsn"><span class="dot"></span>
-      <span>${esc(d[0])} is tracking ${esc(d[1])} &mdash; ${esc(d[2])}</span>
-      ${infoTag(SRC.dsn,"Deep Space Network")}
+    <div class="modes hero">
+      <button class="btn primary hero-start" data-act="start">START A MISSION</button>
     </div>
-    <div class="modes">
-      <button class="btn primary" data-act="start">START A MISSION</button>
-      <button class="btn ghost" data-act="how">HOW IT WORKS</button>
-      <button class="btn ghost" data-act="devjump" title="Dev scene jump menu (?s= shortcuts)">DEV JUMP &#8681;</button>
+    <div class="title-foot">
+      <button class="tlink" data-act="about">WHAT IS MARGIN?</button>
+      <span class="tsep" aria-hidden="true">·</span>
+      <span class="dsn-mini"><span class="dot"></span>
+        <span>${esc(d[0])} is tracking ${esc(d[1])} &mdash; ${esc(d[2])}</span>
+        ${infoTag(SRC.dsn,"Deep Space Network")}
+      </span>
     </div>
-    <p class="hint" style="margin-top:22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em">
-      NASA-DERIVED DATA &#183; INDEPENDENT SPACE APPS CHALLENGE PROTOTYPE</p>
+    <p class="proto">NASA-DERIVED DATA &#183; INDEPENDENT SPACE APPS CHALLENGE PROTOTYPE</p>
   </div></div>`;
 }
 
-/* ── MISSION SELECT ── */
+/* ── MISSION SELECT (fullscreen solar-system stage) ── */
 function scrSelect(){
-  return `<div class="wrap">
-    <div class="spread mb">
-      <div><h2>Choose a mission</h2>
+  return `<div class="sel-full">
+    <div id="selview" role="img" aria-label="Solar system destination view"><div class="selview-fallback" aria-hidden="true"></div></div>
+    <div class="sel-top">
+      <div class="sel-title"><h2>Choose a mission</h2>
         <p class="hint">Each mission adds exactly one new constraint. Play them in order the first time.</p></div>
-      <div class="tape">${S.mode==="cadet"?"CADET MODE":"FLIGHT DIRECTOR MODE"}</div>
-      <div><button class="sysbtn" data-act="gohome" title="Back to homescreen">&#8962; HOME</button></div>
-    </div>
-    <div class="selstage">
-    <div class="panel selview"><span class="bracket tl"></span><span class="bracket br"></span>
-      <h3>DESTINATION <span class="code">NAV-01</span></h3>
-      <div id="selview"><div class="selview-fallback" aria-hidden="true"></div></div>
-      <div class="selcap" id="selcap" aria-live="polite">
-        <div class="sc-row"><span class="sc-dest">DESTINATION · EARTH</span></div>
-        <div class="sc-name">First Light</div>
-        <div class="sc-sub">Earth observer, Sun-synchronous orbit</div>
-        <div class="sc-stats"><span>1.00 AU</span><span>3 YR</span><span>$400M CAP</span><span>0.3 KRAD/YR</span></div>
+      <div class="sel-controls">
+        <div id="selcontrols"></div>
+        <div class="sel-tools"><span class="tape">${S.mode==="cadet"?"CADET MODE":"FLIGHT DIRECTOR MODE"}</span></div>
       </div>
     </div>
-    <div class="lvgrid">${LEVELS.map((L,idx)=>{
+    <div class="selcap-chip" id="selcap" aria-live="polite">
+      <div class="sc-row"><span class="sc-dest">DESTINATION · EARTH</span></div>
+      <div class="sc-name">First Light</div>
+      <div class="sc-sub">Earth observer, Sun-synchronous orbit</div>
+      <div class="sc-stats"><span>1.00 AU</span><span>3 YR</span><span>$400M CAP</span><span>0.3 KRAD/YR</span></div>
+    </div>
+    <div class="sel-bottom">
+    <div class="strip-head" aria-hidden="true"><span>MISSION TIMELINE</span><i></i><span>DRAG OR SCROLL &#8594;</span></div>
+    <div class="strip-wrap"><div class="lvstrip" role="list">${LEVELS.map((L,idx)=>{
       const done=S.progress[L.id];
-      return `<button class="lvcard" data-act="level" data-id="${L.id}" style="--i:${idx}">
-        <span class="bracket tl"></span><span class="bracket br"></span>
-        ${done?`<span class="grade">${done.grade}</span>`:""}
-        <span class="lvart lvart-${L.body}" aria-hidden="true"></span>
+      return `<button class="lvcard" role="listitem" data-act="level" data-id="${L.id}" style="--i:${idx}">
         <span class="top">
-          <span class="kicker">MISSION ${L.num} &#183; ${esc(BODY[L.body].n.toUpperCase())}</span>
+          <span class="krow"><span class="num">${String(L.num).padStart(2,"0")}</span><span class="destpill">${esc(BODY[L.body].n.toUpperCase())}</span></span>
           <h3>${L.name}</h3>
           <span class="sub">${esc(L.sub)}</span>
-          <span class="new">New: ${esc(L.newMech)}</span>
+          <span class="newpill"><i></i><span>New: ${esc(L.newMech)}</span></span>
         </span>
-        <span class="bot"><span>${L.years} yr &#183; cap $${fmt(L.capM)}M</span><span class="go">FLY &#9656;</span></span>
-      </button>`}).join("")}</div>
+        <span class="bot"><span class="brow"><span class="spec">${L.years} yr &#183; cap $${fmt(L.capM)}M</span>${done?`<span class="grade">${done.grade}</span>`:""}<span class="go">FLY <b>&#8594;</b></span></span><span class="env">${L.dose} krad/yr &#183; dsn ${L.dsnHrs}h/day</span></span>
+      </button>`}).join("")}</div></div>
     </div>
   </div>`;
 }
@@ -1008,8 +1231,74 @@ function scrBrief(){
   const wmax=Math.max(...L.objs.map(o=>OBJ[o].w));
   const auStr=L.mode==="leo"?L.altKm+" KM SSO":L.body==="moon"?"0.4M KM":BODY[L.body].au.toFixed(2)+" AU";
   const ltStr=L.mode==="leo"?(L.altKm/299792.458*1000).toFixed(1)+" MS":L.body==="moon"?"1.3 S":(BODY[L.body].au*499/60).toFixed(1)+" MIN";
+  const isSurface = (L.body==="moon"||L.body==="mars");
+
+  const sitePanel = isSurface ? `
+    <div class="panel glass mt"><span class="bracket tl"></span><span class="bracket br"></span>
+      <h3>LANDING SITE SELECTION <span class="code">SITE-01</span></h3>
+      <div class="pad">
+        <p class="hint" style="margin-bottom:8px">Pick one site. ${L.body==="moon"?"Rugged ice-rich polar rim costs divert propellant; benign mare costs traverse distance.":"Mars dust trims solar duty; broken delta ground costs divert propellant while benign plains cost traverse distance."}</p>
+        <div class="objlist" id="siteList">
+        ${((L.body==="moon"?MOON_SITES:MARS_SITES).map((s,idx)=>{
+          const on=S.site===s.id;
+          return `<button class="obj site ${on?'sel':''}" data-act="site" data-id="${s.id}" style="--i:${idx}">
+            <span class="box">${on?"\u2713":""}</span>
+            <span style="flex:1"><span class="t">${esc(s.n)}</span>
+            <span class="d">${esc(s.lat)} · ${esc(s.lon)} — ${esc(s.d)}</span>
+            <div class="site-metrics-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:6px 0;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,0.03);padding:4px 8px;border-radius:3px">
+              <div><span style="color:var(--dim);display:block;font-size:9.5px">SLOPE</span><b style="color:var(--bone)">${s.slope}°</b></div>
+              <div><span style="color:var(--dim);display:block;font-size:9.5px">SUN</span><b style="color:var(--phosphor)">${(s.sun*100).toFixed(0)}%</b></div>
+              <div><span style="color:var(--dim);display:block;font-size:9.5px">EARTH</span><b style="color:var(--blue-lift)">${(s.earth*100).toFixed(0)}%</b></div>
+              <div><span style="color:var(--dim);display:block;font-size:9.5px">SCI MULT</span><b style="color:var(--amber)">×${s.sci.toFixed(2)}</b></div>
+              <div><span style="color:var(--dim);display:block;font-size:9.5px">TRAVERSE</span><b style="color:var(--bone)">${s.travKm} km</b></div>
+            </div>
+            <div class="bar-legend" style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:4px">
+              <span>Terrain Hazard Index</span><span>${(s.hazard*100).toFixed(0)}%</span>
+            </div>
+            <span class="mini" title="Site hazard — share of the roughest option"><i style="width:${(s.hazard/Math.max(...(L.body==="moon"?MOON_SITES:MARS_SITES).map(q=>q.hazard))*100).toFixed(0)}%"></i></span></span>
+          </button>`})).join("")}
+        </div>
+        <p class="hint mt-s" id="siteFx" style="font-size:11.5px;color:var(--blue-lift);border-top:1px solid var(--hairline);padding-top:6px">${(()=>{const _sfx=byId(MOON_SITES,S.site)||byId(MARS_SITES,S.site);return _sfx?esc(_sfx.fx):"No site selected — choose a site above or in the sticky dock."})()}</p>
+      </div>
+    </div>` : "";
+
+  const briefPanel = `<div class="panel glass"><span class="bracket tl"></span><span class="bracket br"></span>
+    <h3>MISSION BRIEF &amp; ENVIRONMENT <span class="code">FRM-01</span></h3>
+    <div class="pad">
+      <p class="hint" style="margin-bottom:10px;font-size:12.5px;line-height:1.6">${esc(L.real)}</p>
+      <p style="line-height:1.7;font-size:13.5px;color:var(--bone)">${esc(L.brief)}</p>
+      <div class="heritage" style="margin-top:14px">${esc(L.newMech)} This is the only new thing in this mission &mdash; everything else you already know.</div>
+      <dl class="briefstats" style="margin-top:16px">
+        <dt class="hint">Deep Space Network time ${infoTag(SRC.dsn,"DSN pass allocation")}</dt><dd class="num">${L.dsnHrs} h/day</dd>
+        <dt class="hint">Radiation environment ${infoTag(SRC.nssdc,"Radiation dose")}</dt><dd class="num">${L.dose} krad/yr</dd>
+      </dl>
+    </div>
+  </div>`;
+
+  const objsPanel = `<div class="panel glass"><span class="bracket tl"></span><span class="bracket br"></span>
+    <h3>SCIENCE OBJECTIVES <span class="code" id="objCountCode">${sel.length} / ${L.req} SELECTED</span></h3>
+    <div class="pad">
+      <p class="hint" style="margin-bottom:10px;font-size:12px">Pick at least ${L.req}. Every objective you take must be
+      matched by an instrument that can measure it &mdash; and every instrument costs you mass.</p>
+      <div class="objlist${L.objs.length>4?' many':''}">
+      ${L.objs.map((oid,idx)=>{
+        const o=OBJ[oid], on=sel.includes(oid), forced=(L.force||[]).includes(oid);
+        return `<button class="obj ${on?'sel':''} ${forced?'req':''}" data-act="obj" data-id="${oid}" style="--i:${idx}">
+          <span class="box">${on?"\u2713":""}</span>
+          <span style="flex:1"><span class="t">${esc(o.t)}${forced?' <span class="tag">REQUIRED</span>':''}</span>
+          <span class="d">${esc(o.d)}</span>
+          <span class="need">${o.need.map(t=>`<span class="nchip">${t}</span>`).join("")}<span class="wnum">${fmtData(needMb(L,oid))} &#183; weight ${o.w} pts</span></span>
+          <div class="bar-legend" style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:4px">
+            <span>Science Scoring Weight</span><span>${o.w} pts</span>
+          </div>
+          <span class="mini" title="Scoring weight — share of the science score this objective is worth"><i style="width:${(o.w/wmax*100).toFixed(0)}%"></i></span></span>
+        </button>`}).join("")}
+      </div>
+    </div>
+  </div>`;
+
   return `<div class="wrap briefwrap">
-  <div id="briefview" aria-hidden="true"><div class="briefview-fallback"></div></div>
+  <div id="briefview" aria-hidden="true" style="opacity:0.4"><div class="briefview-fallback"></div></div>
   <div class="briefdossier">
     <span class="kicker">MISSION ${L.num} &#183; DESTINATION ${esc(BODY[L.body].n.toUpperCase())}</span>
     <h1>${L.name}</h1>
@@ -1017,60 +1306,14 @@ function scrBrief(){
     <div class="bstats"><span>${auStr}</span><span>${ltStr} ONE-WAY LIGHT</span><span>${L.years} YR</span><span>$${fmt(L.capM)}M CAP</span></div>
   </div>
   <div class="brief">
-    <div class="panel glass"><span class="bracket tl"></span><span class="bracket br"></span>
-      <h3>MISSION BRIEF <span class="code">FRM-01</span></h3>
-      <div class="pad">
-        <p class="hint" style="margin-bottom:10px">${esc(L.real)}</p>
-        <p style="line-height:1.65;max-width:62ch;font-size:13.5px">${esc(L.brief)}</p>
-        <div class="heritage">${esc(L.newMech)} This is the only new thing in this mission &mdash; everything else you already know.</div>
-        <dl class="briefstats">
-          <dt class="hint">Deep Space Network time ${infoTag(SRC.dsn,"DSN pass allocation")}</dt><dd class="num">${L.dsnHrs} h/day</dd>
-          <dt class="hint">Radiation environment ${infoTag(SRC.nssdc,"Radiation dose")}</dt><dd class="num">${L.dose} krad/yr</dd>
-        </dl>
-      </div>
-    </div>
-    <div class="panel glass"><span class="bracket tl"></span><span class="bracket br"></span>
-      <h3>SCIENCE OBJECTIVES <span class="code">${sel.length} SELECTED</span></h3>
-      <div class="pad">
-        ${L.body==="moon"?`<p class="hint" style="margin-bottom:8px">LANDING SITE &mdash; pick one. Rugged ice-rich ground costs divert propellant and power duty; benign mare costs traverse distance to the good science.</p>
-        <div class="objlist" id="siteList">
-        ${MOON_SITES.map((s,idx)=>{
-          const on=S.site===s.id;
-          return `<button class="obj site ${on?'sel':''}" data-act="site" data-id="${s.id}" style="--i:${idx}">
-            <span class="box">${on?"\u2715":""}</span>
-            <span><span class="t">${esc(s.n)}</span>
-            <span class="d">${esc(s.lat)} · ${esc(s.lon)} — ${esc(s.d)}</span>
-            <span class="need"><span class="nchip">slope ${s.slope}°</span><span class="nchip">sun ${(s.sun*100).toFixed(0)}%</span><span class="nchip">earth-view ${(s.earth*100).toFixed(0)}%</span><span class="nchip">sci ×${s.sci.toFixed(2)}</span><span class="wnum">${s.travKm} km to prime target</span></span>
-            <span class="mini" title="Site hazard — share of the roughest option"><i style="width:${(s.hazard/0.6*100).toFixed(0)}%"></i></span></span>
-          </button>`}).join("")}
-        </div>
-        <p class="hint mt-s" id="siteFx">${S.site?esc(byId(MOON_SITES,S.site).fx):"No site selected — the BUILD button unlocks once you commit to a site."}</p>`:""}
-        <p class="hint" style="margin-bottom:8px">Pick at least ${L.req}. Every objective you take must be
-        matched by an instrument that can measure it &mdash; and every instrument costs you mass.</p>
-        <div class="objlist${L.objs.length>4?' many':''}">
-        ${L.objs.map((oid,idx)=>{
-          const o=OBJ[oid], on=sel.includes(oid), forced=(L.force||[]).includes(oid);
-          return `<button class="obj ${on?'sel':''} ${forced?'req':''}" data-act="obj" data-id="${oid}" style="--i:${idx}">
-            <span class="box">${on?"\u2715":""}</span>
-            <span><span class="t">${esc(o.t)}${forced?' <span class="tag">REQUIRED</span>':''}</span>
-            <span class="d">${esc(o.d)}</span>
-            <span class="need">${o.need.map(t=>`<span class="nchip">${t}</span>`).join("")}<span class="wnum">${fmtData(needMb(L,oid))} &#183; weight ${o.w}</span></span>
-            <span class="mini" title="Scoring weight — share of the science score this objective is worth"><i style="width:${(o.w/wmax*100).toFixed(0)}%"></i></span></span>
-          </button>`}).join("")}
-        </div>
-        <div class="row mt">
-          <button class="btn primary" data-act="tobuild" ${sel.length<L.req||(L.body==="moon"&&!S.site)?"disabled":""}>BUILD THE SPACECRAFT</button>
-          <button class="btn ghost" data-act="home">BACK</button>
-        </div>
-        ${sel.length<L.req?`<p class="hint mt-s">Select ${L.req-sel.length} more objective${L.req-sel.length>1?"s":""} to continue.</p>`:(L.body==="moon"&&!S.site?`<p class="hint mt-s">Commit to a landing site above to continue.</p>`:"")}
-      </div>
-    </div>
+    <div class="brief-col">${briefPanel}</div>
+    <div class="brief-col">${objsPanel}${sitePanel}</div>
   </div></div>`;
 }
 
-/* ── Phase-2 rover kit panels (L2 systems step; same .part grammar as pick()) ── */
+/* ── Phase-2 rover kit panels (landing-level systems step; same .part grammar as pick()) ── */
 function roverPanels(){
-  const L=byId(LEVELS,S.levelId), D=derive(S), st=moonSite(S);
+  const L=byId(LEVELS,S.levelId), D=derive(S), st=landSite(S);
   const grp=(label,list,key,code,detail)=>`
     <div class="panel mt"><h3>${label} <span class="code">${code}</span></h3>
     ${list.map(x=>{
@@ -1101,6 +1344,7 @@ function roverPanels(){
     + compat;
 }
 
+
 /* ── BUILD BAY ── */
 function scrBuild(){
   const L=byId(LEVELS,S.levelId), D=derive(S);
@@ -1110,43 +1354,77 @@ function scrBuild(){
   const have=objTags(S);
   const missing=[...need].filter(t=>!have.has(t));
 
-  const catHtml = Object.keys(groups).map(g=>
-    `<div class="catgrp">${g.toUpperCase()}</div>`+
-    groups[g].map(x=>{
+  const catHtml = Object.keys(groups).map(g=>{
+    let parts=groups[g];
+    if(S.filterUseful){
+      parts=parts.filter(x=>x.tags.some(t=>need.has(t)));
+      if(!parts.length) return "";
+    }
+    return `<div class="catgrp">${g.toUpperCase()}</div>`+
+    parts.map(x=>{
       const on=S.instruments.includes(x.id);
       const useful=x.tags.some(t=>need.has(t));
       return `<button class="part ${on?'on':''}" data-act="instr" data-id="${x.id}">
-        <span class="pn"><span>${esc(x.n)}</span>${useful?'<span class="tag" style="border-color:var(--nasa-blue);color:var(--blue-lift)">USEFUL</span>':''}</span>
-        <span class="ps"><span><b>m</b> ${x.m} kg</span><span><b>P</b> ${x.w} W</span>
-        <span><b>D</b> ${x.d} Mb/s</span><span><b>$</b> ${x.c}M</span><span title="Technology Readiness Level — instruments below TRL 8 add development schedule"><b>TRL</b> ${x.trl}</span></span>
+        <span class="pn">
+          <span>${esc(x.n)}</span>
+          <span style="display:inline-flex;gap:6px;align-items:center">
+            ${useful?'<span class="tag" style="border-color:var(--nasa-blue);color:var(--blue-lift)">USEFUL</span>':''}
+            <span class="part-add-btn ${on?'mounted':''}" style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px;border:1px solid ${on?'var(--phosphor)':'rgba(255,255,255,0.2)'};background:${on?'rgba(101,242,165,0.15)':'transparent'};color:${on?'var(--phosphor)':'var(--bone)'}">${on?'✓ MOUNTED':'＋ ADD'}</span>
+          </span>
+        </span>
+        <span class="ps">
+          <span title="Instrument Mass"><b>MASS</b> ${x.m} kg</span>
+          <span title="Operational Power Draw"><b>PWR</b> ${x.w} W</span>
+          <span title="Data Generation Rate"><b>DATA</b> ${x.d} Mb/s</span>
+          <span title="Hardware Cost"><b>COST</b> $${x.c}M</span>
+          <span title="Technology Readiness Level"><b>TRL</b> ${x.trl}</span>
+        </span>
         <span class="ps"><span style="color:var(--dimmer)">measures: ${x.tags.join(" · ")}</span></span>
-      </button>`}).join("")
-  ).join("");
+      </button>`}).join("");
+  }).join("");
 
-  const pick=(label,list,key,code)=>`
-    <div class="panel mt"><h3>${label} <span class="code">${code}</span></h3>
-    ${list.map(x=>{
-      const on=S[key]===x.id;
-      const detail = key==="shield"
-        ? `${x.f<1?"dose \u00D7 "+x.f.toFixed(3):"full environment"} &#183; ${x.m} kg &#183; $${x.c}M`
-        : key==="power"
-        ? `${x.solar?fmt(solarPower(x.bol,D.auDist,0,x.deg))+" W at target":x.bol+" W BOL"} &#183; ${x.m} kg &#183; $${x.c}M${x.sch?" &#183; +"+x.sch+" mo":""}`
-        : key==="comms" ? `${x.gain} dBi &#183; ${x.w} W &#183; ${x.m} kg &#183; $${x.c}M`
-        : `${x.isp?"Isp "+x.isp+" s":"no propulsion"} &#183; ${x.m} kg &#183; $${x.c}M`;
-      return `<button class="part ${on?'on':''}" data-act="${key}" data-id="${x.id}">
-        <span class="pn"><span>${esc(x.n)}</span>${infoTag(x.p,x.n)}</span>
-        <span class="ps"><span>${detail}</span></span></button>`}).join("")}
+  const pick=(label,list,key,code,curPickName)=>{
+    const curObj=byId(list,S[key]);
+    const pName=curPickName || (curObj?curObj.n:"SELECT");
+    return `
+    <div class="accordion-item open" id="acc-${key}">
+      <div class="accordion-header" data-act="toggle-acc" data-target="acc-${key}">
+        <div class="accordion-title-wrap">
+          <span class="accordion-title">${label} <span class="code">${code}</span></span>
+          <span class="accordion-badge">${esc(pName)}</span>
+        </div>
+        <span class="accordion-chevron">▾</span>
+      </div>
+      <div class="accordion-content">
+        ${list.map(x=>{
+          const on=S[key]===x.id;
+          const detail = key==="shield"
+            ? `${x.f<1?"dose \u00D7 "+x.f.toFixed(3):"full environment"} &#183; ${x.m} kg &#183; $${x.c}M`
+            : key==="power"
+            ? `${x.solar?fmt(solarPower(x.bol,D.auDist,0,x.deg))+" W at target":x.bol+" W BOL"} &#183; ${x.m} kg &#183; $${x.c}M${x.sch?" &#183; +"+x.sch+" mo":""}`
+            : key==="comms" ? `${x.gain} dBi &#183; ${x.w} W &#183; ${x.m} kg &#183; $${x.c}M`
+            : `${x.isp?"Isp "+x.isp+" s":"no propulsion"} &#183; ${x.m} kg &#183; $${x.c}M`;
+          return `<button class="part ${on?'on':''}" data-act="${key}" data-id="${x.id}" style="${on?'border-color:var(--phosphor);background:rgba(101,242,165,0.08);':''}">
+            <span class="pn">
+              <span>${esc(x.n)}</span>
+              <span style="display:inline-flex;align-items:center;gap:6px">
+                ${infoTag(x.p,x.n)}
+                ${on?'<span style="color:var(--phosphor);font-family:var(--mono);font-size:11px">✓ SELECTED</span>':''}
+              </span>
+            </span>
+            <span class="ps"><span>${detail}</span></span></button>`}).join("")}
+      </div>
     </div>`;
+  };
 
-  /* 3A.1: one step = one job. PAYLOAD (what science) → SYSTEMS (can it fly)
-     → REVIEW (are we ready). State lives in S;derivations unchanged. */
+  /* 3A.1: one step = one job. PAYLOAD → SYSTEMS → REVIEW */
   if(!S.bstep)S.bstep="payload";
   const steps=[["payload","1 · PAYLOAD","What science will we perform?"],
               ["systems","2 · SYSTEMS","Can the spacecraft support it?"],
               ["review","3 · REVIEW","Are we actually ready?"]];
   const si=steps.findIndex(s=>s[0]===S.bstep);
   const stepTabs=`<div class="panel"><div class="pad spread" style="gap:8px">
-    <span class="hint" style="font-size:11px">${esc(steps[si][2])}</span>
+    <span class="hint" style="font-size:12px;color:var(--dim)">${esc(steps[si][2])}</span>
     <span class="spd">${steps.map((s,k)=>`<button data-act="bstep" data-v="${s[0]}" class="${k===si?'on':''}" ${k===2&&S.instruments.length===0?"disabled":""}>${s[1]}</button>`).join("")}</span>
   </div></div>`;
 
@@ -1154,130 +1432,191 @@ function scrBuild(){
     const ok=objMet(S,oid);
     const tags=objTags(S);
     const lack=OBJ[oid].need.filter(t=>!tags.has(t));
-    return `<div class="spread" style="padding:4px 0;font-size:12px">
-      <span style="color:${ok?'var(--phosphor)':'var(--red)'}" title="${ok?"Covered by selected instruments":"Missing measurement: "+lack.join(", ")}">${ok?"\u25CF READY":"\u25CB NOT READY"} ${esc(OBJ[oid].t)}${ok?"":" — needs "+lack.join(", ")}</span>
+    return `<div class="spread" style="padding:5px 0;font-size:12px">
+      <span style="color:${ok?'var(--phosphor)':(S.instruments.length===0?'#94a3b8':'var(--amber)')}" title="${ok?"Covered by selected instruments":"Missing measurement: "+lack.join(", ")}">
+        ${ok?"\u25CF READY":(S.instruments.length===0?"\u25CB PENDING":"\u25B3 UNCOVERED")} ${esc(OBJ[oid].t)}${ok?"":" — needs "+lack.join(", ")}
+      </span>
       <span class="num hint">${fmtData(needMb(byId(LEVELS,S.levelId),oid))}</span></div>`}).join("");
-  const coverNote=missing.length?`<div class="ghost-note">No instrument covers: ${missing.join(", ")}. Those objectives will return nothing.</div>`:
-    `<div class="ghost-note" style="color:var(--phosphor)">Every selected objective has an instrument that can measure it.</div>`;
+  const coverNote=missing.length?(S.instruments.length===0?`<div class="ghost-note" style="color:#94a3b8">0 of ${S.objectives.length} objectives covered. Mount instruments on the left to fulfill requirements.</div>`:
+    `<div class="ghost-note" style="color:var(--amber)">Missing measurements: ${missing.join(", ")}. Objectives without matching instruments will return no data.</div>`):
+    `<div class="ghost-note" style="color:var(--phosphor)">✓ All selected objectives have matching instruments mounted!</div>`;
 
   if(S.bstep==="payload"){
-    return `<div class="wrap"><div class="bay" style="grid-template-columns:1fr 330px">
-    <div>
-      ${stepTabs}
-      <div class="panel mt"><h3>INSTRUMENT CATALOGUE <span class="code">PLD-01</span></h3>
-        <div class="pad hint" style="font-size:11px;border-bottom:1px solid var(--hairline)">Data rates assume instruments observe ~12% of the time. Match <b>USEFUL</b> tags to your objectives.</div>
-        <div class="cat" style="max-height:520px;overflow:auto">${catHtml}</div></div>
-    </div>
-    <div>
-      <div class="panel"><h3>OBJECTIVES <span class="code">SCI-01</span></h3><div class="pad">${coverRows}${coverNote}</div></div>
-      <div class="panel mt"><h3>SPACECRAFT <span class="code">3D-01</span></h3><div class="v3host v3compact" id="v3payload"></div></div>
-      <div class="row mt">
-        <button class="btn primary" data-act="bstep" data-v="systems" ${S.instruments.length===0?"disabled":""}>CONFIGURE SYSTEMS</button>
-        <button class="btn ghost" data-act="tobrief">BACK</button>
+    return `<div class="wrap buildwrap">
+    ${stepTabs}
+    <div class="bay bay-payload">
+      <div class="bay-col bay-cat-col">
+        <div class="panel">
+          <div class="spread pad" style="padding:10px 14px;border-bottom:1px solid var(--hairline);background:rgba(255,255,255,0.02)">
+            <h3>INSTRUMENT CATALOGUE <span class="code">PLD-01</span></h3>
+            <button class="btn ghost btn-sm" data-act="filter-useful" style="font-family:var(--mono);font-size:10.5px;padding:3px 9px;${S.filterUseful?'background:rgba(75,130,215,0.25);border-color:var(--blue-lift)':''}">
+              ${S.filterUseful?'SHOWING USEFUL ONLY':'FILTER: USEFUL ONLY'}
+            </button>
+          </div>
+          <div class="pad hint" style="font-size:11.5px;border-bottom:1px solid var(--hairline)">Match <b>USEFUL</b> tags to your science objectives. Hover options to preview budget deltas.</div>
+          <div class="cat">${catHtml}</div>
+        </div>
       </div>
-      ${S.instruments.length===0?`<p class="hint mt-s">Select at least one instrument to continue.</p>`:""}
-    </div>
+      <div class="bay-col bay-preview-col">
+        <div class="panel"><h3>OBJECTIVES COVERAGE <span class="code">SCI-01</span></h3><div class="pad">${coverRows}${coverNote}</div></div>
+        <div class="panel"><span class="bracket tl"></span><span class="bracket br"></span>
+          <h3>SPACECRAFT PREVIEW &mdash; ASSEMBLY BAY <span class="code">3D-01</span></h3>
+          <div class="v3host v3bay" id="v3payload"></div>
+          <div class="model-asset-note"><span class="model-chip">NASA / GLB</span><span>3D: NASA FLIGHT HARDWARE &amp; PAYLOAD SUBSYSTEMS</span><a href="assets/ASSET_SOURCES.md" target="_blank" rel="noopener">ASSET SOURCES</a></div>
+        </div>
+      </div>
     </div></div>`;
   }
 
   if(S.bstep==="systems"){
-    return `<div class="wrap"><div class="bay">
-    <div>
-      ${stepTabs}
-      ${pick("POWER SOURCE",L.power.map(id=>byId(POWER,id)),"power","PWR-02")}
-    </div>
+    const downRate=D.rate>1e6?fmt(D.rate/1e6,1)+" Mb/s":D.rate>1e3?fmt(D.rate/1e3,1)+" kb/s":fmt(D.rate)+" b/s";
+    const retFrac=D.genMbPerDay>0?Math.min(1,D.downMbPerDay/D.genMbPerDay):1;
+    const commsBottleneck=retFrac<0.5;
 
-    <div>
-      <div class="panel"><span class="bracket tl"></span><span class="bracket br"></span>
-        <h3>SPACECRAFT &mdash; ${esc(byId(LEVELS,S.levelId).name.toUpperCase())} <span class="code">STR-04</span></h3>
-        <div class="v3host v3bay" id="v3systems"></div>
-        <canvas id="bayCanvas" width="880" height="470" role="img" aria-label="PBR spacecraft engineering preview with dynamic mounting points"></canvas>
-        <div class="model-asset-note"><span class="model-chip">NASA / GLB</span><span>3D: NASA SPACECRAFT & SUBSYSTEMS</span><span>2D: SCHEMATIC</span><a href="assets/ASSET_SOURCES.md" target="_blank" rel="noopener">ASSET SOURCES</a></div>
-        <div class="readout">
-          <div><div class="k">DRY MASS</div><div class="v">${fmt(D.dryMass)}<span style="font-size:10px;color:var(--dim)"> kg</span></div></div>
-          <div><div class="k">PROPELLANT</div><div class="v">${fmt(D.propMass)}<span style="font-size:10px;color:var(--dim)"> kg</span></div></div>
-          <div><div class="k">&#916;V BUDGET</div><div class="v">${fmt(D.dvTotal,2)}<span style="font-size:10px;color:var(--dim)"> km/s</span></div></div>
-          <div><div class="k">POWER AT TARGET</div><div class="v">${fmt(D.genEOL)}<span style="font-size:10px;color:var(--dim)"> W</span></div></div>
-          <div><div class="k">DOSE OVER MISSION</div><div class="v" style="color:${L.dose*D.sh.f*L.years>80?'var(--red)':L.dose*D.sh.f*L.years>30?'var(--amber)':'var(--bone)'}">${fmt(L.dose*D.sh.f*L.years)}<span style="font-size:10px;color:var(--dim)"> krad</span></div></div>
-          <div><div class="k">DOWNLINK</div><div class="v">${D.rate>1e6?fmt(D.rate/1e6,1)+" Mb/s":D.rate>1e3?fmt(D.rate/1e3,1)+" kb/s":fmt(D.rate)+" b/s"}</div></div>
+    return `<div class="wrap buildwrap">
+    ${stepTabs}
+    <div class="bay bay-systems">
+      <div class="bay-col">
+        <div class="accordion-group">
+          ${pick("POWER SOURCE",L.power.map(id=>byId(POWER,id)),"power","PWR-02")}
+          ${pick("PROPULSION",L.prop.map(id=>byId(PROP,id)),"prop","PRP-03")}
+          ${L.dose>=2?pick("RADIATION SHIELDING",SHIELD,"shield","RAD-05"):""}
+        </div>
+        ${D.dv.length?`
+        <div class="panel mt"><h3>DELTA-V BUDGET &amp; MARGIN ${infoTag(SRC.nssdc,"Delta-v line items")} <span class="code">GNC-07</span></h3>
+          <div class="pad" style="font-family:var(--mono);font-size:12px">
+            <div class="budget-bar-wrap" style="margin-bottom:8px">
+              <div class="budget-bar-head">
+                <span>ΔV Budget: ${D.dvTotal.toFixed(2)} km/s</span>
+                <span style="color:var(--phosphor)">Available Isp ${D.pr?D.pr.isp:0}s</span>
+              </div>
+              <div class="budget-bar-track">
+                <div class="budget-bar-fill nominal" style="width:100%"></div>
+              </div>
+            </div>
+            ${D.dv.map(x=>`<div class="spread" style="padding:3px 0"><span style="color:var(--dim)">${esc(x[0])}</span><span>${x[1].toFixed(2)} km/s</span></div>`).join("")}
+            <div class="spread" style="padding:7px 0 0;border-top:1px solid var(--hairline);margin-top:6px">
+              <span>TOTAL MANEUVER &#916;V</span><span style="color:var(--phosphor);font-weight:600">${D.dvTotal.toFixed(2)} km/s</span>
+            </div>
+            <div class="hint" style="margin-top:8px;font-family:var(--sans);font-size:11.5px">Tsiolkovsky: ${fmt(D.propMass)} kg propellant for a ${fmt(D.dryMass)} kg dry spacecraft at Isp ${D.pr?D.pr.isp:0} s.</div>
+          </div>
+        </div>`:""}
+      </div>
+
+      <div class="bay-col bay-center-col">
+        <div class="panel"><span class="bracket tl"></span><span class="bracket br"></span>
+          <h3>SPACECRAFT CAD &mdash; ${esc(byId(LEVELS,S.levelId).name.toUpperCase())} <span class="code">STR-04</span></h3>
+          <div class="v3host v3bay" id="v3systems"></div>
+          <canvas id="bayCanvas" width="880" height="470" role="img" aria-label="PBR spacecraft engineering preview with dynamic mounting points"></canvas>
+          <div class="model-asset-note"><span class="model-chip">NASA / GLB</span><span>3D: NASA 3D HARDWARE</span><span>2D: SCHEMATIC</span><a href="assets/ASSET_SOURCES.md" target="_blank" rel="noopener">ASSET SOURCES</a></div>
+          <div class="readout" style="position:sticky;bottom:0;background:rgba(6,10,18,0.96);padding:10px;border-top:1px solid var(--hairline)">
+            <div><div class="k">DRY MASS</div><div class="v">${fmt(D.dryMass)}<span style="font-size:10px;color:var(--dim)"> kg</span></div></div>
+            <div><div class="k">PROPELLANT</div><div class="v">${fmt(D.propMass)}<span style="font-size:10px;color:var(--dim)"> kg</span></div></div>
+            <div><div class="k">&#916;V BUDGET</div><div class="v">${fmt(D.dvTotal,2)}<span style="font-size:10px;color:var(--dim)"> km/s</span></div></div>
+            <div><div class="k">POWER AT TARGET</div><div class="v">${fmt(D.genEOL)}<span style="font-size:10px;color:var(--dim)"> W</span></div></div>
+            <div><div class="k">DOSE OVER MISSION</div><div class="v" style="color:${L.dose*D.sh.f*L.years>80?'var(--red)':L.dose*D.sh.f*L.years>30?'var(--amber)':'var(--bone)'}">${fmt(L.dose*D.sh.f*L.years)}<span style="font-size:10px;color:var(--dim)"> krad</span></div></div>
+            <div><div class="k">DOWNLINK</div><div class="v">${downRate}</div></div>
+          </div>
         </div>
       </div>
-      ${D.dv.length?`<div class="panel mt"><h3>DELTA-V BUDGET ${infoTag(SRC.nssdc,"Delta-v line items")} <span class="code">GNC-07</span></h3>
-        <div class="pad" style="font-family:var(--mono);font-size:12px">
-        ${D.dv.map(x=>`<div class="spread" style="padding:3px 0"><span style="color:var(--dim)">${esc(x[0])}</span><span>${x[1].toFixed(2)} km/s</span></div>`).join("")}
-        <div class="spread" style="padding:7px 0 0;border-top:1px solid var(--hairline);margin-top:6px">
-          <span>TOTAL</span><span style="color:var(--phosphor)">${D.dvTotal.toFixed(2)} km/s</span></div>
-        <div class="hint" style="margin-top:8px;font-family:var(--sans)">Tsiolkovsky gives ${fmt(D.propMass)} kg of propellant for a ${fmt(D.dryMass)} kg dry spacecraft at Isp ${D.pr?D.pr.isp:0} s. ${infoTag(SRC.nssdc,"Rocket equation","We ignore gravity losses, finite-burn losses and residuals.")}</div>
-        </div></div>`:""}
-      <div class="row mt">
-        <button class="btn primary" data-act="bstep" data-v="review">REVIEW READINESS</button>
-        <button class="btn ghost" data-act="bstep" data-v="payload">BACK</button>
-      </div>
-    </div>
 
-    <div>
-      ${pick("COMMUNICATIONS",L.comms.map(id=>byId(COMMS,id)),"comms","TLM-11")}
-      <div class="panel mt"><h3>DSN ALLOCATION ${infoTag(SRC.dsn,"DSN pass allocation")} <span class="code">TLM-12</span></h3>
-      ${DSN.map(t=>{const on=S.dsn===t.id;
-        const eff=(L.dsnHrs*t.f).toFixed(1);
-        return `<button class="part ${on?'on':''}" data-act="dsn" data-id="${t.id}">
-          <span class="pn"><span>${esc(t.n)} — ${eff} h/day</span></span>
-          <span class="ps"><span>${esc(t.d)}</span></span></button>`}).join("")}
+      <div class="bay-col">
+        <div class="accordion-group">
+          ${pick("COMMUNICATIONS",L.comms.map(id=>byId(COMMS,id)),"comms","TLM-11",commsBottleneck?`${D.cm?D.cm.n:""} (BOTTLENECK: ${(retFrac*100).toFixed(0)}% RETURN ⚠)`:null)}
+          <div class="accordion-item open" id="acc-dsn">
+            <div class="accordion-header" data-act="toggle-acc" data-target="acc-dsn">
+              <div class="accordion-title-wrap">
+                <span class="accordion-title">DSN ALLOCATION <span class="code">TLM-12</span></span>
+                <span class="accordion-badge">${esc(dsnTier().n)}</span>
+              </div>
+              <span class="accordion-chevron">▾</span>
+            </div>
+            <div class="accordion-content">
+              ${DSN.map(t=>{const on=S.dsn===t.id;
+                const eff=(L.dsnHrs*t.f).toFixed(1);
+                return `<button class="part ${on?'on':''}" data-act="dsn" data-id="${t.id}" style="${on?'border-color:var(--phosphor);background:rgba(101,242,165,0.08);':''}">
+                  <span class="pn"><span>${esc(t.n)} — ${eff} h/day</span>${on?'<span style="color:var(--phosphor);font-family:var(--mono);font-size:11px">✓ SELECTED</span>':''}</span>
+                  <span class="ps"><span>${esc(t.d)}</span></span></button>`}).join("")}
+            </div>
+          </div>
+          ${L.body==="moon"||L.body==="mars"?roverPanels():""}
+        </div>
+        ${commsBottleneck?`
+        <div class="panel mt" style="border-color:rgba(255,183,77,0.4);background:rgba(255,183,77,0.05)">
+          <h3 style="color:var(--amber)">⚠ COMMS BOTTLENECK DETECTED</h3>
+          <div class="pad hint" style="font-size:11.5px;line-height:1.6;color:var(--bone)">
+            Downlink capacity (${downRate}) returns only <b>${(retFrac*100).toFixed(0)}%</b> of generated instrument data. Upgrade communications or increase DSN allocation to capture full science value.
+          </div>
+        </div>`:""}
       </div>
-      ${L.dose>=2?pick("RADIATION SHIELDING",SHIELD,"shield","RAD-05"):""}
-      ${pick("PROPULSION",L.prop.map(id=>byId(PROP,id)),"prop","PRP-03")}
-      ${L.body==="moon"&&S.rover?roverPanels():""}
-    </div>
-  </div></div>`;
+    </div></div>`;
   }
 
   /* review step */
   const ready=[
     ["Objectives covered by instruments",S.objectives.every(o=>objMet(S,o)),
-      S.objectives.filter(o=>!objMet(S,o)).length+" uncovered"],
-    ["Power positive at end of life",D.genEOL>=D.loadPeak,`${fmt(D.loadPeak)} W load vs ${fmt(D.genEOL)} W`],
-    ["Within cost cap",D.cost<=L.capM,`$${fmt(D.cost)}M vs $${fmt(L.capM)}M`],
-    ["Launch readiness within 72 months",D.months<=72,`${fmt(D.months)} months`]
+      S.objectives.filter(o=>!objMet(S,o)).length+" uncovered","payload"],
+    ["Power positive at end of life",D.genEOL>=D.loadPeak,`${fmt(D.loadPeak)} W load vs ${fmt(D.genEOL)} W`,"systems"],
+    ["Within cost cap",D.cost<=L.capM,`$${fmt(D.cost)}M vs $${fmt(L.capM)}M`,"systems"],
+    ["Launch readiness within 72 months",D.months<=72,`${fmt(D.months)} months`,"systems"]
   ];
-  /* Phase-2: L2 review gates rover↔site survival visibly — no hidden traps. */
-  if(S.levelId==="l2"&&S.rover&&moonSite(S)){
-    ready.push(["Rover clears site slopes",D.rvSlopeOk,`chassis ${D.rv.rm.slope}° vs ground ${moonSite(S).slope}°`]);
+  if((S.levelId==="l2"||S.levelId==="l3"||S.levelId==="sbx")&&S.rover&&landSite(S)){
+    ready.push(["Rover clears site slopes",D.rvSlopeOk,`chassis ${D.rv.rm.slope}° vs ground ${landSite(S).slope}°`,"systems"]);
     ready.push(["Rover night + link compatible",D.rvNightOk&&D.rvComOk,
-      `${D.rvNightOk?"heat OK":"no night heat"} · ${D.rvComOk?"link OK":"no link"}`]);
+      `${D.rvNightOk?"heat OK":"no night heat"} · ${D.rvComOk?"link OK":"no link"}`,"systems"]);
   }
   const allReady=ready.every(r=>r[1]);
   const retFrac=D.genMbPerDay>0?Math.min(1,D.downMbPerDay/D.genMbPerDay):1;
-  return `<div class="wrap"><div style="max-width:760px;margin:0 auto">
+  const stampText = !allReady ? "NOT READY" : (retFrac < 0.9 ? "READY (with warnings)" : "READY");
+
+  return `<div class="wrap buildwrap">
     ${stepTabs}
-    <div class="panel mt"><span class="bracket tl"></span><span class="bracket br"></span>
-      <h3>SPACECRAFT <span class="code">3D-01</span></h3>
-      <div class="v3host v3compact" id="v3review"></div>
-    </div>
-    <div class="panel mt"><span class="bracket tl"></span><span class="bracket br"></span>
-      <h3>MISSION REVIEW <span class="code">REV-01</span></h3>
-      <div class="pad">
-        <div class="spread" style="font-size:12.5px;padding:2px 0"><span class="hint">Spacecraft</span><span class="num">${fmt(D.wetMass)} kg wet &#183; ${S.instruments.length} instruments</span></div>
-        <div class="spread" style="font-size:12.5px;padding:2px 0"><span class="hint">Systems</span><span class="num" style="font-size:11.5px">${esc(D.pw?D.pw.n:"—")} &#183; ${esc(D.cm?D.cm.n:"—")} &#183; ${esc(D.pr?D.pr.isp?D.pr.n:"—":"—")}${D.rv?` &#183; rover ${D.rvMass} kg/${D.rvDraw} W`:``}</span></div>
-        <div class="spread" style="font-size:12.5px;padding:2px 0"><span class="hint">DSN allocation</span><span class="num" style="font-size:11.5px">${esc(dsnTier().n)} (${(L.dsnHrs*dsnTier().f).toFixed(1)} h/day)</span></div>
-        <div class="spread" style="font-size:12.5px;padding:2px 0"><span class="hint">Trajectory</span><span class="num" style="font-size:11.5px">selected on the launch screen</span></div>
-        <div class="hint" style="font-size:11px;line-height:1.6">Spacecraft view: representative NASA flight hardware and modular subsystems · instruments schematic · launcher illustration dimensionally anchored to manufacturer/NASA figures. Full register: MISSION DATA.</div>
+    <div class="revgrid">
+      <div class="rev-col">
+        <div class="panel"><span class="bracket tl"></span><span class="bracket br"></span>
+          <h3>SPACECRAFT INSPECTION <span class="code">3D-01</span></h3>
+          <div class="v3host v3bay" id="v3review"></div>
+          <div class="model-asset-note"><span class="model-chip">NASA / GLB</span><span>3D: SPACECRAFT ASSEMBLY READY FOR FLIGHT</span><a href="assets/ASSET_SOURCES.md" target="_blank" rel="noopener">ASSET SOURCES</a></div>
+        </div>
+        <div class="panel mt"><span class="bracket tl"></span><span class="bracket br"></span>
+          <h3>MISSION REVIEW MATRIX <span class="code">REV-01</span></h3>
+          <div class="pad">
+            <table class="site-matrix-table">
+              <tr><th>SUBSYSTEM</th><th>CONFIGURATION</th></tr>
+              <tr><td>Spacecraft Mass</td><td>${fmt(D.wetMass)} kg wet (${fmt(D.dryMass)} kg dry · ${S.instruments.length} instruments)</td></tr>
+              <tr><td>Power Bus</td><td>${esc(D.pw?D.pw.n:"—")} (${fmt(D.genEOL)} W at target)</td></tr>
+              <tr><td>Propulsion</td><td>${esc(D.pr?D.pr.isp?D.pr.n:"—":"—")} (ΔV ${D.dvTotal.toFixed(2)} km/s)</td></tr>
+              <tr><td>Communications</td><td>${esc(D.cm?D.cm.n:"—")} (${D.rate>1e6?fmt(D.rate/1e6,1)+" Mb/s":D.rate>1e3?fmt(D.rate/1e3,1)+" kb/s":fmt(D.rate)+" b/s"})</td></tr>
+              <tr><td>DSN Allocation</td><td>${esc(dsnTier().n)} (${(L.dsnHrs*dsnTier().f).toFixed(1)} h/day)</td></tr>
+              ${D.rv?`<tr><td>Surface Rover</td><td>${D.rvMass} kg · ${D.rvDraw} W · Chassis ${D.rv.rm.slope}°</td></tr>`:""}
+            </table>
+            <div class="hint" style="font-size:11px;line-height:1.6;margin-top:8px">Representative spacecraft configuration anchored to NASA/JPL subsystem data.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rev-col">
+        <div class="panel"><h3>READINESS CERTIFICATION <span class="code">REV-02</span></h3><div class="pad">
+          ${ready.map(r=>`<button class="spread rev-check-btn" data-act="bstep" data-v="${r[3]}" style="width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.04);padding:6px 0;cursor:pointer">
+            <span style="color:${r[1]?'var(--phosphor)':'var(--red)'};font-size:12.5px">${r[1]?"\u2713":"\u2715"} ${r[0]}</span>
+            <span class="num hint" style="font-size:11.5px">${r[2]} →</span></button>`).join("")}
+          <div style="text-align:center;margin:16px 0 10px"><span class="stamp ${allReady?'go':'nogo'}">${stampText}</span></div>
+        </div></div>
+
+        ${retFrac<0.9?`
+        <div class="panel mt" style="border:1px solid rgba(255,183,77,0.4);background:rgba(255,183,77,0.06)">
+          <h3 style="color:var(--amber)">⚠ SCIENCE DOWNLINK RISK</h3>
+          <div class="pad">
+            <p style="font-size:12.5px;color:var(--bone);line-height:1.6">The current communications link returns only <b>${(retFrac*100).toFixed(0)}%</b> of what your instruments generate. Overflowing data will be permanently discarded.</p>
+            <button class="btn ghost mt-s" data-act="bstep" data-v="systems" style="border-color:var(--amber);color:var(--amber);font-size:12px;width:100%">FIX IN SYSTEMS STEP →</button>
+          </div>
+        </div>`:""}
+
+        <div class="panel mt"><h3>OBJECTIVE COVERAGE <span class="code">SCI-01</span></h3>
+          <div class="pad">${coverRows}${coverNote}</div></div>
       </div>
     </div>
-    <div class="panel mt"><h3>READINESS <span class="code">REV-02</span></h3><div class="pad">
-      ${ready.map(r=>`<div class="spread" style="padding:4px 0;font-size:12.5px">
-        <span style="color:${r[1]?'var(--phosphor)':'var(--red)'}">${r[1]?"\u2713":"\u2715"} ${r[0]}</span>
-        <span class="num hint" style="font-size:11px">${r[2]}</span></div>`).join("")}
-      ${retFrac<0.9?`<div class="ghost-note">Caution — the link returns only ${(retFrac*100).toFixed(0)}% of what the instruments generate. This will not stop a launch, but much of the data will be discarded.</div>`:""}
-      <div style="text-align:center;margin:14px 0 6px"><span class="stamp ${allReady?'go':'nogo'}">${allReady?"READY":"NOT READY"}</span></div>
-    </div></div>
-    <div class="panel mt"><h3>OBJECTIVE COVERAGE <span class="code">SCI-01</span></h3>
-      <div class="pad">${coverRows}${coverNote}</div></div>
-    <div class="row mt">
-      <button class="btn primary" data-act="tolaunch" ${S.instruments.length===0||!S.power||!S.comms||!S.prop?"disabled":""}>GO TO LAUNCH</button>
-      <button class="btn ghost" data-act="bstep" data-v="systems">BACK</button>
-    </div>
-    ${S.mode==="cadet"?`<p class="hint mt-s" style="font-size:11.5px">The launch screen adds trajectory energy and the vehicle — the final readiness check happens there.</p>`:""}
-  </div></div>`;
+  </div>`;
 }
 
 /* ── spacecraft engineering preview ── */
@@ -1338,48 +1677,61 @@ function scrLaunch(){
         <canvas id="pork" width="900" height="480" role="img" aria-label="Porkchop plot of departure energy"></canvas>
         <div class="readout" id="porkOut"></div>
       </div>
-      <p class="hint mt-s">Click anywhere in the plot. Each point is a Lambert solution between Earth's and
-      ${esc(BODY[L.body].n)}'s real orbits, solved in your browser. Dark means cheap.
-      <b style="color:var(--bone);font-weight:500">Departure energy and arrival energy do not have their minima in the same place</b>
-      &mdash; a cheap launch usually means an expensive arrival, and you pay for that one in propellant.
-      <br><span title="C3 (departure energy): how hard the launcher must throw the spacecraft. Lower C3 means more vehicles can lift your mass.">C3 = departure energy (lower is easier to launch).</span>
-      <span title="V-infinity (arrival energy): how fast you arrive relative to the target. Higher means more propellant to slow down or rendezvous.">Arrival V&#8734; = arrival speed (higher costs propellant).</span></p>`
+      <p class="hint mt-s" style="font-size:11.5px;line-height:1.55">Click anywhere in the plot. Each point is a Lambert solution between Earth's and ${esc(BODY[L.body].n)}'s orbits.
+      <br><b>C3 (departure energy)</b>: how hard the launcher throws the craft. Lower C3 allows cheaper vehicles.
+      <br><b>Arrival V&#8734; (arrival speed)</b>: relative velocity at destination. Higher V&#8734; costs braking propellant.</p>`
     : L.mode==="fixedC3" ? `
       <div class="panel"><h3>TRANSLUNAR INJECTION <span class="code">TRJ-01</span></h3>
-        <div class="pad"><p class="hint">Translunar injection needs C3 = ${L.c3} km&sup2;/s&sup2; &mdash; barely more than
-        Earth escape &mdash; and a window opens roughly every month. The hard part is not getting there. It is stopping.</p>
+        <div class="pad"><p class="hint" style="font-size:12px;line-height:1.6">Translunar injection needs C3 = ${L.c3} km&sup2;/s&sup2; &mdash; barely more than Earth escape &mdash; with monthly windows. The hard part is braking into orbit or descent.</p>
         <div class="readout mt"><div><div class="k">C3</div><div class="v">${L.c3}</div></div>
         <div><div class="k">CRUISE</div><div class="v">${L.tof} d</div></div>
         <div><div class="k">CAPTURE &#916;V</div><div class="v">${fmt(D.dvTotal,2)} km/s</div></div></div></div></div>`
     : `<div class="panel"><h3>ORBIT SELECTION <span class="code">TRJ-01</span></h3>
-        <div class="pad"><p class="hint">A ${L.altKm} km Sun-synchronous orbit crosses the equator at the same
-        local solar time on every pass, so every image has the same lighting. It costs a dog-leg at launch,
-        which is why only about a third of a vehicle's low-Earth-orbit capability reaches it.</p>
+        <div class="pad"><p class="hint" style="font-size:12px;line-height:1.6">A ${L.altKm} km Sun-synchronous orbit crosses the equator at constant local solar time. Requires a dog-leg at launch, utilizing ~34% of standard LEO vehicle capability.</p>
         <div class="readout mt"><div><div class="k">ALTITUDE</div><div class="v">${L.altKm} km</div></div>
         <div><div class="k">INCLINATION</div><div class="v">98.1&deg;</div></div>
         <div><div class="k">PERIOD</div><div class="v">98.6 min</div></div>
         <div><div class="k">GROUND CONTACTS</div><div class="v">${L.dsnHrs} h/d</div></div></div></div></div>`;
 
-  return `<div class="wrap"><div class="launchgrid">
-    <div>${body}</div>
-    <div>
-      <div class="panel"><h3>LAUNCH VEHICLE ${infoTag(SRC.lsp,"Launch vehicle performance")} <span class="code">LSP-01</span></h3>
+  return `<div class="wrap launchwrap">
+  <div class="launchgrid">
+    <div class="launch-col launch-ops-col">
+      <div class="panel">
+        <h3>LAUNCH VEHICLE FLEET &amp; CAPABILITY ${infoTag(SRC.lsp,"Launch vehicle performance")} <span class="code">LSP-01</span></h3>
+        <div class="pad hint" style="font-size:11.5px;border-bottom:1px solid var(--hairline)">Compare vehicle lift capacity against your spacecraft wet mass (${fmt(D.wetMass)} kg) at current trajectory energy.</div>
         <div id="lvList"></div>
       </div>
+
       ${L.assist?`<div class="panel mt"><h3>TRAJECTORY OPTION <span class="code">TRJ-02</span></h3>
         <div class="pad">
-          <button class="obj ${S.assist?'sel':''}" data-act="assist" style="margin:0">
-            <span class="box">${S.assist?"\u2715":""}</span>
+          <button class="obj ${S.assist?'sel':''}" data-act="assist" style="margin:0;width:100%">
+            <span class="box">${S.assist?"\u2713":""}</span>
             <span><span class="t">${esc(L.assist.label)}</span>
-            <span class="d">Borrow momentum from two planets instead of buying it at launch.
-            Departure energy drops to C3 ${L.assist.c3} km&sup2;/s&sup2;, which roughly triples what any
-            vehicle can lift &mdash; but you add ${(L.assist.addDays/365.25).toFixed(1)} years of cruise
-            and $${L.assist.costM}M of operations.</span></span>
+            <span class="d">Gravity assist drops departure energy to C3 ${L.assist.c3} km&sup2;/s&sup2; (triples vehicle lift), adding ${(L.assist.addDays/365.25).toFixed(1)} yr cruise and $${L.assist.costM}M ops.</span></span>
           </button>
-          ${!S.assist?`<p class="hint mt-s" style="font-size:11.5px">A direct transfer to Jupiter needs
-          C3 near ${S.launch&&S.launch.set?S.launch.c3.toFixed(0):"75"} km&sup2;/s&sup2;. No vehicle on this
-          list can throw a spacecraft this heavy that hard.</p>`:""}
         </div></div>`:""}
+
+      <div class="accordion-item ${L.mode==="pork"?"":"open"}" id="acc-milestones" style="margin-top:12px">
+        <div class="accordion-header" data-act="toggle-acc" data-target="acc-milestones">
+          <div class="accordion-title-wrap">
+            <span class="accordion-title">FLIGHT PROFILE &amp; SEQUENCE <span class="code">FLT-01</span></span>
+          </div>
+          <span class="accordion-chevron">▾</span>
+        </div>
+        <div class="accordion-content">
+          <div class="flight-milestones">
+            <div class="f-ms"><span class="f-time">T-00:00</span><span class="f-dot"></span><span class="f-desc"><b>LIFTOFF</b> &mdash; Ignition at Launch Complex 39B &amp; tower clearance</span></div>
+            <div class="f-ms"><span class="f-time">T+01:12</span><span class="f-dot"></span><span class="f-desc"><b>MAX-Q</b> &mdash; Maximum aerodynamic pressure</span></div>
+            <div class="f-ms"><span class="f-time">T+02:40</span><span class="f-dot"></span><span class="f-desc"><b>STAGING</b> &mdash; Booster burnout &amp; separation</span></div>
+            <div class="f-ms"><span class="f-time">T+08:30</span><span class="f-dot"></span><span class="f-desc"><b>ORBIT INSERTION</b> &mdash; Second stage shutdown</span></div>
+            ${L.mode==="fixedC3"?`<div class="f-ms"><span class="f-time">T+45:00</span><span class="f-dot"></span><span class="f-desc"><b>TLI BURN</b> &mdash; Trans-lunar injection to transfer orbit</span></div>`:""}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="launch-col launch-traj-col">
+      ${body}
       <div class="panel mt" id="goBox"></div>
     </div>
   </div></div>`;
@@ -1507,20 +1859,37 @@ function renderLV(){
   box.innerHTML=list.map(v=>{
     const cap = L.mode==="leo" ? v.leo*0.34 : lvCapability(v,S.launch?S.launch.c3:0);
     const ok = cap>=D.wetMass;
-    return `<button class="lv ${S.launch&&S.launch.lv===v.id?'on':''} ${ok?'go':'nogo'}" data-act="lv" data-id="${v.id}">
-      <span class="r1"><span>${esc(v.n)}</span><span class="cap">${fmt(cap)} kg</span></span>
-      <span class="r2"><span>$${v.cost}M &#183; reliability ${(v.rel*100).toFixed(0)}%</span>
-      <span class="cap">${ok?"+"+fmt(cap-D.wetMass)+" kg spare":fmt(D.wetMass-cap)+" kg over"}</span></span>
-    </button>`}).join("");
+    const margin = cap>0 ? (cap-D.wetMass)/cap : -1;
+    const isSel = S.launch&&S.launch.lv===v.id;
+    return `
+    <button class="lv ${isSel?'on':''} ${ok?'go':'nogo'}" data-act="lv" data-id="${v.id}" style="${isSel?'border-color:var(--phosphor);background:rgba(101,242,165,0.08);':''}">
+      <div class="r1">
+        <span style="font-weight:600;font-size:13px">${esc(v.n)}</span>
+        <span class="cap" style="font-weight:600;color:${ok?'var(--phosphor)':'var(--red)'}">${fmt(cap)} kg capacity</span>
+      </div>
+      <div class="r2" style="margin:4px 0 6px">
+        <span>Unit Cost: $${v.cost}M &#183; Reliability: ${(v.rel*100).toFixed(0)}%</span>
+        <span class="cap">${ok?"+"+fmt(cap-D.wetMass)+" kg spare":fmt(D.wetMass-cap)+" kg deficit"}</span>
+      </div>
+      <div class="budget-bar-track" style="height:5px">
+        <div class="budget-bar-fill ${margin<0?'crit':margin<0.15?'warn':'nominal'}" style="width:${Math.max(0,Math.min(100,(cap/Math.max(cap,D.wetMass*1.2))*100))}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-family:var(--mono);font-size:10.5px">
+        <span style="color:var(--dim)">Mass Margin: ${(margin*100).toFixed(0)}%</span>
+        <span style="color:${isSel?'var(--phosphor)':'var(--bone)'}">${isSel?'✓ SELECTED':'SELECT'}</span>
+      </div>
+    </button>`;
+  }).join("");
   renderGo();
+  renderDock();
 }
+
 function renderGo(){
   const box=el("goBox"); if(!box)return;
   const D=derive(S), L=byId(LEVELS,S.levelId);
   if(!S.launch||!S.launch.lv){
-    box.innerHTML=`<h3>FLIGHT READINESS <span class="code">FRR-01</span></h3>
-      <div class="pad"><p class="hint">Select a launch vehicle. Its capability is read off the
-      NASA Launch Services Program performance curve at your departure energy. ${infoTag(SRC.lsp,"C3 performance curve")}</p></div>`;
+    box.innerHTML=`<h3>FLIGHT READINESS REVIEW <span class="code">FRR-01</span></h3>
+      <div class="pad"><p class="hint">Select a launch vehicle on the left to evaluate flight margins.</p></div>`;
     return;
   }
   const checks=[
@@ -1532,34 +1901,67 @@ function renderGo(){
   ];
   const go=checks.every(c=>c[1]);
   const retFrac = D.genMbPerDay>0 ? Math.min(1,D.downMbPerDay/D.genMbPerDay) : 1;
-  const fixes=[];
-  if(D.capability<D.wetMass){
-    const over=D.wetMass-D.capability;
-    const cands=D.instr.slice().sort((a,b)=>b.m-a.m).slice(0,3);
-    cands.forEach(i=>fixes.push(`Remove <b>${i.n}</b> &mdash; saves ${i.m} kg plus propellant`));
-    const bigger=L.lvs.map(id=>byId(LV,id)).filter(v=>v&&(L.mode==="leo"?v.leo*0.34:lvCapability(v,S.launch.c3))>=D.wetMass);
-    if(bigger.length) fixes.push(`Switch to <b>${bigger[0].n}</b> &mdash; ${fmt((L.mode==="leo"?bigger[0].leo*0.34:lvCapability(bigger[0],S.launch.c3))-D.wetMass)} kg spare`);
-    if(L.mode==="pork") fixes.push(`Find a lower arrival V&#8734; on the plot &mdash; you are carrying ${fmt(D.propMass)} kg of propellant`);
-    if(!fixes.length) fixes.push(`You are ${fmt(over)} kg over. Something has to go.`);
-  }
-  if(D.genEOL<D.loadPeak) fixes.push(`Power shortfall of ${fmt(D.loadPeak-D.genEOL)} W &mdash; larger array, or fewer instruments running at once`);
-  if(D.cost>L.capM) fixes.push(`$${fmt(D.cost-L.capM)}M over cap &mdash; the cheapest cut is a lower-cost launch vehicle`);
+  const selLv = byId(LV, S.launch.lv);
+  const lvCost = selLv ? selLv.cost : 0;
+  const craftCost = D.cost - lvCost;
+
+  const mMass = D.margins.mass, mPower = D.margins.power, mCost = D.margins.cost;
+  const minMargin = Math.min(mMass, mPower, mCost);
 
   box.innerHTML=`<h3>FLIGHT READINESS REVIEW <span class="code">FRR-01</span></h3>
     <div class="pad">
+      <div style="background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.05);margin-bottom:10px">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:4px">TOTAL COST BREAKDOWN</div>
+        <div class="spread" style="font-size:12px;padding:2px 0">
+          <span>Spacecraft &amp; Payload Bus:</span><span class="num">$${fmt(craftCost)}M</span>
+        </div>
+        <div class="spread" style="font-size:12px;padding:2px 0">
+          <span>Launch Vehicle (${selLv?selLv.n:"Selected"}):</span><span class="num">$${fmt(lvCost)}M</span>
+        </div>
+        <div class="spread" style="font-size:12.5px;padding:4px 0 0;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;font-weight:600">
+          <span>Total Mission Commitment:</span><span class="num" style="color:${D.cost<=L.capM?'var(--phosphor)':'var(--red)'}">$${fmt(D.cost)}M / $${fmt(L.capM)}M</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:6px">MISSION MARGIN BARS</div>
+        <div class="budget-bar-wrap" style="padding:6px 10px;margin-bottom:6px">
+          <div class="budget-bar-head" style="font-size:11px">
+            <span>Mass Margin</span>
+            <span style="color:${mMass<0?'var(--red)':mMass<0.15?'var(--amber)':'var(--phosphor)'}">${(mMass*100).toFixed(0)}%</span>
+          </div>
+          <div class="budget-bar-track" style="height:5px">
+            <div class="budget-bar-fill ${mMass<0?'crit':mMass<0.15?'warn':'nominal'}" style="width:${Math.max(0,Math.min(100,mMass*100))}%"></div>
+          </div>
+        </div>
+
+        <div class="budget-bar-wrap" style="padding:6px 10px;margin-bottom:6px">
+          <div class="budget-bar-head" style="font-size:11px">
+            <span>Power Margin</span>
+            <span style="color:${mPower<0?'var(--red)':mPower<0.15?'var(--amber)':'var(--phosphor)'}">${(mPower*100).toFixed(0)}%</span>
+          </div>
+          <div class="budget-bar-track" style="height:5px">
+            <div class="budget-bar-fill ${mPower<0?'crit':mPower<0.15?'warn':'nominal'}" style="width:${Math.max(0,Math.min(100,mPower*100))}%"></div>
+          </div>
+        </div>
+
+        <div class="budget-bar-wrap" style="padding:6px 10px;margin-bottom:6px">
+          <div class="budget-bar-head" style="font-size:11px">
+            <span>Cost Margin</span>
+            <span style="color:${mCost<0?'var(--red)':mCost<0.15?'var(--amber)':'var(--phosphor)'}">${(mCost*100).toFixed(0)}%</span>
+          </div>
+          <div class="budget-bar-track" style="height:5px">
+            <div class="budget-bar-fill ${mCost<0?'crit':mCost<0.15?'warn':'nominal'}" style="width:${Math.max(0,Math.min(100,mCost*100))}%"></div>
+          </div>
+        </div>
+        ${minMargin<0.15?`<div class="hint" style="color:var(--amber);font-size:11px;margin-top:4px">⚠ Weakest margin is ${(minMargin*100).toFixed(0)}% (${minMargin===mMass?'Mass':minMargin===mPower?'Power':'Cost'}). Absorbs minimal flight anomalies.</div>`:""}
+      </div>
+
       ${checks.map(c=>`<div class="spread" style="padding:4px 0;font-size:12px">
         <span style="color:${c[1]?'var(--phosphor)':'var(--red)'}">${c[1]?"\u2713":"\u2715"} ${c[0]}</span>
         <span class="num hint" style="font-size:11px">${c[2]}</span></div>`).join("")}
-      ${retFrac<0.9?`<div class="ghost-note">Caution &mdash; the link can return only ${(retFrac*100).toFixed(0)}%
-        of what your instruments generate. The rest will fill onboard storage and be discarded. This does not
-        stop a launch; it just means you will not see most of the data you paid to collect.</div>`:""}
-      <div style="text-align:center;margin:18px 0 10px"><span class="stamp ${go?'go':'nogo'}">${go?"GO":"NO-GO"}</span></div>
-      ${go?`<button class="btn primary" style="width:100%" data-act="fly">COMMIT TO LAUNCH</button>
-            <p class="hint mt-s" style="font-size:11.5px">Margins at launch: mass ${(D.margins.mass*100).toFixed(0)}%,
-            power ${(D.margins.power*100).toFixed(0)}%, cost ${(D.margins.cost*100).toFixed(0)}%. Whatever you keep here is
-            what you have left when something goes wrong.</p>`
-           :`<ul class="fixlist">${fixes.slice(0,4).map(f=>`<li>${f}</li>`).join("")}</ul>`}
-      <button class="btn ghost mt" style="width:100%" data-act="tobuild">BACK TO THE BUILD BAY</button>
+
+      <div style="text-align:center;margin:16px 0 10px"><span class="stamp ${go?'go':'nogo'}">${go?"GO":"NO-GO"}</span></div>
     </div>`;
 }
 
@@ -1613,8 +2015,10 @@ function initOpsState(){
     evs.push({...e,day});
   }
   evs.sort((a,b)=>a.day-b.day);
+  const isMoon = S.levelId === "l2";
+  const speed = isMoon ? 1 : 4;
   S.ops={
-    day:0,totalDays,cruise,speed:4,running:true,events:evs,evIdx:0,
+    day:0,totalDays,cruise,speed,running:true,events:evs,evIdx:0,
     delivered:{},backlog:0,storageMb:L.storeMb||160000,
     dose:0,opsCost:0,lost:0,propUsed:0,powerMult:1,sciMult:1,doseMult:1,dsnFactor:dsnFactorOf(),
     blackout:0,dsnCut:0,dsnCutSoft:0,dead:new Set(),log:[],status:"nominal",
@@ -1635,11 +2039,15 @@ function initOpsState(){
     else if(LO.type==="partial"){ S.ops.propUsed+=0.06; S.ops.powerMult*=0.95; S.ops.sciMult*=0.95; S.ops.opsCost+=10; logLine(0,"Partial launch shortfall: upper stage compensated by spacecraft (+6% prop, −5% power/science, +$10M).","warn"); }
   }
   else if(!LO) logLine(0,"Launch. Vehicle performance nominal.","good");
-  if(cruise>0) logLine(0,`Cruise phase begins. ${cruise} days to ${BODY[L.body].n}.`);
+  if(cruise>0) logLine(0, isMoon ? `Translunar injection nominal. Cruise phase begins. ${cruise} days to Moon.` : `Cruise phase begins. ${cruise} days to ${BODY[L.body].n}.`);
 }
 function logLine(day,txt,cls){
-  S.ops.log.unshift({day,txt,cls:cls||""});
-  if(S.ops.log.length>120)S.ops.log.pop();
+  const O=S.ops; if(!O) return;
+  const countSameDay = O.log.filter(l=>l.day===day).length;
+  const hour = Math.min(23, countSameDay * 2);
+  const timeSub = `+${String(hour).padStart(2,"0")}h`;
+  O.log.unshift({day,timeSub,txt,cls:cls||""});
+  if(O.log.length>120) O.log.pop();
 }
 function dayLabel(d){
   return "L+"+String(d).padStart(4,"0");
@@ -1652,6 +2060,7 @@ function scrOps(){
     <div id="ops3d-mount" class="ops3d-container">
       <canvas id="ops3d"></canvas>
     </div>
+    <div id="roverStatusStrip" class="rover-status-strip hidden"></div>
     <div class="ops-hud-top">
       <div class="clock-hud">
         <span class="big" id="clkDay">L+0000</span>
@@ -1672,10 +2081,10 @@ function scrOps(){
       </div>
       <div class="spd">
         <button data-act="spd" data-v="0" aria-label="Pause">II</button>
-        <button data-act="spd" data-v="1">2 d/s</button>
-        <button data-act="spd" data-v="4" class="on">10 d/s</button>
-        <button data-act="spd" data-v="20">50 d/s</button>
-        <button data-act="spd" data-v="90">MAX</button>
+        <button data-act="spd" data-v="1" class="${(S.ops&&S.ops.speed===1)?'on':''}">2 d/s</button>
+        <button data-act="spd" data-v="4" class="${((!S.ops&&S.levelId!=='l2')||(S.ops&&S.ops.speed===4))?'on':''}">10 d/s</button>
+        <button data-act="spd" data-v="20" class="${(S.ops&&S.ops.speed===20)?'on':''}">50 d/s</button>
+        <button data-act="spd" data-v="90" class="${(S.ops&&S.ops.speed===90)?'on':''}">MAX</button>
       </div>
       <button data-act="toggle-hud" class="hud-toggle-btn" title="Toggle HUD visibility">HUD</button>
     </div>
@@ -1717,9 +2126,10 @@ function scrOps(){
 let rafId=null,acc=0,lastT=0,lastSpd=4,lastAuxPaint=0;
 function initOps(){
   if(!S.ops||S.ops.levelId!==S.levelId){ initOpsState(); S.ops.levelId=S.levelId; }
-  /* Phase 3: mission-relevant arrival brief once per OPS run; l1 bypasses cleanly. */
+  /* Phase 3: mission-relevant arrival brief once per OPS run; l1 bypasses cleanly.
+     Only shown at OPS start if already at or past arrival day (e.g. reload); fresh missions fly cruise first. */
   if(!phaseRequired("arrival")){ ensurePhases().done.arrival="bypass"; }
-  else if(!S.ops.arrivalApplied){ maybeShowArrivalBrief(); }
+  else if(!S.ops.arrivalApplied && S.ops.day >= S.ops.cruise){ maybeShowArrivalBrief(); }
   /* Phase 4: proximity follows arrival; non-proximity missions bypass cleanly. */
   if(!phaseRequired("proximity")){ ensurePhases().done.proximity="bypass"; }
   else if(S.ops.arrivalApplied&&!S.ops.proxApplied&&!el("modal").classList.contains("on")){ maybeShowProxBrief(); }
@@ -1782,6 +2192,9 @@ function resolveArrival(i){
   enterPhaseOnce("arrival");
   const D=derive(S);
   logLine(O.day,`Arrival (${spec.body}): ${c.t}. Capture Δv ${fmt(D.dvTotal,2)} km/s, ${fmt(D.propMass*(1-O.propUsed))} kg propellant remaining.`,"good");
+  if(spec.body==="Moon"){
+    logLine(O.day,"Lunar orbit insertion confirmed. Polar orbit established. Surveying landing site.","good");
+  }
   el("modal").classList.remove("on"); delete el("modal").dataset.ev;
   O.running=true;
   /* Phase 4: chain proximity brief where the mission requires it. */
@@ -1836,8 +2249,8 @@ function resolveProx(i){
    profile is committed when the orbiter is actually over the site. Outcome is
    computed deterministically here; the overlay only reveals it. */
 function landSpec(){
-  if(!S||S.levelId!=="l2") return null;
-  const st=moonSite(S), rv=roverKit(S);
+  if(!S||(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx")) return null;
+  const st=landSite(S), rv=roverKit(S);
   if(!st||!rv) return null;
   return {site:st,rv};
 }
@@ -1856,11 +2269,38 @@ function computeLanding(prof){
     travKm:spec.site.travKm+prof.off,
     dProp:prof.dProp+(ok?0:0.03),opsM:ok?2:15,sciM:ok?prof.sci:0.90};
 }
+function setOpsSpeed(v){
+  if(!S.ops) return;
+  S.ops.speed=v; S.ops.running=v>0;
+  if(v>0) lastSpd=v;
+  document.querySelectorAll(".spd button").forEach(b=>b.classList.toggle("on",+b.dataset.v===v));
+}
+function maybeTriggerArrival(){
+  const O=S.ops;
+  if(!O||O.ended||O.arrivalApplied) return;
+  if(!phaseRequired("arrival")) return;
+  if(!(O.day>=O.cruise)) return;
+  if(window.__opsV && window.__opsV.satTick && !window.__opsV._satDone) return;
+  if(O.speed>1){
+    setOpsSpeed(1);
+    logLine(O.day,"CRITICAL EVENT: Trajectory auto-slowed to 1× for arrival orbit insertion.","warn");
+  }
+  try{ if(el("modal").classList.contains("on")) return; }catch(e){ return; }
+  maybeShowArrivalBrief();
+}
 function maybeTriggerLanding(){
   const O=S.ops;
   if(!O||O.ended||O.landApplied||O.descentActive) return;
   if(!landSpec()) return;
-  if(!(O.day>=O.cruise)) return;
+  const L=byId(LEVELS,S.levelId);
+  const landDay = O.cruise + (L && L.body === "moon" ? 3 : 0);
+  if(!(O.day>=landDay)) return;
+  if(phaseRequired("arrival")&&!O.arrivalApplied) return;
+  if(window.__opsV && window.__opsV.satTick && !window.__opsV._satDone) return;
+  if(O.speed>1){
+    setOpsSpeed(1);
+    logLine(O.day,"CRITICAL EVENT: Trajectory auto-slowed to 1× for terminal landing guidance.","warn");
+  }
   try{ if(el("modal").classList.contains("on")) return; }catch(e){ return; }
   maybeShowLandBrief();
 }
@@ -1878,6 +2318,7 @@ function resolveLand(i){
   const spec=landSpec(); if(!spec) return;
   const c=LAND_PROFILES[i]; if(!c) return;
   const out=computeLanding(c); if(!out) return;
+  setOpsSpeed(1);
   O.landApplied=true; O.landing=c.id; O.descentActive=true; O.running=false;
   S.landing=out;
   logLine(O.day,`Descent commit: ${c.t} over ${spec.site.n}. Touchdown ellipse ±${out.offsetKm} km.`,"");
@@ -1977,9 +2418,13 @@ function loopOps(t){
   const dt=Math.min(100,t-lastT); lastT=t;
   const O=S.ops;
   if(O&&O.running&&!O.ended&&S.screen==="ops"){
-    acc+=dt/1000*O.speed*2.5;
+    const isMoonPreLand = (S.levelId === "l2" && !S.landing && !O.landApplied);
+    const rateMul = isMoonPreLand ? (O.day < O.cruise ? 0.30 : 0.35) : 2.5;
+    acc+=dt/1000*O.speed*rateMul;
     let guard=0;
     while(acc>=1&&guard<400&&!O.ended&&O.running){ acc-=1; stepDay(); guard++; }
+    /* Phase 3: mission arrival decision triggers at destination */
+    try{ maybeTriggerArrival(); }catch(e){}
     /* Phase 4: landing decision fires once on arrival day (after any stepDay
        in this tick so O.day is current); the modal pauses the sim. */
     try{ maybeTriggerLanding(); }catch(e){}
@@ -2294,8 +2739,7 @@ function drawOrbit(paint2D){
      BLINK RULE: this branch returns before the background fill below, so a
      throttled (skipped) frame retains the last map instead of flashing the
      starfield. ce/cn and the 3D feed run EVERY tick regardless. */
-  if(S.landing&&S.landing.site&&typeof SURFACE_PATCHES!=="undefined"
-     &&SURFACE_PATCHES.sites&&SURFACE_PATCHES.sites[S.landing.site]){
+  if(S.landing&&S.landing.site&&surfPatchFor(S.landing.site)){
     /* Honest-timelapse rover: continuous sol time = completed sols + the acc
        fraction into the next sol. ce/cn render surfEvalAt(sC) at the eased
        adaptive lag (1 sol ≤10 d/s, deeper at warp) — the exact simulated
@@ -2447,6 +2891,98 @@ function drawOrbit(paint2D){
         });
       }
     }
+  }else if(L.body==="moon" && (!O || (O.day + Math.min(0.999, Math.max(0, acc))) < O.cruise)){
+    // Translunar Injection (TLI) — Earth to Moon Satellite Travel Phase
+    const smoothDay = (O ? (O.day + Math.min(0.999, Math.max(0, acc))) : 0);
+    const frac = clamp(smoothDay / Math.max(1, (O ? O.cruise : 1)), 0, 1);
+    const ex = cx - W * 0.28, ey = cy + 12;
+    const mx = cx + W * 0.28, my = cy - 22;
+    const rE = 26, rM = 14;
+
+    // Earth
+    const grdE = x.createRadialGradient(ex-8, ey-8, 4, ex, ey, rE);
+    grdE.addColorStop(0, "#4A7FC1");
+    grdE.addColorStop(0.7, "#1D4E89");
+    grdE.addColorStop(1, "#0D2A52");
+    x.fillStyle = grdE; x.beginPath(); x.arc(ex, ey, rE, 0, 7); x.fill();
+    x.strokeStyle = "rgba(74,127,193,0.4)"; x.lineWidth = 2;
+    x.beginPath(); x.arc(ex, ey, rE + 4, 0, 7); x.stroke();
+
+    // Moon
+    const grdM = x.createRadialGradient(mx-4, my-4, 2, mx, my, rM);
+    grdM.addColorStop(0, "#C9C6BE");
+    grdM.addColorStop(0.7, "#7A7873");
+    grdM.addColorStop(1, "#3A3833");
+    x.fillStyle = grdM; x.beginPath(); x.arc(mx, my, rM, 0, 7); x.fill();
+    x.strokeStyle = "rgba(201,198,190,0.3)"; x.lineWidth = 1;
+    x.beginPath(); x.arc(mx, my, rM + 3, 0, 7); x.stroke();
+
+    // Translunar transfer arc: quadratic bezier from Earth departure to Moon arrival
+    const p0 = [ex + rE * 0.8, ey - rE * 0.4];
+    const cp = [cx - 5, cy - H * 0.32];
+    const p1 = [mx - rM * 0.7, my + rM * 0.3];
+    const bez = t => {
+      const u = 1 - t;
+      return [
+        u*u*p0[0] + 2*u*t*cp[0] + t*t*p1[0],
+        u*u*p0[1] + 2*u*t*cp[1] + t*t*p1[1]
+      ];
+    };
+
+    // Planned arc (dashed)
+    x.setLineDash([3, 4]); x.strokeStyle = "rgba(94,246,160,.35)"; x.lineWidth = 1;
+    x.beginPath();
+    for(let i=0; i<=80; i++){
+      const p = bez(i/80);
+      i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]);
+    }
+    x.stroke(); x.setLineDash([]);
+
+    // Flown arc (solid green)
+    x.strokeStyle = "#5EF6A0"; x.lineWidth = 2;
+    x.beginPath();
+    for(let i=0; i<=80; i++){
+      const t = frac * (i/80);
+      const p = bez(t);
+      i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]);
+    }
+    x.stroke();
+
+    // Spacecraft marker
+    const scPos = bez(frac);
+    x.fillStyle = "#5EF6A0"; x.beginPath(); x.arc(scPos[0], scPos[1], 3.5, 0, 7); x.fill();
+    x.strokeStyle = "rgba(94,246,160,.6)"; x.beginPath(); x.arc(scPos[0], scPos[1], 8, 0, 7); x.stroke();
+
+    // Comms beam to Earth
+    x.setLineDash([2, 4]); x.strokeStyle = "rgba(42,107,212,.45)"; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(ex, ey); x.lineTo(scPos[0], scPos[1]); x.stroke();
+    x.setLineDash([]);
+
+    // Distance & light-time
+    const remKm = Math.round((1 - frac) * 384400);
+    cv._lt = Math.max(0.1, frac * 1.28);
+    x.font = "10px 'IBM Plex Mono',monospace"; x.fillStyle = "#8D93A1";
+    x.fillText("EARTH", ex - 16, ey + rE + 16);
+    x.fillText("MOON", mx - 12, my + rM + 16);
+    x.fillStyle = "#5EF6A0";
+    x.fillText(`TLI \u2014 ${remKm.toLocaleString()} KM TO MOON`, cx - 75, H - 26);
+
+    if(window.OpsView&&OpsView.isActive()){
+      OpsView.update({
+        day: smoothDay,
+        cruise: O ? O.cruise : 0,
+        totalDays: O ? O.totalDays : 1,
+        arrived: false,
+        frac: frac,
+        targetKey: L.body,
+        tNow: 2029.0 + smoothDay / 365.25,
+        mode: L.mode,
+        running: O ? !!(O.running && !O.ended) : false,
+        rate: (O&&O.running&&!O.ended&&isFinite(O.speed))?O.speed*0.30:0,
+        linkF: !O||O.blackout>0?0:O.dsnCut>0?0.35:O.dsnCutSoft>0?0.8:1,
+        healthF: O?D.instr.filter(i=>!O.dead.has(i.id)).length/Math.max(1,D.instr.length):1
+      });
+    }
   }else{
     // body-centric
     const R=110;
@@ -2470,6 +3006,8 @@ function drawOrbit(paint2D){
     x.font="10px 'IBM Plex Mono',monospace";x.fillStyle="#8D93A1";
     x.fillText(BODY[L.body].n.toUpperCase(),cx-R,cy+R+22);
     if(window.OpsView&&OpsView.isActive()){
+      const isMoonOrbit = S.levelId === "l2" && !S.landing && !(O && O.landApplied);
+      const orbitRateMul = isMoonOrbit ? 0.35 : 2.5;
       OpsView.update({
         day: smoothDay,
         cruise: O ? O.cruise : 0,
@@ -2482,7 +3020,7 @@ function drawOrbit(paint2D){
         running: O ? !!(O.running && !O.ended) : false,
         /* Exact warp rate for the 3D view clock (d/s; 0 while paused) —
            never wall-clock-estimated downstream. */
-        rate: (O&&O.running&&!O.ended&&isFinite(O.speed))?O.speed*2.5:0,
+        rate: (O&&O.running&&!O.ended&&isFinite(O.speed))?O.speed*orbitRateMul:0,
         linkF: !O||O.blackout>0?0:O.dsnCut>0?0.35:O.dsnCutSoft>0?0.8:1,
         healthF: O?D.instr.filter(i=>!O.dead.has(i.id)).length/Math.max(1,D.instr.length):1
       });
@@ -2498,7 +3036,7 @@ function drawOrbit(paint2D){
    placement convention, true touchdown offset labeled even when clamped. */
 function drawSurfaceFallback(x,W,H){
   try{
-    const Ld=S.landing, P=SURFACE_PATCHES.sites[Ld.site];
+    const Ld=S.landing, P=surfPatchFor(Ld.site);
     if(!P)return;
 
     /* ---------------------------------------------------------------
@@ -2544,6 +3082,29 @@ function drawSurfaceFallback(x,W,H){
           hc[Ld.site]=P.h;
         }
       }
+      /* Mars v2 I/F drape (measured RED display values, same sampling grid
+         as the heights above; missing layer = identity, Moon untouched). */
+      try{
+        let cc=drawSurfaceFallback._colCache;
+        if(!cc){
+          cc=Object.create(null);
+          drawSurfaceFallback._colCache=cc;
+        }
+        if(!cc[Ld.site]){
+          cc[Ld.site]=null;
+          if(P.col&&P.col.b){
+            const bin=atob(P.col.b),cu=new Uint8Array(bin.length);
+            for(let k=0;k<bin.length;k++)cu[k]=bin.charCodeAt(k);
+            const CN=P.col.n||0, n=(P.n||80), c=new Float64Array(n*n);
+            for(let j=0;j<n;j++)for(let i=0;i<n;i++){
+              const ci=Math.min(CN-1,Math.round(i/(n-1)*(CN-1)));
+              const cj=Math.min(CN-1,Math.round(j/(n-1)*(CN-1)));
+              c[j*n+i]=cu[cj*CN+ci]/255;
+            }
+            cc[Ld.site]=c;
+          }
+        }
+      }catch(e){}
     }catch(e){}
 
     const F=S.surface;
@@ -2581,7 +3142,10 @@ function drawSurfaceFallback(x,W,H){
     const siteName=
       Ld.site==="shackleton"?"SHACKLETON RIM":
       Ld.site==="malapert"?"MONS MALAPERT":
-      "TRANQUILLITATIS";
+      Ld.site==="tranq"?"TRANQUILLITATIS":
+      Ld.site==="jezero"?"JEZERO DELTA":
+      Ld.site==="gale"?"GALE CRATER":
+      "ELYSIUM PLANITIA";
 
     /* ---------------------------------------------------------------
        STATIC TERRAIN CACHE
@@ -2671,21 +3235,36 @@ function drawSurfaceFallback(x,W,H){
             else if(base>96)base=96;
 
             const r=P.rock&&P.rock[idx];
+            /* Measured drape factor (1.0 where no col layer): multiplies the
+               height-shaded cell, same role as the 3D shader term. */
+            let cf=1;
+            try{
+              const cc=drawSurfaceFallback._colCache&&drawSurfaceFallback._colCache[Ld.site];
+              if(cc&&cc[idx]>0)cf=cc[idx];
+            }catch(e){}
 
+            /* Mars Tier-1 tint (measured, NOT eyeballed): per-site hue factor
+               = mean sRGB / mean, sampled with PIL over a 3° box from the
+               vendored NASA Mars texture (assets/textures/mars.jpg, SOURCES
+               §3): jezero (106,85,67), gale (133,100,67), elysium
+               (143,107,68). Same luminance logic, site-true hue. Exact
+               end-state: HiRISE ortho drape. */
+            const mt=Ld.site==="jezero"?[1.23,0.99,0.78]:Ld.site==="gale"?[1.33,1.00,0.67]:Ld.site==="elysium"?[1.35,1.01,0.64]:null;
             if(r===2){
-              const rr=Math.min(150,base+70);
-              const gg=Math.min(125,Math.round(base*0.72+35));
-              const bb=Math.min(88,Math.round(base*0.42+10));
-              b.fillStyle=`rgb(${rr},${gg},${bb})`;
+              const rr=Math.min(255,Math.round(Math.min(150,base+70)*cf));
+              const gg=Math.min(255,Math.round(Math.min(125,Math.round(base*0.72+35))*cf));
+              const bb=Math.min(255,Math.round(Math.min(88,Math.round(base*0.42+10))*cf));
+              b.fillStyle=mt?`rgb(${Math.min(255,Math.round(rr*mt[0]))},${Math.min(255,Math.round(gg*mt[1]))},${Math.min(255,Math.round(bb*mt[2]))})`:`rgb(${rr},${gg},${bb})`;
             }else if(r===1){
-              const rr=Math.min(130,base+34);
-              const gg=Math.min(112,Math.round(base*0.82+20));
-              const bb=Math.min(78,Math.round(base*0.56+6));
-              b.fillStyle=`rgb(${rr},${gg},${bb})`;
+              const rr=Math.min(255,Math.round(Math.min(130,base+34)*cf));
+              const gg=Math.min(255,Math.round(Math.min(112,Math.round(base*0.82+20))*cf));
+              const bb=Math.min(255,Math.round(Math.min(78,Math.round(base*0.56+6))*cf));
+              b.fillStyle=mt?`rgb(${Math.min(255,Math.round(rr*mt[0]))},${Math.min(255,Math.round(gg*mt[1]))},${Math.min(255,Math.round(bb*mt[2]))})`:`rgb(${rr},${gg},${bb})`;
             }else{
-              const gg=Math.min(104,base+5);
-              const bb=Math.min(116,base+12);
-              b.fillStyle=`rgb(${base},${gg},${bb})`;
+              const gg=Math.min(255,Math.round(Math.min(104,base+5)*cf));
+              const bb=Math.min(255,Math.round(Math.min(116,base+12)*cf));
+              const r0=Math.min(255,Math.round(base*cf));
+              b.fillStyle=mt?`rgb(${Math.min(255,Math.round(r0*mt[0]))},${Math.min(255,Math.round(gg*mt[1]))},${Math.min(255,Math.round(bb*mt[2]))})`:`rgb(${r0},${gg},${bb})`;
             }
 
             b.fillRect(
@@ -3243,61 +3822,17 @@ function drawSurfaceFallback(x,W,H){
         const z=Math.round(ds*100)/100;
 
         if(compact){
-          x.fillText(
-            "SOL "+F.sol+" · "+
-            mode.toUpperCase()+"/"+
-            pace.toUpperCase(),
-            mapX,
-            y0
-          );
-
-          x.fillText(
-            "NRG "+nrg+
-            "% · BUF "+
-            fmtData(F.dataMb),
-            mapX,
-            y0+12
-          );
-
-          x.fillText(
-            dist+
-            " KM TO TARGET · ×"+
-            z,
-            mapX,
-            y0+24
-          );
-
+          x.fillText("SOL "+F.sol+" · "+mode.toUpperCase()+"/"+pace.toUpperCase(), mapX, y0);
+          x.fillText("NRG "+nrg+"% · BUF "+fmtData(F.dataMb), mapX, y0+11);
+          x.fillText(dist+" KM TO TGT · ×"+z, mapX, y0+22);
           x.fillStyle="#5A6172";
-          x.fillText(
-            "BOUNDED PATCH — NOT TO SCALE",
-            mapX,
-            y0+36
-          );
+          x.fillText("NOT TO SCALE", mapX, y0+33);
         }else{
-          x.fillText(
-            "SOL "+F.sol+" · "+
-            mode.toUpperCase()+"/"+
-            pace.toUpperCase()+
-            " · NRG "+nrg+"%",
-            mapX,
-            y0
-          );
-
-          x.fillText(
-            "BUF "+fmtData(F.dataMb)+" · "+
-            dist+
-            " KM TO TARGET · ×"+
-            z,
-            mapX,
-            y0+12
-          );
-
+          x.fillText("SOL "+F.sol+" · "+mode.toUpperCase()+"/"+pace.toUpperCase(), mapX, y0);
+          x.fillText("NRG "+nrg+"% · BUF "+fmtData(F.dataMb), mapX, y0+11);
+          x.fillText(dist+" KM TO TGT · ×"+z, mapX, y0+22);
           x.fillStyle="#5A6172";
-          x.fillText(
-            "BOUNDED PATCH — NOT TO SCALE BEYOND",
-            mapX,
-            y0+24
-          );
+          x.fillText("BOUNDED PATCH (3×3 KM)", mapX, y0+33);
         }
       }else{
         const off=
@@ -3362,8 +3897,7 @@ const SURF_PACE={cautious:{rate:0.2,risk:0.5,cost:15},standard:{rate:0.5,risk:1.
 const SURF_LINKMB={0:50,1:200,2:500};
 function surfHazard(eKm,nKm){
   try{
-    const P=(typeof SURFACE_PATCHES!=="undefined")?SURFACE_PATCHES:null;
-    const Ld=S.landing, pg=P&&P.sites?P.sites[Ld.site]:null;
+    const Ld=S.landing, pg=Ld?surfPatchFor(Ld.site):null;
     if(pg){
       const half=pg.sizeM/2, x=eKm*1000, z=nKm*1000;
       if(Math.abs(x)<=half&&Math.abs(z)<=half){
@@ -3377,7 +3911,7 @@ function surfHazard(eKm,nKm){
       }
     }
   }catch(e){}
-  const st=moonSite(S);
+  const st=landSite(S);
   return {slope:st?st.slope:3,rock:1,inside:false};
 }
 function initSurface(){
@@ -3580,7 +4114,7 @@ function renderOpsSide(force){
   const O=S.ops,D=derive(S),L=byId(LEVELS,S.levelId);
   const cd=el("clkDay"); if(!cd)return;
   cd.textContent=dayLabel(O.day);
-  el("clkPhase").textContent = O.day<O.cruise?"cruise":"science operations";
+  el("clkPhase").textContent = S.landing ? "surface operations" : (O.day < O.cruise ? (L.body === "moon" ? "translunar cruise" : "cruise") : (L.body === "moon" ? "lunar orbit" : "science operations"));
   const lt=el("orbit")._lt||0;
   el("clkLt").textContent = lt>0.5?`command round trip ${lt>60?Math.round(lt/60)+" min":Math.round(lt)+" s"}`:"";
   /* Mission-control hierarchy: status + phase + primary objective, updated every render. */
@@ -3596,19 +4130,61 @@ function renderOpsSide(force){
   const c=opsSideCache;
   if(!force&&c.day===O.day&&c.ord===ord&&c.log===O.log.length&&(nowMs-c.t)<500) return;
   c.day=O.day; c.t=nowMs; c.ord=ord; c.log=O.log.length;
-  el("gauges").innerHTML=`
-    <div><div class="k">SPACECRAFT HEALTH</div><div class="v" style="color:${O.dead.size?'var(--amber)':'var(--phosphor)'}">${O.dead.size?"DEGRADED":"NOMINAL"} · ${live.length}/${D.instr.length} live</div></div>
-    <div><div class="k">POWER MARGIN (EOL)</div><div class="v" style="color:${D.margins.power<0?'var(--red)':D.margins.power<0.15?'var(--amber)':'var(--bone)'}">${(D.margins.power*100).toFixed(0)}%${O.powerMult<1?" · gen ×"+O.powerMult.toFixed(2):""}</div></div>
-    <div><div class="k">COMMS STATUS</div><div class="v">${O.blackout>0?"BLACKOUT":O.dsnCut>0?"35% (CONTENTION)":esc(dsnTier().n.toUpperCase())+" · "+(L.dsnHrs*O.dsnFactor).toFixed(1)+" h/d"}</div></div>
-    <div><div class="k">DATA BACKLOG</div><div class="v" style="color:${O.backlog>O.storageMb*0.85?'var(--amber)':'var(--bone)'}">${fmtData(O.backlog)} / ${fmtData(O.storageMb)}</div></div>
-    <div><div class="k">DOWNLINK TODAY</div><div class="v">${fmtData(D.downMbPerDay*(O.blackout>0?0:O.dsnCut>0?0.35:1))}</div></div>
-    <div><div class="k">TOTAL DOSE</div><div class="v" style="color:${O.dose>60?'var(--red)':O.dose>25?'var(--amber)':'var(--bone)'}">${fmt(O.dose)} krad</div></div>
-    <div><div class="k">INSTRUMENTS LIVE</div><div class="v">${live.length} / ${D.instr.length}</div></div>
-    <div><div class="k">OPERATIONS OVERRUN</div><div class="v">$${fmt(O.opsCost)}M</div></div>
-    <div><div class="k">SCIENCE DISCARDED</div><div class="v" style="color:${O.overflow>0?'var(--amber)':'var(--bone)'}">${fmtData(O.overflow)}</div></div>`;
+  const vp=el("opsViewport");
+  if(vp) vp.classList.toggle("in-descent", !!(O&&O.descentActive));
+
+  if(O&&O.descentActive&&S.landing){
+    const land=S.landing;
+    const propRem=Math.max(0, D.propMass*(1-O.propUsed));
+    el("gauges").innerHTML=`
+      <div><div class="k">DESCENT PHASE</div><div class="v" style="color:var(--amber)">POWERED TERMINAL DESCENT</div></div>
+      <div><div class="k">RADAR TRACKING</div><div class="v" style="color:var(--phosphor)">ACTIVE RETRO-BRAKING</div></div>
+      <div><div class="k">DESCENT PROFILE</div><div class="v">${esc((land.profile||"balanced").toUpperCase())}</div></div>
+      <div><div class="k">PROPELLANT REMAINING</div><div class="v" style="color:${propRem<50?'var(--amber)':'var(--phosphor)'}">${fmt(propRem)} kg</div></div>
+      <div><div class="k">TOUCHDOWN SLOPE</div><div class="v" style="color:${land.slope>10?'var(--amber)':'var(--phosphor)'}">${land.slope.toFixed(1)}° (CHASSIS CAP ${D.rv?D.rv.rm.slope:0}°)</div></div>
+      <div><div class="k">TERRAIN MARGIN</div><div class="v" style="color:${land.margin<1?'var(--amber)':'var(--phosphor)'}">${land.margin>0?'+':''}${land.margin.toFixed(1)}°</div></div>
+      <div><div class="k">TARGET OFFSET</div><div class="v">&plusmn;${land.offsetKm.toFixed(1)} km</div></div>`;
+  } else {
+    el("gauges").innerHTML=`
+      <div><div class="k">SPACECRAFT HEALTH</div><div class="v" style="color:${O.dead.size?'var(--amber)':'var(--phosphor)'}">${O.dead.size?"DEGRADED":"NOMINAL"} · ${live.length}/${D.instr.length} live</div></div>
+      <div><div class="k">POWER MARGIN (EOL)</div><div class="v" style="color:${D.margins.power<0?'var(--red)':D.margins.power<0.15?'var(--amber)':'var(--bone)'}">${(D.margins.power*100).toFixed(0)}%${O.powerMult<1?" · gen ×"+O.powerMult.toFixed(2):""}</div></div>
+      <div><div class="k">COMMS STATUS</div><div class="v">${O.blackout>0?"BLACKOUT":O.dsnCut>0?"35% (CONTENTION)":esc(dsnTier().n.toUpperCase())+" · "+(L.dsnHrs*O.dsnFactor).toFixed(1)+" h/d"}</div></div>
+      <div><div class="k">DATA BACKLOG</div><div class="v" style="color:${O.backlog>O.storageMb*0.85?'var(--amber)':'var(--bone)'}">${fmtData(O.backlog)} / ${fmtData(O.storageMb)}</div></div>
+      <div><div class="k">DOWNLINK TODAY</div><div class="v">${fmtData(D.downMbPerDay*(O.blackout>0?0:O.dsnCut>0?0.35:1))}</div></div>
+      <div><div class="k">TOTAL DOSE</div><div class="v" style="color:${O.dose>60?'var(--red)':O.dose>25?'var(--amber)':'var(--bone)'}">${fmt(O.dose)} krad</div></div>
+      <div><div class="k">INSTRUMENTS LIVE</div><div class="v">${live.length} / ${D.instr.length}</div></div>
+      <div><div class="k">OPERATIONS OVERRUN</div><div class="v">$${fmt(O.opsCost)}M</div></div>
+      <div><div class="k">SCIENCE DISCARDED</div><div class="v" style="color:${O.overflow>0?'var(--amber)':'var(--bone)'}">${fmtData(O.overflow)}</div></div>`;
+  }
+
+  /* Compact always-visible rover status strip */
+  const strip = el("roverStatusStrip");
+  if(strip){
+    if(S.surface){
+      const F = S.surface;
+      const nrg = Math.round(F.energy || 0);
+      const buf = F.dataMb || 0;
+      const dist = Math.round(surfDist(F) * 10) / 10;
+      const om = (F.orders && F.orders.mode) || "drive";
+      const op = (F.orders && F.orders.pace) || "standard";
+      const nrgClass = nrg < 15 ? "crit" : nrg < 25 ? "warn" : "";
+      const bufClass = buf > 400 ? "crit" : buf > 200 ? "warn" : "";
+      strip.classList.remove("hidden");
+      strip.innerHTML = `
+        <div class="rover-status-item"><span class="lbl">SOL</span><span class="val">${F.sol}</span></div>
+        <div class="rover-status-item ${nrgClass}"><span class="lbl">NRG</span><span class="val">${nrg}%</span></div>
+        <div class="rover-status-item ${bufClass}"><span class="lbl">BUF</span><span class="val">${fmtData(buf)}</span></div>
+        <div class="rover-status-item"><span class="lbl">TARGET</span><span class="val">${dist} km</span></div>
+        <div class="rover-status-item"><span class="lbl">ORDERS</span><span class="val">${om.toUpperCase()} / ${op.toUpperCase()}</span></div>
+      `;
+    } else {
+      strip.classList.add("hidden");
+    }
+  }
+
   /* Phase-6 surface orders (landed L2): standing orders + live sol telemetry.
      Same gauges grammar; refreshes every tick and on every order click. */
-  if(S.landing&&S.surface){
+  if(S.landing&&S.surface&&!O.descentActive){
     const F=S.surface, om=F.orders.mode, op=F.orders.pace;
     const dist=surfDist(F), cxz=Math.min(1,1500/Math.max(1500,F.d0*1000));
     const btn=(act,v,on,lbl)=>`<button data-act="${act}" data-v="${v}" class="minimap-action-btn" style="${on?"border-color:var(--phosphor);color:var(--phosphor)":""}" title="">${lbl}</button>`;
@@ -3630,7 +4206,7 @@ function renderOpsSide(force){
         const left=cps>0?F.energy/cps:99;
         if(left<3) nrgWarn=`<div class="hint" style="font-size:10px;color:var(--amber)">LOW ENERGY — ~${Math.max(0,left).toFixed(1)} sols of driving left at ${op} pace. CHARGE before it stalls.</div>`;
       } else if(om==="recharge"){
-        const st0=(typeof moonSite==="function")?moonSite(S):null;
+        const st0=(typeof landSite==="function")?landSite(S):null;
         const g=rpN===2?20:Math.round(45*((st0&&st0.sun)||1));
         nrgWarn=`<div class="hint" style="font-size:10px">Charging +${g}/sol${F.energy>=100?" (full)":""} — driving resumes on your orders.</div>`;
       }
@@ -3652,7 +4228,7 @@ function renderOpsSide(force){
       <span class="num hint">${(f*100).toFixed(0)}% <span style="color:var(--dimmer)">of ${fmtData(needMb(L,o))}</span></span></div>
       <div class="mini"><i style="width:${f*100}%;background:${f>=1?'var(--phosphor)':covered?'var(--blue-lift)':'var(--red)'}"></i></div></div>`}).join("")+
     (O.dead.size?`<div class="ghost-note">Lost: ${[...O.dead].map(i=>byId(INSTR,i).n).join(", ")}</div>`:"");
-  el("logbox").innerHTML=O.log.map(l=>`<div class="logline ${l.cls}"><span class="d">${dayLabel(l.day)}</span><span>${esc(l.txt)}</span></div>`).join("");
+  el("logbox").innerHTML=O.log.map(l=>`<div class="logline ${l.cls}"><span class="d">${dayLabel(l.day)} <i style="font-style:normal;opacity:0.6;font-size:9px">${l.timeSub||""}</i></span><span>${esc(l.txt)}</span></div>`).join("");
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -3875,7 +4451,7 @@ function verdict(D,R,O){
   if(OA==="survey") out.push("The cautious Bennu survey cost 20 extra days of operations and returned more science.");
   /* Phase-4: touchdown record feeds the report narrative (full grading in Phase 7). */
   if(S.landing){
-    const Ld=S.landing, st=byId(MOON_SITES,Ld.site);
+    const Ld=S.landing, st=byId(MOON_SITES,Ld.site)||byId(MARS_SITES,Ld.site);
     out.push(Ld.degraded
       ? `Touchdown at ${st?st.n:"the site"} was hard (${Ld.slope}° on a ${Ld.margin}° deficit) — the rover drove degraded after a $${Ld.opsM}M recovery, ${Ld.offsetKm} km from the prime target.`
       : `Touchdown at ${st?st.n:"the site"} was nominal (${Ld.slope}°, +${Ld.margin}° margin, ${Ld.offsetKm} km from the prime target).`);
@@ -3939,7 +4515,7 @@ function loadShare(){
     S.levelId=d.l;S.objectives=d.o||[];S.instruments=d.i||[];
     S.power=d.p;S.comms=d.c;S.prop=d.r;S.shield=d.s||"sh0";S.assist=!!d.a;S.mode=d.m||"cadet";S.dsn=d.q||"standard";S.site=d.t||null;
     S.rover=null;
-    if(d.v&&d.l==="l2"){
+    if(d.v&&(d.l==="l2"||d.l==="l3"||d.l==="sbx")){
       const q={mob:d.v.mob,pwr:d.v.pwr,com:d.v.com,pay:d.v.pay};
       if(byId(ROVER_MOB,q.mob)&&byId(ROVER_PWR,q.pwr)&&byId(ROVER_COM,q.com)&&byId(ROVER_PAY,q.pay)) S.rover=q;
     }
@@ -3963,9 +4539,9 @@ function startLevel(id){
   S.power=L.power[Math.min(1,L.power.length-1)];
   S.comms=L.comms[Math.min(1,L.comms.length-1)];
   S.prop=L.prop[0]; S.shield="sh0";
-  /* Phase-2: L2 preselects the baseline rover kit (player upgrades from here);
-     every other mission carries no rover. Old saves (no key) behave as null. */
-  S.rover=(id==="l2")?{mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}:null;
+  /* Phase-2: landing levels preselect the baseline rover kit (player upgrades
+     from here); every other mission carries no rover. Old saves behave as null. */
+  S.rover=(id==="l2"||id==="l3"||id==="sbx")?{mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}:null;
   /* Phase-4: touchdown record, written once at LAND resolution. */
   S.landing=null;
   go("brief");
@@ -3979,6 +4555,7 @@ document.addEventListener("click",e=>{
 
   switch(a){
     case "start": go("select"); Audio_.click(); break;
+    case "about": aboutModal(); Audio_.click(); break;
     case "how": howModal(); break;
     case "home": try{ finishLanding(); }catch(e){} S.ops=null; go("select"); break;
     case "gohome": try{ finishLanding(); }catch(e){} S.ops=null; go("title"); Audio_.click(); break;
@@ -3998,35 +4575,30 @@ document.addEventListener("click",e=>{
         if(btn){
           btn.classList.toggle("sel", on);
           const box = btn.querySelector(".box");
-          if(box) box.textContent = on ? "\u2715" : "";
+          if(box) box.textContent = on ? "\u2713" : "";
         }
-        const codeEl = document.querySelector(".brief h3 .code");
-        if(codeEl) codeEl.textContent = `${S.objectives.length} SELECTED`;
+        const codeEl = document.getElementById("objCountCode") || document.querySelector(".brief h3 .code");
+        if(codeEl) codeEl.textContent = `${S.objectives.length} / ${L.req} SELECTED`;
         const toBuild = document.querySelector('[data-act="tobuild"]');
-        if(toBuild) toBuild.disabled = S.objectives.length < L.req || (L.body==="moon" && !S.site);
-        const pad = toBuild ? toBuild.closest(".pad") : null;
-        if(pad){
-          let hint = pad.querySelector(".hint.mt-s");
-          if(S.objectives.length < L.req){
-            const rem = L.req - S.objectives.length;
-            const msg = `Select ${rem} more objective${rem > 1 ? "s" : ""} to continue.`;
-            if(hint) { hint.textContent = msg; hint.style.display = ""; }
-            else {
-              hint = document.createElement("p");
-              hint.className = "hint mt-s";
-              hint.textContent = msg;
-              pad.appendChild(hint);
-            }
-          } else if(hint){
-            hint.style.display = "none";
-          }
-        }
+        if(toBuild) toBuild.disabled = S.objectives.length < L.req || ((L.body==="moon"||L.body==="mars") && !S.site);
         renderHUD();
+        renderDock();
         break;
       }
       render(); break;
     }
     case "tobuild": S.bstep="payload"; go("build"); break;
+    case "bstep-systems": S.bstep="systems"; Audio_.click(); render(); break;
+    case "bstep-review": S.bstep="review"; Audio_.click(); render(); break;
+    case "bstep-payload": S.bstep="payload"; Audio_.click(); render(); break;
+    case "filter-useful": S.filterUseful=!S.filterUseful; Audio_.click(); render(); break;
+    case "toggle-acc": {
+      const targetId = t.dataset.target;
+      const acc = document.getElementById(targetId);
+      if(acc) acc.classList.toggle("open");
+      Audio_.click();
+      break;
+    }
     case "landch": resolveLand(+t.dataset.i); Audio_.click(); break;
     case "sord": {
       if(!S.surface) break;
@@ -4040,21 +4612,23 @@ document.addEventListener("click",e=>{
     }
     case "site": {
       const L2=byId(LEVELS,S.levelId);
-      if(!L2||L2.body!=="moon") break;
-      if(!byId(MOON_SITES,id)) break;
+      if(!L2||(L2.body!=="moon"&&L2.body!=="mars")) break;
+      if(!byId(MOON_SITES,id)&&!byId(MARS_SITES,id)) break;
       S.site=id; Audio_.click();
       if(S.screen==="brief"){
         document.querySelectorAll('#siteList [data-act="site"]').forEach(b=>{
           const on=b.dataset.id===id;
           b.classList.toggle("sel",on);
           const box=b.querySelector(".box");
-          if(box) box.textContent=on?"\u2715":"";
+          if(box) box.textContent=on?"\u2713":"";
         });
         const fx=document.getElementById("siteFx");
-        if(fx) fx.textContent=byId(MOON_SITES,id).fx;
+        if(fx) fx.textContent=(byId(MOON_SITES,id)||byId(MARS_SITES,id)).fx;
         const L3=byId(LEVELS,S.levelId);
         const toBuild=document.querySelector('[data-act="tobuild"]');
         if(toBuild) toBuild.disabled=S.objectives.length<L3.req;
+        renderHUD();
+        renderDock();
       }
       break;
     }
@@ -4067,7 +4641,7 @@ document.addEventListener("click",e=>{
     case "prop":  S.prop=id;  Audio_.click(); refreshBuild(prev); break;
     case "shield":S.shield=id;Audio_.click(); refreshBuild(prev); break;
     case "rover": {
-      if(S.levelId!=="l2") break;
+      if(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx") break;
       const k=t.dataset.k;
       if(!["mob","pwr","com","pay"].includes(k)) break;
       const cat=k==="mob"?ROVER_MOB:k==="pwr"?ROVER_PWR:k==="com"?ROVER_COM:ROVER_PAY;
@@ -4178,7 +4752,7 @@ function refreshBuild(prev){
     if(liveHost && liveCanvas){
       const parent=liveHost.parentNode, next=liveHost.nextSibling;
       try{ parent.removeChild(liveHost); }catch(e){}
-      s.innerHTML=scrBuild(); drawBay(); renderHUD(); cascade(prev);
+      s.innerHTML=scrBuild(); drawBay(); renderHUD(); renderDock(); cascade(prev);
       const back=s.querySelector("#"+liveHost.id)||s.querySelector(".v3host");
       if(back&&back.parentNode){
         try{ back.parentNode.replaceChild(liveHost,back); }catch(e){ try{back.appendChild(liveCanvas);}catch(e2){} }
@@ -4191,11 +4765,32 @@ function refreshBuild(prev){
       return;
     }
   }catch(e){}
-  s.innerHTML=scrBuild(); drawBay(); renderHUD(); cascade(prev); s.scrollTop=sc;
+  s.innerHTML=scrBuild(); drawBay(); renderHUD(); renderDock(); cascade(prev); s.scrollTop=sc;
   const newCat2 = s ? s.querySelector(".cat") : null;
   if(newCat2) newCat2.scrollTop = catScroll;
   if(window.M3D)M3D.sync();
 }
+
+/* Delta preview hover listeners */
+document.addEventListener("pointerover", e=>{
+  const t=e.target.closest("[data-act]");
+  if(t) previewRailDeltas(t);
+});
+document.addEventListener("pointerout", e=>{
+  const t=e.target.closest("[data-act]");
+  if(t) clearRailDeltas();
+});
+document.addEventListener("click", e=>{
+  const btn=e.target.closest("#btnTelemToggle");
+  if(btn){
+    const telem=document.getElementById("telem");
+    if(telem){
+      telem.classList.toggle("ticker-hidden");
+      btn.classList.toggle("paused", telem.classList.contains("ticker-hidden"));
+    }
+  }
+});
+
 
 /* rail breakdown drawer */
 document.addEventListener("click",e=>{
@@ -4471,9 +5066,8 @@ function liftoff(){
   const ov = document.createElement("div");
   ov.id = "launchOverlay";
   ov.innerHTML =
-    '<div class="launch3d-head"><span class="kicker">GROUND PHASE — KENNEDY ASCENT (ILLUSTRATED)</span>' +
-    '<span class="hint">' + esc(lvName) + ' &mdash; ' + esc(yrToDate(S.launch.tDep)) +
-    ' &middot; vehicle shown: dimensionally-true illustration (verified heights/diameters/boosters)</span></div>' +
+    '<div class="launch3d-head"><span class="kicker">LC-39B COUNTDOWN & ASCENT</span>' +
+    '<span class="hint">' + esc(lvName) + ' &middot; T-0 ' + esc(yrToDate(S.launch.tDep)) + '</span></div>' +
     '<div class="launch3d-body" id="launch3dBody"></div>';
   document.body.appendChild(ov);
   const cleanup = () => { try { ov.parentElement.removeChild(ov); } catch (e) {} };
@@ -4530,14 +5124,37 @@ function liftoff(){
   };
   try {
     import("./js/launch-view.js").then((mod) => {
+      console.log("[LAUNCH] launch-view.js imported successfully", mod);
       const LV3 = (mod && mod.LaunchView) || window.LaunchView;
-      if (!LV3 || !LV3.start) { fallbackCountdown(); return; }
+      if (!LV3 || !LV3.start) {
+        console.error("[LAUNCH] LV3 or LV3.start missing", LV3);
+        fallbackCountdown();
+        return;
+      }
       const body = ov.querySelector("#launch3dBody");
       const ok = LV3.start(body, { vehicleName: lvName, lvId: lvId, onDone: proceed,
         tDep: (S.launch && isFinite(S.launch.tDep)) ? S.launch.tDep : 2029.0 }); // solar hook date only, no sim change
+      console.log("[LAUNCH] LV3.start returned:", ok);
       if (!ok) fallbackCountdown();
-    }).catch(() => fallbackCountdown());
-  } catch (e) { fallbackCountdown(); }
+    }).catch((err) => {
+      console.error("[LAUNCH] import('./js/launch-view.js') rejected:", err);
+      fallbackCountdown();
+    });
+  } catch (e) {
+    console.error("[LAUNCH] sync import error:", e);
+    fallbackCountdown();
+  }
+}
+
+function aboutModal(){
+  el("mbox").innerHTML=`<h3>WHAT IS MARGIN</h3><div class="mb" style="font-size:13px;line-height:1.7">
+    <p>Designing a space mission is a fight over margin. Add a better camera and you gain
+    science &mdash; and lose eighteen kilograms, which costs you array area, which costs you propellant,
+    which costs you two years of cruise, which costs you the transmitter you needed to send any of it home.</p>
+    <p class="mt-s">Pick a real NASA science objective. Build the spacecraft. Choose a launch window off a real
+    Lambert solution. Then fly it, and live with what you built.</p>
+    <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
+  el("modal").classList.add("on");
 }
 
 function howModal(){

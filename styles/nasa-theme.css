@@ -41,7 +41,7 @@ button:focus-visible,[tabindex]:focus-visible,a:focus-visible{outline:2px solid 
   backdrop-filter:blur(8px);
 }
 #topbar .mark{font-family:var(--disp);font-weight:700;letter-spacing:.24em;font-size:14px}
-#topbar .mark i{font-style:normal;color:var(--red)}
+#topbar .mark i{font-style:normal;color:var(--gold,#ffb84d)}
 #steps{display:flex;gap:2px;align-items:center;flex:1;min-width:0;overflow:hidden}
 .step{
   font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--dimmer);
@@ -112,16 +112,27 @@ h2{font-size:22px;letter-spacing:.01em}
 #tip .simp{display:block;margin-top:5px;color:var(--amber);font-size:10.5px}
 
 /* ── HUD rails ───────────────────────────── */
-#hud{flex:0 0 auto;border-top:1px solid var(--hairline);background:rgba(7,10,18,.96);backdrop-filter:blur(8px)}
+#hud{flex:0 0 auto;border-top:1px solid rgba(75,130,215,0.2);background:rgba(7,10,18,.96);backdrop-filter:blur(8px)}
 #hud.hidden{display:none}
 .rails{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--hairline)}
-.rail{background:var(--panel);padding:8px 11px 9px;cursor:pointer;position:relative;text-align:left;width:100%}
+.rail{background:var(--panel);padding:8px 12px 9px;cursor:pointer;position:relative;text-align:left;width:100%;transition:background .15s}
 .rail:hover{background:var(--panel-2)}
-.rail .rl{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.rail .nm{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--dim)}
-.rail .mg{font-family:var(--mono);font-size:10px;color:var(--dim)}
-.rail .vl{font-family:var(--mono);font-size:15px;font-weight:500;margin:3px 0 5px;font-variant-numeric:tabular-nums}
-.rail .vl small{font-size:10.5px;color:var(--dim);font-weight:400}
+.rail .rl{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rail .nm{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dim);font-weight:600}
+.rail .status-slot{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.rail .sig{position:static;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;padding:1px 5px;border-radius:2px;font-weight:600}
+.rail.caution .sig{color:var(--amber);background:rgba(255,183,77,0.14)}
+.rail.over .sig{color:var(--red);background:rgba(255,92,92,0.18)}
+.rail:not(.caution):not(.over) .sig{color:var(--phosphor);background:rgba(94,246,160,0.1)}
+.rail .mg{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.rail.caution .mg{color:var(--amber)}
+.rail.over .mg{color:var(--red)}
+.rail .vl{font-family:var(--mono);font-size:14.5px;font-weight:500;margin:3px 0 5px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:6px}
+.rail .vl small{font-size:11px;color:var(--dim);font-weight:400}
+.rail .vl .delta-ghost{font-size:11.5px;font-weight:600;padding:1px 5px;border-radius:2px;letter-spacing:0}
+.delta-ghost.ghost-better{color:var(--phosphor);background:rgba(94,246,160,0.16)}
+.delta-ghost.ghost-worse{color:var(--amber);background:rgba(255,183,77,0.16)}
+.delta-ghost.ghost-crit{color:var(--red);background:rgba(255,92,92,0.22)}
 .bar{height:4px;background:#121925;position:relative;overflow:hidden}
 .bar i{position:absolute;inset:0 auto 0 0;background:var(--phosphor);transition:width .42s var(--ease),background .3s}
 .rail.caution .bar i{background:var(--amber)} .rail.caution .mg{color:var(--amber)}
@@ -132,11 +143,19 @@ h2{font-size:22px;letter-spacing:.01em}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}50%{transform:translateX(3px)}80%{transform:translateX(-2px)}}
 .rail.caution .bar::after{content:'';position:absolute;inset:0;background:var(--amber);opacity:0;animation:pulse 1.6s infinite}
 @keyframes pulse{0%,100%{opacity:0}50%{opacity:.16}}
-.rail .sig{position:absolute;top:8px;right:10px;font-size:10px}
 
 /* ── telemetry strip ─────────────────────── */
-#telem{flex:0 0 auto;height:22px;border-top:1px solid var(--hairline);background:#04060B;overflow:hidden;position:relative}
-#telem .run{position:absolute;white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--dimmer);line-height:22px;animation:scroll 70s linear infinite}
+#telem{flex:0 0 auto;height:24px;border-top:1px solid var(--hairline);background:#04060B;overflow:hidden;position:relative;display:flex;align-items:center}
+.telem-btn{
+  position:relative;z-index:3;height:100%;
+  background:#090d16;color:var(--dim);border:none;border-right:1px solid var(--hairline);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;padding:0 10px;cursor:pointer;
+  transition:all .15s;
+}
+.telem-btn:hover{color:var(--bone);background:rgba(75,130,215,0.2)}
+.telem-btn.paused{color:var(--amber);background:rgba(255,183,77,0.12)}
+#telem.ticker-hidden .run{display:none}
+#telem .run{position:absolute;left:70px;white-space:nowrap;font-family:var(--mono);font-size:10.5px;color:var(--dimmer);line-height:24px;animation:scroll 70s linear infinite}
 @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 #telem .run b{color:var(--phosphor);font-weight:400}
 
@@ -534,11 +553,10 @@ body.ops-active #screen { overflow: hidden; }
 }
 
 .ops-viewport.hud-hidden .ops-minimap {
-  opacity: 0.35;
-}
-
-.ops-viewport.hud-hidden .ops-minimap:hover {
-  opacity: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(16px);
+  transition: opacity .2s ease, transform .2s ease;
 }
 
 /* Legacy & Component Styles */
@@ -565,9 +583,9 @@ body.ops-active #screen { overflow: hidden; }
    overflow hidden). Same remedy as #logbox: science scrolls internally, the
    timeline card never shrinks. */
 .ops-hud-right .hud-card:first-child{min-height:0}
-#sciBox{min-height:0;max-height:calc(100vh - 560px);overflow:auto;scrollbar-width:thin}
+#sciBox{min-height:90px;max-height:280px;overflow:auto;scrollbar-width:thin}
 #sciBox::-webkit-scrollbar{width:6px}#sciBox::-webkit-scrollbar-thumb{background:var(--hairline)}
-.ops-hud-right .hud-card:last-child{flex-shrink:0}
+.ops-hud-right .hud-card:last-child{flex-shrink:0;min-height:105px}
 
 /* ── modal ───────────────────────────────── */
 #modal{position:fixed;inset:0;z-index:80;display:none;place-items:center;background:rgba(3,5,10,.82);padding:20px;backdrop-filter:blur(3px)}
@@ -712,7 +730,7 @@ button,.btn,.tb-btn{border-radius:var(--ds-radius);}
 }
 #topbar::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(58,120,209,.55),transparent);opacity:.65;}
 #topbar .mark{font-family:var(--disp);font-weight:800;letter-spacing:.25em;font-size:14px;color:var(--ds-text);}
-#topbar .mark i{font-style:normal;color:var(--ds-red);}
+#topbar .mark i{font-style:normal;color:var(--gold,#ffb84d);}
 .step{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--ds-text-3);padding:4px 9px;border:1px solid transparent;}
 .step.on{color:var(--ds-nominal);border-color:rgba(101,242,165,.30);background:rgba(101,242,165,.055);}
 .step.done{color:var(--ds-text-2);}
@@ -1008,6 +1026,220 @@ body.sel3d .selview-fallback{display:none}
   background:rgba(11,61,145,.4);border-color:var(--ds-blue-hi);color:#fff;box-shadow:0 0 14px rgba(58,120,209,.4);
 }
 
+/* ── Custom Celestial Body HUD Selector ── */
+.cbs-wrap{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  font-family:var(--mono, monospace);
+  z-index:30;
+}
+.cbs-trigger{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  background:rgba(6,12,24,.88);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;
+  color:rgba(235,242,252,.9);
+  font-family:var(--mono, monospace);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.06em;
+  padding:6px 14px;
+  cursor:pointer;
+  box-shadow:0 4px 18px rgba(0,0,0,.5);
+  transition:all .18s var(--ease, ease);
+  user-select:none;
+}
+.cbs-trigger:hover,
+.cbs-wrap.open .cbs-trigger{
+  background:rgba(12,24,44,.95);
+  border-color:var(--sel-blue, #5ba4ff);
+  color:#fff;
+  box-shadow:0 0 16px rgba(91,164,255,.35), 0 4px 20px rgba(0,0,0,.6);
+}
+.cbs-trig-icon{
+  font-size:11px;
+  line-height:1;
+}
+.cbs-trig-label{
+  white-space:nowrap;
+}
+.cbs-caret{
+  font-size:9px;
+  opacity:.6;
+  margin-left:2px;
+  transition:transform .2s ease, opacity .2s ease;
+  display:inline-block;
+}
+.cbs-wrap.open .cbs-caret{
+  transform:rotate(180deg);
+  opacity:1;
+  color:var(--sel-blue, #5ba4ff);
+}
+
+/* ── Custom Dropdown Menu Panel ── */
+.cbs-menu{
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);
+  left:0;
+  width:290px;
+  max-height:380px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:linear-gradient(180deg, rgba(8,16,32,.97), rgba(4,8,16,.97));
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(91,164,255,.3);
+  border-radius:12px;
+  box-shadow:0 20px 48px rgba(0,0,0,.9), 0 0 24px rgba(11,61,145,.28), inset 0 1px 0 rgba(255,255,255,.12);
+  padding:6px 4px;
+  z-index:1000;
+  animation:cbsIn .18s cubic-bezier(.16,1,.3,1);
+  scrollbar-width:thin;
+  scrollbar-color:rgba(91,164,255,.3) transparent;
+}
+.cbs-wrap.open .cbs-menu{
+  display:block;
+}
+@keyframes cbsIn{
+  from{opacity:0;transform:translateY(-6px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* Custom scrollbar for menu */
+.cbs-menu::-webkit-scrollbar{
+  width:5px;
+}
+.cbs-menu::-webkit-scrollbar-track{
+  background:transparent;
+}
+.cbs-menu::-webkit-scrollbar-thumb{
+  background:rgba(91,164,255,.25);
+  border-radius:999px;
+}
+.cbs-menu::-webkit-scrollbar-thumb:hover{
+  background:rgba(91,164,255,.5);
+}
+
+/* Group Headers */
+.cbs-group{
+  margin-bottom:4px;
+}
+.cbs-group:not(:first-child){
+  border-top:1px solid rgba(255,255,255,.07);
+  margin-top:6px;
+  padding-top:4px;
+}
+.cbs-group-title{
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.16em;
+  color:rgba(91,164,255,.75);
+  text-transform:uppercase;
+  padding:6px 12px 3px;
+  user-select:none;
+}
+
+/* Menu Items */
+.cbs-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  padding:7px 12px;
+  background:transparent;
+  border:none;
+  border-radius:7px;
+  color:#d4e2f2;
+  font-family:var(--mono, monospace);
+  font-size:11px;
+  cursor:pointer;
+  text-align:left;
+  transition:all .12s ease;
+  user-select:none;
+}
+.cbs-item:hover,
+.cbs-item:focus{
+  background:rgba(91,164,255,.16);
+  color:#fff;
+  outline:none;
+  transform:translateX(2px);
+}
+.cbs-item.is-sub{
+  padding-left:22px;
+  font-size:10.5px;
+  color:#9ab5d4;
+}
+.cbs-item.is-sub:hover,
+.cbs-item.is-sub:focus{
+  color:#fff;
+  background:rgba(126,232,200,.14);
+}
+.cbs-item-left{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.cbs-sub-indent{
+  color:rgba(255,255,255,.25);
+  font-size:9px;
+  margin-right:-2px;
+}
+.cbs-item-icon{
+  font-size:12px;
+  line-height:1;
+  flex-shrink:0;
+}
+.cbs-item-name{
+  font-weight:550;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Tag Pills */
+.cbs-tag{
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.12em;
+  padding:2px 6px;
+  border-radius:999px;
+  background:rgba(255,255,255,.06);
+  color:rgba(255,255,255,.45);
+  flex-shrink:0;
+}
+.cbs-tag-star{
+  background:rgba(255,200,60,.14);
+  color:#fed156;
+  border:1px solid rgba(255,200,60,.25);
+}
+.cbs-tag-planet{
+  background:rgba(91,164,255,.12);
+  color:#8dc2ff;
+  border:1px solid rgba(91,164,255,.22);
+}
+.cbs-tag-moon{
+  background:rgba(126,232,200,.12);
+  color:#7ee8c8;
+  border:1px solid rgba(126,232,200,.22);
+}
+.cbs-tag-dwarf{
+  background:rgba(180,160,255,.14);
+  color:#cfbaff;
+  border:1px solid rgba(180,160,255,.25);
+}
+.cbs-tag-asteroid{
+  background:rgba(240,140,200,.14);
+  color:#f5a4d6;
+  border:1px solid rgba(240,140,200,.25);
+}
+
 /* ── Fullscreen / Expanded Solar System Viewport ── */
 .selview.expanded-solar-system{
   position:fixed!important;inset:0!important;z-index:999!important;width:100vw!important;height:100vh!important;
@@ -1150,7 +1382,7 @@ button:focus-visible,.btn:focus-visible,.tb-btn:focus-visible,[tabindex]:focus-v
   .ops-hud-left,.ops-hud-right{opacity:.55;transition:opacity .2s ease,transform .28s var(--ease)}
   .ops-hud-left:hover,.ops-hud-left:focus-within,.ops-hud-right:hover,.ops-hud-right:focus-within{opacity:1}
 }
-.ops-viewport.hud-hidden .ops-minimap{opacity:.35}
+.ops-viewport.hud-hidden .ops-minimap{opacity:0;pointer-events:none;transform:translateY(16px)}
 /* ── Orrery nav: dim cluster until needed, scrim for legibility ── */
 .orrery-nav-bar{opacity:.62;transition:opacity .18s ease;background:rgba(4,8,16,.55);padding:4px;border:1px solid var(--ds-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .orrery-nav-bar:hover,.orrery-nav-bar:focus-within{opacity:1}
@@ -1189,29 +1421,754 @@ select.planet-select-dropdown{background-color:#060d1a;color:#d5e5f5}
 .launch-hud .lh-phase-block{flex:1;min-width:0}
 .launch-hud .lh-phase{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--ds-nominal,#40e090);text-transform:uppercase}
 .launch-hud .lh-sub{font-size:9.5px;letter-spacing:.08em;color:var(--ds-text-2,#8ca0b8);margin-top:2px}
-.launch-hud .lh-stages-bar{display:flex;gap:6px;margin:8px 0;padding:4px 0}
+.launch-hud .lh-subhead{font-size:8.5px;letter-spacing:.14em;color:var(--ds-text-3,#6a7d94);margin-top:8px;font-weight:600;text-transform:uppercase}
+.launch-hud .lh-stages-bar{display:flex;gap:6px;margin:4px 0 8px;padding:2px 0}
 .launch-hud .lh-stage-badge{font-size:9px;padding:3px 7px;border-radius:2px;letter-spacing:.09em;font-weight:600;
-  background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.08);transition:all .2s ease}
+  background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1);transition:all .2s ease;display:flex;align-items:center;gap:4px}
+.launch-hud .badge-dot{font-size:7px;opacity:.5}
 .launch-hud .lh-stage-badge.badge-on{background:rgba(64,224,144,.18);color:#5affb0;border-color:rgba(64,224,144,.5);box-shadow:0 0 8px rgba(64,224,144,.25)}
+.launch-hud .lh-stage-badge.badge-on .badge-dot{color:#40e090;opacity:1}
+.launch-hud .lh-milestones-track{display:flex;gap:4px;background:rgba(0,0,0,.35);padding:5px 8px;border-radius:3px;margin-bottom:8px;border:1px solid rgba(255,255,255,.05)}
+.launch-hud .lh-ms-item{flex:1;text-align:center;font-size:8.5px;letter-spacing:.1em;padding:2px 0;color:var(--ds-text-3,#6a7d94);border-radius:2px;transition:all .2s ease}
+.launch-hud .lh-ms-item.passed{color:#5eb4ff;font-weight:700;background:rgba(94,180,255,.12);border-bottom:2px solid #5eb4ff}
 .launch-hud .lh-tele-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:rgba(0,0,0,.3);padding:8px 10px;border-radius:3px;margin:6px 0}
 .launch-hud .lh-tele-cell{display:flex;flex-direction:column;gap:2px}
 .launch-hud .lh-tele-cell .lh-label{font-size:8.5px;letter-spacing:.12em;color:var(--ds-text-3,#6a7d94)}
 .launch-hud .lh-tele-cell b{font-size:12px;font-weight:700;color:#ffffff;font-variant-numeric:tabular-nums}
 .launch-hud .lh-tele{display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--ds-text-2)}
 .launch-hud .lh-tele b{color:var(--ds-text);font-variant-numeric:tabular-nums}
-.launch-hud .lh-note{margin-top:8px;font-size:9.5px;line-height:1.45;color:var(--ds-text-3);max-width:64ch}
-.launch-hud .lh-skip{margin-top:8px;width:100%;letter-spacing:.12em;font-size:10.5px;padding:7px;border:1px solid rgba(255,255,255,.15);cursor:pointer}
-.launch-hud .lh-skip:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3)}
+.launch-hud .lh-note{margin-top:6px;font-size:9.5px;line-height:1.4;color:var(--ds-text-3);max-width:64ch}
+.launch-hud .lh-ctrl-row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+.launch-hud .lh-speed-bar{display:flex;gap:3px;align-items:center}
+.launch-hud .lh-speed-label{font-size:9px;letter-spacing:.12em;color:var(--ds-text-3);margin-right:2px}
+.launch-hud .lh-spd-btn{font-family:var(--mono);font-size:9.5px;padding:3px 7px;background:rgba(255,255,255,.06);color:var(--ds-text-2);border:1px solid rgba(255,255,255,.1);border-radius:2px;cursor:pointer}
+.launch-hud .lh-spd-btn.on{background:rgba(64,224,144,.2);color:#40e090;border-color:rgba(64,224,144,.5)}
+.launch-hud .lh-skip{letter-spacing:.1em;font-size:10px;padding:5px 10px;border:1px solid rgba(255,255,255,.12);color:var(--ds-text-2);background:transparent;cursor:pointer;border-radius:2px}
+.launch-hud .lh-skip:hover{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.25)}
+
+/* Phase-adaptive HUD during powered descent */
+.ops-viewport.in-descent .ops-hud-right{display:none!important}
+.ops-viewport.in-descent .ops-hud-left .hud-card{border-color:rgba(255,176,0,.4);box-shadow:0 0 16px rgba(255,176,0,.1)}
+.hud-card{background:linear-gradient(180deg,rgba(10,18,32,.92),rgba(5,10,18,.94));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(80,120,180,.32)}
 
 /* Phase-4 descent illusion overlay (DOM over the live scene; ?no3d-safe) */
 .dz-overlay{position:absolute;inset:0;z-index:40;pointer-events:none}
-.dz-tape{position:absolute;top:64px;left:50%;transform:translateX(-50%);display:flex;gap:18px;padding:8px 18px;background:rgba(4,6,12,.82);border:1px solid rgba(255,176,0,.5);border-radius:2px;font-family:var(--mono)}
+.dz-tape{position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;gap:18px;padding:8px 18px;background:rgba(4,6,12,.92);border:1px solid rgba(255,176,0,.5);border-radius:4px;font-family:var(--mono);backdrop-filter:blur(8px);z-index:42}
 .dz-tape .dz-row{display:flex;flex-direction:column;align-items:center;gap:2px}
 .dz-tape span{font-size:9px;letter-spacing:.18em;color:var(--dim)}
 .dz-tape b{font-size:16px;color:var(--amber)}
 .dz-glow{position:absolute;left:50%;bottom:-12%;width:120vmin;height:60vmin;transform:translateX(-50%);background:radial-gradient(ellipse at 50% 100%,rgba(255,150,60,.55),rgba(255,120,40,.18) 55%,transparent 75%);opacity:0;pointer-events:none}
-.dz-dust{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 110%,rgba(160,150,135,.95),rgba(120,112,100,.55) 45%,transparent 75%);opacity:0;pointer-events:none;transition:opacity .12s linear}
-.dz-skip{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);pointer-events:auto;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--bone);background:rgba(4,6,12,.8);border:1px solid var(--hairline);border-radius:2px;padding:7px 16px;cursor:pointer}
+.dz-dust{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 110%,rgba(180,175,165,.6),rgba(140,135,125,.25) 50%,transparent 80%);opacity:0;pointer-events:none;transition:opacity .12s linear}
+.dz-controls{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:45;pointer-events:auto}
+.dz-divert-btn{font-family:var(--mono);font-size:11px;letter-spacing:.12em;font-weight:600;color:var(--amber);background:rgba(255,176,0,.12);border:1px solid rgba(255,176,0,.45);border-radius:3px;padding:8px 16px;cursor:pointer;transition:all .2s ease}
+.dz-divert-btn:hover{background:rgba(255,176,0,.22);border-color:var(--amber);color:#fff}
+.dz-divert-btn.diverted{background:rgba(64,224,144,.2);border-color:#40e090;color:#40e090}
+.dz-skip{pointer-events:auto;font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--bone);background:rgba(4,6,12,.85);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:8px 16px;cursor:pointer;transition:all .2s ease}
 .dz-skip:hover{border-color:var(--phosphor);color:var(--phosphor)}
 .ops-viewport.dz-shake #ops3d-mount{animation:dzshake .18s linear infinite}
 @keyframes dzshake{0%{transform:translate(0,0)}25%{transform:translate(calc(var(--dzAmp,1)*2px),calc(var(--dzAmp,1)*-1px))}50%{transform:translate(calc(var(--dzAmp,1)*-2px),calc(var(--dzAmp,1)*1px))}75%{transform:translate(calc(var(--dzAmp,1)*1px),calc(var(--dzAmp,1)*2px))}100%{transform:translate(0,0)}}
+
+/* ── title: transparent chrome + cinematic hero (UI-only, title screen only) ── */
+body.title-active #app{position:relative}
+body.title-active #topbar{
+  position:absolute;top:0;left:0;right:0;z-index:5;
+  background:transparent;border-bottom:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+body.title-active #topbar::after{display:none}
+body.title-active #topbar .mark{display:none}
+body.title-active #steps{visibility:hidden}
+body.title-active .tb-btn{
+  background:transparent;border:0;box-shadow:none;min-height:36px;
+  color:rgba(231,236,242,.72);text-shadow:0 1px 12px rgba(0,0,0,.9);
+}
+body.title-active .tb-btn:hover{color:#fff;background:transparent;border:0;filter:none}
+.title-screen.cinematic{min-height:100%;padding:64px 20px 40px;align-content:center}
+.title-screen.cinematic .title-copy{max-width:760px;text-shadow:0 2px 24px rgba(0,0,0,.85)}
+/* all-caps display has no descenders: tighten the built-in leading so the tagline sits close */
+.title-screen.cinematic .mark-lg{line-height:1}
+.title-screen.cinematic .tagline{margin-top:8px}
+/* difference blend on the tagline: light over dark space, dark over bright clouds */
+.title-screen.cinematic .tagline{color:#c3ccd6;mix-blend-mode:difference}
+.title-screen.cinematic .modes{margin-top:26px}
+.title-screen.cinematic .title-foot{
+  margin-top:14px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);
+}
+.title-screen.cinematic .tlink{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--dim);
+  padding:6px 2px;border-bottom:1px solid transparent;
+}
+.title-screen.cinematic .tlink:hover{color:var(--bone);border-bottom-color:var(--dimmer)}
+.title-screen.cinematic .tsep{color:var(--dimmer);opacity:.6}
+.title-screen.cinematic .dsn-mini{display:inline-flex;gap:8px;align-items:center;opacity:.85}
+.title-screen.cinematic .proto{
+  margin-top:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--dimmer);opacity:.75;
+}
+/* title-only topbar links: hidden on every other screen */
+#topbar .title-only{display:none}
+body.title-active #topbar .title-only{display:inline-block}
+/* single hero CTA: centered, cinematic */
+.title-screen.cinematic .modes.hero{display:flex;justify-content:center;margin-top:20px}
+.title-screen.cinematic .hero-start{padding:14px 44px;font-size:13px;letter-spacing:.22em}
+/* hero CTA: brand green on a dark fill over the scrim — readable on any pass */
+.title-screen.cinematic .hero-start{
+  color:var(--phosphor);border-color:rgba(101,242,165,.75);
+  background:rgba(3,8,14,.55);text-shadow:0 1px 10px rgba(0,0,0,.9);
+}
+.title-screen.cinematic .hero-start:hover{background:rgba(101,242,165,.14);color:var(--phosphor)}
+@media (max-width:640px){
+  body.title-active #topbar{gap:8px}
+  body.title-active .tb-btn{padding:5px 4px;font-size:9px}
+}
+
+/* ── select: fullscreen solar-system stage + floating UI (no blocking panels) ── */
+body.select-active #screen{overflow:hidden}
+/* same chrome treatment as the title: transparent overlay bar, text-only buttons */
+body.select-active #app{position:relative}
+body.select-active #topbar{
+  position:absolute;top:0;left:0;right:0;z-index:5;
+  background:transparent;border-bottom:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  padding-left:max(3%,env(safe-area-inset-left));padding-right:max(3%,env(safe-area-inset-right));
+}
+body.select-active #topbar::after{display:none}
+body.select-active #steps{visibility:hidden}
+body.select-active .tb-btn{
+  background:transparent;border:0;box-shadow:none;min-height:36px;
+  color:rgba(231,236,242,.72);text-shadow:0 1px 12px rgba(0,0,0,.9);
+}
+body.select-active .tb-btn:hover{color:#fff;background:transparent;border:0;filter:none}
+body.select-active #topbar .title-only{display:inline-block}
+#topbar .select-only{display:none}
+body.select-active #topbar .select-only{display:inline-block}
+/* full-system mode: mission UI clears; exit paths stay (planet card RETURN,
+   nav RETURN, Escape). Class is owned by select-viewer (toggle/stop). */
+body.select-active.sysview .sel-bottom{display:none}
+body.select-active.sysview .sel-title,body.select-active.sysview .sel-tools{display:none}
+body.select-active.sysview .selcap-chip,
+body.sysview .selcap-chip{
+  display:none !important;
+}
+body.select-active.sysview .sel-full .planet-info,
+body.select-active.sysview .planet-info,
+body.sysview .sel-full .planet-info,
+body.sysview .planet-info{
+  top:auto;
+  bottom:max(24px,env(safe-area-inset-bottom));
+  left:3%;
+  right:auto;
+  transform:none;
+  max-height:calc(100vh - 120px);
+}
+body.select-active.sysview .sel-full .planet-info-content,
+body.select-active.sysview .planet-info-content{
+  max-height:calc(100vh - 120px);
+}
+.sel-full{position:absolute;inset:0;overflow:hidden;background:#04070d}
+.sel-full #selview{position:absolute;inset:0;aspect-ratio:auto;opacity:1}
+.sel-full #selview.swap{opacity:0}
+.sel-full .selview-fallback{position:absolute;inset:0}
+/* mock palette, select scope */
+.sel-full{--sel-mint:#7ee8c8;--sel-blue:#5ba4ff;--sel-ink:#f5f5f5;color:var(--sel-ink)}
+/* stage grades (mock): vignette + left legibility scrim + top/bottom bars */
+.sel-full::before{
+  content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:
+    radial-gradient(ellipse 90% 70% at 58% 50%,rgba(0,0,0,0) 42%,rgba(0,0,0,.22) 78%,rgba(0,0,0,.55) 100%),
+    linear-gradient(90deg,rgba(3,8,18,.78) 0%,rgba(3,8,18,.32) 24%,rgba(0,0,0,0) 52%,rgba(0,0,0,0) 72%,rgba(0,0,0,.25) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 22%,rgba(0,0,0,0) 80%,rgba(0,0,0,.6) 100%);
+}
+/* faint dot texture over the void (retired: overlaid 2D screen-space dots on dark sides of 3D planets) */
+.sel-full::after{
+  display:none;
+}
+/* fullscreen toggle is redundant: the stage is always fullscreen now */
+.sel-full #btnToggleFullscreen{display:none}
+/* one header control row: viewer nav docked beside the mode pills */
+.sel-full .orrery-nav-bar{
+  position:static;background:transparent;border:0;box-shadow:none;
+  backdrop-filter:none;-webkit-backdrop-filter:none;opacity:1;padding:0;
+}
+#selcontrols{display:flex;align-items:center;min-width:0}
+/* planet fact card: right side aligned with destination dossier, matching glass */
+.sel-full .planet-info{
+  left:auto;right:3%;top:116px;transform:none;
+  width:min(340px,calc(100vw - 32px));max-width:340px;
+  z-index:10;margin:0;
+}
+.sel-full .planet-info-content{
+  background:rgba(10,18,32,.22);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,.08);border-radius:20px;
+  box-shadow:0 16px 48px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
+  text-shadow:0 2px 18px rgba(0,0,0,.85);
+  padding:20px 22px;position:relative;overflow-x:hidden;overflow-y:auto;
+  max-height:calc(100vh - 400px);
+}
+.sel-full .planet-info-content::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(91,164,255,.6),transparent);
+}
+.sel-full .planet-info-content .close-btn{
+  top:16px;right:18px;color:rgba(255,255,255,.4);font-size:20px;
+  line-height:1;transition:color .15s ease;
+}
+.sel-full .planet-info-content .close-btn:hover{
+  color:#fff;text-shadow:0 0 8px rgba(255,255,255,.6);
+}
+.planet-info .pi-actions,
+.sel-full .planet-info .pi-actions{
+  margin-top:14px;
+}
+.planet-info .sysbtn,
+.sel-full .planet-info .sysbtn{
+  width:100%;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  background:rgba(255,255,255,.06);
+  padding:8px 16px;
+  min-height:0;
+  font-family:var(--mono, monospace);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.14em;
+  color:rgba(255,255,255,.85);
+  cursor:pointer;
+  transition:all .15s ease;
+  display:block;
+  text-align:center;
+}
+.planet-info .sysbtn:hover,
+.sel-full .planet-info .sysbtn:hover{
+  border-color:var(--sel-blue);
+  color:#fff;
+  background:rgba(91,164,255,.18);
+  box-shadow:0 0 14px rgba(91,164,255,.25);
+  filter:none;
+}
+.sel-full .planet-select-dropdown,
+.sel-full .cbs-trigger{background:rgba(4,9,18,.72);border:1px solid rgba(255,255,255,.12);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+.sel-full .cbs-trigger:hover,
+.sel-full .cbs-wrap.open .cbs-trigger{background:rgba(12,24,44,.95);border-color:var(--sel-blue);color:#fff}
+.sel-full .orrery-toggle-btn,.sel-full .orrery-fullsys-btn{background:transparent;border:0;box-shadow:none;text-shadow:0 1px 10px rgba(0,0,0,.9);color:rgba(231,236,242,.72)}
+.sel-full .orrery-toggle-btn:hover,.sel-full .orrery-fullsys-btn:hover{color:#fff}
+/* floating header: text floats over the system, only controls take clicks */
+.sel-top{
+  position:absolute;top:58px;left:3%;right:3%;z-index:5;
+  display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;
+  pointer-events:none;text-shadow:0 2px 18px rgba(0,0,0,.9);
+}
+.sel-top .tape,.sel-top .orrery-nav-bar{pointer-events:auto}
+.sel-title h2{font-size:24px}
+.sel-title .hint{margin-top:2px}
+.sel-tools{display:flex;gap:8px;align-items:center;flex-shrink:0}
+/* shared header row: viewer controls + mode pills on one baseline */
+.sel-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+/* fixed height (border-box): tape can never delevel */
+.sel-tools .tape{height:32px}
+/* mock pill: mint mode tag */
+.sel-tools .tape{
+  display:inline-flex;align-items:center;gap:8px;transform:none;border:1px solid rgba(126,232,200,.3);
+  border-radius:999px;background:rgba(10,18,32,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  color:var(--sel-mint);padding:6px 12px;font-size:10px;letter-spacing:.18em;
+}
+.sel-tools .tape::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--sel-mint);box-shadow:0 0 6px var(--sel-mint)}
+/* bottom stack: timeline label + filmstrip (dossier lives under the header) */
+.sel-bottom{
+  position:absolute;left:0;right:0;bottom:0;z-index:6;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+/* destination dossier: tucked under the header (never mid-screen),
+   free height on tall viewports, capped only to protect the strip below */
+.selcap-chip{
+  position:absolute;left:3%;top:116px;z-index:10;
+  margin:0;overflow-x:hidden;overflow-y:auto;
+  max-height:calc(100vh - 400px);
+  width:min(340px,calc(100vw - 32px));
+  padding:20px 22px;border-radius:20px;
+  border:1px solid rgba(255,255,255,.08);background:rgba(10,18,32,.22);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  box-shadow:0 16px 48px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
+  text-shadow:0 2px 18px rgba(0,0,0,.85);
+}
+.selcap-chip::before{
+  content:'';position:absolute;top:-80px;left:50%;width:120%;height:160px;transform:translateX(-50%);
+  background:radial-gradient(ellipse at center,rgba(91,164,255,.15),transparent 70%);
+  filter:blur(20px);pointer-events:none;
+}
+.selcap-chip::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(91,164,255,.6),transparent);
+}
+.selcap-chip .sc-dest{font-size:10px;letter-spacing:.22em;color:rgba(255,255,255,.4)}
+.selcap-chip .sc-name{font-size:20px;font-weight:650;letter-spacing:-.01em;margin-top:6px}
+.selcap-chip .sc-sub{font-size:12px;line-height:1.5;color:#8a9bb0;margin-top:2px}
+.selcap-chip .sc-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:12px}
+.selcap-chip .sc-stats>span{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:12.5px;color:var(--sel-ink)}
+.selcap-chip .sc-stats b{font-weight:400;font-size:9px;letter-spacing:.18em;color:rgba(255,255,255,.4)}
+.selcap-chip .sc-actions{margin-top:10px}
+.selcap-chip .sysbtn{border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(255,255,255,.06);padding:6px 14px;min-height:0;font-size:10px;letter-spacing:.14em;color:rgba(255,255,255,.75)}
+.selcap-chip .sysbtn:hover{border-color:var(--sel-blue);color:#fff;background:rgba(91,164,255,.15);filter:none}
+.selcap-chip #selstatus{opacity:.55}
+/* filmstrip header row (mock timeline label) */
+.strip-head{
+  display:flex;align-items:center;gap:12px;padding:0 3%;pointer-events:none;
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:rgba(255,255,255,.4);
+  text-shadow:0 1px 10px rgba(0,0,0,.9);
+}
+.strip-head i{flex:1;max-width:240px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.15),transparent)}
+/* mission grid: all 6 cards fit the available width, 3% headroom each side */
+.strip-wrap{position:relative;pointer-events:auto}
+.lvstrip{
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;
+  padding:8px 3% calc(14px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,transparent,rgba(3,6,12,.72));
+}
+/* narrow screens: fall back to the scroll strip (fades imply scrollability) */
+@media (max-width:1150px){
+  .strip-wrap::before,.strip-wrap::after{
+    content:'';position:absolute;top:0;bottom:0;width:32px;z-index:2;pointer-events:none;
+  }
+  .strip-wrap::before{left:0;background:linear-gradient(90deg,rgba(0,0,0,.6),transparent)}
+  .strip-wrap::after{right:0;background:linear-gradient(-90deg,rgba(0,0,0,.6),transparent)}
+  .lvstrip{
+    display:flex;overflow-x:auto;overscroll-behavior-x:contain;
+    scrollbar-width:none;-ms-overflow-style:none;scroll-snap-type:x proximity;
+  }
+  .lvstrip::-webkit-scrollbar{display:none}
+  .sel-full .lvstrip .lvcard{flex:0 0 248px;height:224px;scroll-snap-align:start}
+}
+.sel-full .lvcard{
+  min-width:0;height:auto;min-height:198px;display:flex;flex-direction:column;
+  border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(10,18,32,.38);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 8px 24px rgba(0,0,0,.4);text-align:left;
+}
+.sel-full .lvcard:hover{
+  transform:translateY(-2px);border-color:rgba(255,255,255,.15);
+  background:rgba(18,30,52,.52);box-shadow:0 8px 24px rgba(0,0,0,.4);
+}
+.sel-full .lvcard.selviewing{
+  border-color:rgba(91,164,255,.3);background:rgba(18,32,58,.62);transform:translateY(-4px);
+  box-shadow:0 12px 32px rgba(0,0,0,.5),0 0 0 1px rgba(91,164,255,.2),0 0 24px rgba(91,164,255,.18),inset 0 1px 0 rgba(255,255,255,.1);
+}
+.sel-full .lvcard.selviewing::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(91,164,255,.6),transparent);
+}
+.sel-full .lvcard .top{padding:18px 18px 0;min-width:0;display:flex;flex-direction:column;flex:1;min-height:0}
+.sel-full .lvcard .krow{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.sel-full .lvcard .num{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:rgba(255,255,255,.3)}
+.selviewing .num,.sel-full .lvcard.selviewing .num{color:var(--sel-blue)}
+.sel-full .lvcard .destpill{
+  font-family:var(--mono);font-size:9px;letter-spacing:.12em;white-space:nowrap;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.3);
+  border-radius:999px;padding:2px 8px;
+}
+.sel-full .lvcard.selviewing .destpill{border-color:rgba(91,164,255,.3);background:rgba(91,164,255,.15);color:var(--sel-blue)}
+.sel-full .lvcard h3{font-size:16px;font-weight:650;letter-spacing:-.01em;margin-top:10px;color:rgba(255,255,255,.85)}
+.sel-full .lvcard:hover h3,.sel-full .lvcard.selviewing h3{color:#fff}
+.sel-full .lvcard .sub{
+  margin-top:6px;font-size:12px;line-height:1.4;color:rgba(255,255,255,.45);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.sel-full .lvcard:hover .sub{color:rgba(255,255,255,.6)}
+.sel-full .lvcard .newpill{
+  margin-top:12px;display:flex;align-items:center;gap:6px;align-self:flex-start;max-width:100%;
+  border:1px solid rgba(126,232,200,.12);background:rgba(126,232,200,.08);border-radius:999px;padding:4px 10px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:rgba(126,232,200,.9);
+}
+.sel-full .lvcard .newpill i{width:4px;height:4px;border-radius:50%;background:var(--sel-mint);flex:0 0 auto}
+.sel-full .lvcard .newpill span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
+.sel-full .lvcard .bot{margin-top:auto;padding:14px 18px 18px;font-size:10px;display:flex;flex-direction:column;gap:5px}
+.sel-full .lvcard .brow{display:flex;align-items:center;gap:8px;min-width:0}
+.sel-full .lvcard .env{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:rgba(255,255,255,.35);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-full .lvcard .bot .spec{font-family:var(--mono);color:rgba(255,255,255,.3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.sel-full .lvcard:hover .bot .spec{color:rgba(255,255,255,.5)}
+.sel-full .lvcard .grade{position:static;margin-left:auto;color:var(--gold);font-size:15px}
+.sel-full .lvcard .go{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:rgba(255,255,255,.35);display:inline-flex;align-items:center;gap:4px}
+.sel-full .lvcard .go b{font-weight:400;transition:transform .15s var(--ease)}
+.sel-full .lvcard:hover .go{color:rgba(255,255,255,.8)}
+.sel-full .lvcard:hover .go b,.sel-full .lvcard.selviewing .go b{transform:translateX(2px)}
+.sel-full .lvcard.selviewing .go{color:#fff}
+@media (max-width:640px){
+  body.select-active .tb-btn{padding:5px 4px;font-size:9px}
+  body.select-active #topbar .title-only{display:none}
+  .sel-title h2{font-size:19px}
+  .sel-title .hint{display:none}
+  .sel-controls{justify-content:flex-start;gap:10px}
+  .selcap-chip{padding:16px;top:150px}
+  body.select-active.sysview .selcap-chip{display:none !important}
+  .sel-full .planet-info{left:3%;right:3%;top:auto;bottom:36%;transform:none;max-width:none}
+  body.select-active.sysview .sel-full .planet-info{top:auto;bottom:max(16px,env(safe-area-inset-bottom));left:3%;right:3%}
+  .strip-head{padding:0 3%}
+  .sel-full .lvstrip .lvcard{flex-basis:212px;height:auto;min-height:208px}
+  .sel-tools .tape{display:none}
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MISSION COCKPIT — brief / build / launch.
+   Unified aerospace stage layout: transparent chrome, frosted glass panels,
+   balanced grid distributions, zero outer-page scroll, internal column scrolling.
+   Optimized for F11 fullscreen mode and widescreen displays.
+   ══════════════════════════════════════════════════════════════ */
+body.brief-active #screen,body.build-active #screen,body.launch-active #screen{overflow:hidden}
+body.brief-active #app,body.build-active #app,body.launch-active #app{position:relative}
+body.brief-active #topbar,body.build-active #topbar,body.launch-active #topbar{
+  position:absolute;top:0;left:0;right:0;z-index:10;
+  background:linear-gradient(180deg,rgba(4,7,13,.82),transparent);
+  border-bottom:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  padding-left:max(2.5%,env(safe-area-inset-left));padding-right:max(2.5%,env(safe-area-inset-right));
+}
+body.brief-active #topbar::after,body.build-active #topbar::after,body.launch-active #topbar::after{display:none}
+body.brief-active .tb-btn,body.build-active .tb-btn,body.launch-active .tb-btn{
+  background:transparent;border:0;box-shadow:none;min-height:36px;
+  color:rgba(231,236,242,.75);text-shadow:0 1px 12px rgba(0,0,0,.9);
+}
+body.brief-active .tb-btn:hover,body.build-active .tb-btn:hover,body.launch-active .tb-btn:hover{
+  color:#fff;background:transparent;border:0;filter:none;
+}
+
+/* cockpit shell: full-height flex, clears the floating bar, full-bleed */
+body.brief-active .wrap,body.build-active .wrap,body.launch-active .wrap{
+  height:100%;max-width:none;padding:52px 2.5% 12px;display:flex;flex-direction:column;min-height:0;box-sizing:border-box;gap:12px;
+}
+
+/* panels → sleek aerospace glass */
+body.brief-active .panel,body.build-active .panel,body.launch-active .panel{
+  border-radius:12px;border:1px solid rgba(75,130,215,.22);
+  background:linear-gradient(180deg,rgba(11,20,35,.84),rgba(6,12,22,.88));
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:inset 0 1px 0 rgba(160,200,255,.07),0 16px 48px rgba(0,0,0,.5);
+}
+body.brief-active .panel.glass{backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+body.brief-active .bracket,body.build-active .bracket,body.launch-active .bracket{display:none}
+
+/* pill actions */
+body.brief-active .btn,body.build-active .btn,body.launch-active .btn{border-radius:999px}
+body.brief-active .spd button,body.build-active .spd button,body.launch-active .spd button{border-radius:999px}
+
+/* build tabs header */
+.build-tabs{border-radius:10px;flex:0 0 auto}
+.build-tabs .pad{padding:8px 14px}
+
+/* ── BRIEFING ── */
+body.brief-active .briefdossier{padding:2px 4px 6px;flex:0 0 auto}
+body.brief-active .briefdossier h1{font-size:clamp(24px,3.2vw,36px)}
+body.brief-active .briefdossier .bstats{margin-top:6px}
+body.brief-active .brief{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;
+  flex:1;min-height:0;max-height:100%;
+}
+body.brief-active .brief>.brief-col{
+  min-height:0;max-height:100%;overflow-y:auto;scrollbar-width:thin;
+  display:flex;flex-direction:column;gap:14px;
+}
+body.brief-active .brief>.brief-col::-webkit-scrollbar{width:6px}
+body.brief-active .brief>.brief-col::-webkit-scrollbar-thumb{background:var(--hairline);border-radius:3px}
+body.brief-active .briefwrap .objlist{overflow:visible;max-height:none}
+body.brief-active .panel-foot{
+  padding:12px 14px;border-top:1px solid rgba(255,255,255,.07);
+  background:linear-gradient(180deg,rgba(11,20,35,.6),rgba(6,12,22,.85));
+  border-radius:0 0 12px 12px;
+}
+
+/* ── BUILD BAY (PAYLOAD, SYSTEMS, REVIEW) ── */
+/* Payload step: 2-column balanced integration facility */
+.bay-payload{
+  display:grid;grid-template-columns:minmax(380px,460px) 1fr;gap:16px;
+  flex:1;min-height:0;max-height:100%;
+}
+.bay-payload .bay-cat-col{
+  min-height:0;max-height:100%;display:flex;flex-direction:column;
+}
+.bay-payload .bay-cat-col .panel{
+  display:flex;flex-direction:column;height:100%;min-height:0;
+}
+.bay-payload .bay-cat-col .cat{
+  flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;max-height:none!important;
+}
+.bay-payload .bay-cat-col .cat::-webkit-scrollbar{width:6px}
+.bay-payload .bay-cat-col .cat::-webkit-scrollbar-thumb{background:var(--hairline);border-radius:3px}
+.bay-payload .bay-preview-col{
+  min-height:0;max-height:100%;overflow-y:auto;scrollbar-width:thin;
+  display:flex;flex-direction:column;gap:14px;
+}
+.bay-payload .bay-preview-col::-webkit-scrollbar{width:6px}
+.bay-payload .bay-preview-col::-webkit-scrollbar-thumb{background:var(--hairline);border-radius:3px}
+.bay-payload #v3payload{
+  height:380px;min-height:300px;border-radius:8px;overflow:hidden;
+}
+
+/* Systems step: 3-column symmetrical CAD workstation */
+.bay-systems{
+  display:grid;grid-template-columns:minmax(280px,330px) 1fr minmax(280px,330px);gap:16px;
+  flex:1;min-height:0;max-height:100%;
+}
+.bay-systems>.bay-col{
+  min-height:0;max-height:100%;overflow-y:auto;scrollbar-width:thin;
+  display:flex;flex-direction:column;gap:14px;
+}
+.bay-systems>.bay-col::-webkit-scrollbar{width:6px}
+.bay-systems>.bay-col::-webkit-scrollbar-thumb{background:var(--hairline);border-radius:3px}
+.bay-systems .bay-center-col #v3systems{
+  aspect-ratio:16/9;min-height:300px;max-height:450px;border-radius:8px;overflow:hidden;
+}
+
+/* Review step: 2-column Flight Readiness Review Console */
+.revgrid{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;
+  flex:1;min-height:0;max-height:100%;
+}
+.revgrid>.rev-col{
+  min-height:0;max-height:100%;overflow-y:auto;scrollbar-width:thin;
+  display:flex;flex-direction:column;gap:14px;
+}
+.revgrid>.rev-col::-webkit-scrollbar{width:6px}
+.revgrid>.rev-col::-webkit-scrollbar-thumb{background:var(--hairline);border-radius:3px}
+.revgrid #v3review{
+  height:360px;min-height:280px;border-radius:8px;overflow:hidden;
+}
+
+/* Sticky action bars inside scrolling bay columns */
+.bay-actions,.rev-actions{
+  position:sticky;bottom:0;z-index:5;margin-top:auto;padding:10px 4px 6px;
+  background:linear-gradient(180deg,transparent,rgba(6,12,22,.96) 35%);
+}
+
+/* ── LAUNCH CONSOLE ── */
+.launchgrid{
+  display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px;
+  flex:1;min-height:0;max-height:100%;
+}
+.launchgrid>.launch-col{
+  min-height:0;max-height:100%;overflow-y:auto;scrollbar-width:thin;
+  display:flex;flex-direction:column;gap:14px;
+}
+.launchgrid>.launch-col::-webkit-scrollbar{width:6px}
+.launchgrid>.launch-col::-webkit-scrollbar-thumb{background:var(--hairline);border-radius:3px}
+
+/* Flight milestones sequence */
+.flight-milestones{
+  display:flex;flex-direction:column;gap:8px;margin-top:6px;padding:2px 0;
+}
+.f-ms{
+  display:flex;align-items:center;gap:10px;font-size:12px;padding:5px 8px;
+  border-radius:4px;background:rgba(255,255,255,.015);
+  border-left:2px solid rgba(75,130,215,.35);transition:background .14s,border-left-color .14s;
+}
+.f-ms:hover{
+  background:rgba(75,130,215,.08);border-left-color:var(--ds-blue-hi);
+}
+.f-time{
+  font-family:var(--mono);font-size:11px;color:var(--ds-nominal);min-width:68px;letter-spacing:.05em;flex-shrink:0;
+}
+.f-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--ds-blue-hi);box-shadow:0 0 6px rgba(75,130,215,.6);flex-shrink:0;
+}
+.f-desc{
+  color:var(--ds-text);font-size:12px;line-height:1.4;
+}
+.f-desc b{color:var(--bone);letter-spacing:.04em}
+
+/* High-density parts cards */
+.bay-payload .part{
+  padding:10px 12px;margin-bottom:2px;border-radius:4px;
+  border:1px solid rgba(255,255,255,.04);background:rgba(8,16,28,.6);
+  transition:background .13s,border-color .13s;
+}
+.bay-payload .part:hover{
+  background:rgba(14,28,48,.8);border-color:rgba(91,164,255,.3);
+}
+.bay-payload .part.on{
+  background:rgba(11,61,145,.25);border-color:rgba(101,242,165,.4);
+  box-shadow:inset 3px 0 0 var(--ds-nominal);
+}
+.bay-payload .part .ps span{
+  background:rgba(255,255,255,.04);padding:2px 6px;border-radius:3px;
+  border:1px solid rgba(255,255,255,.03);
+}
+
+/* Responsive fallback: narrow screens keep natural single column and scroll */
+@media (max-width:1080px){
+  body.brief-active #screen,body.build-active #screen,body.launch-active #screen{overflow:auto}
+  body.brief-active .wrap,body.build-active .wrap,body.launch-active .wrap{
+    height:auto;min-height:100%;padding:60px 14px 20px;
+  }
+  .brief,.bay-payload,.bay-systems,.revgrid,.launchgrid{
+    display:flex;flex-direction:column;gap:16px;
+  }
+  .brief>.brief-col,.bay-payload>.bay-col,.bay-systems>.bay-col,.revgrid>.rev-col,.launchgrid>.launch-col{
+    overflow:visible!important;max-height:none!important;
+  }
+  .bay-payload #v3payload,.revgrid #v3review{height:280px}
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ACTION DOCK (Unified Sticky Footer)
+   ══════════════════════════════════════════════════════════════ */
+#dock{
+  flex:0 0 auto;
+  min-height:52px;
+  background:linear-gradient(180deg,#0a101d,#050811);
+  border-top:1px solid rgba(75,130,215,0.3);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  padding:8px 24px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  z-index:45;
+  box-shadow:0 -8px 24px rgba(0,0,0,0.6);
+  backdrop-filter:blur(10px);
+}
+#dock.hidden{display:none}
+.dock-left{
+  display:flex;align-items:center;gap:12px;min-width:160px;
+}
+.dock-center{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:14px;
+  font-family:var(--mono);font-size:12.5px;color:var(--ds-dim);letter-spacing:.04em;
+  text-align:center;padding:0 12px;
+}
+.dock-center b{color:var(--bone);font-weight:600}
+.dock-status-chip{
+  display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:3px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.05em;font-weight:500;
+}
+.dock-status-chip.pending{
+  color:#94a3b8;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+}
+.dock-status-chip.warn{
+  color:var(--amber);background:rgba(255,183,77,0.1);border:1px solid rgba(255,183,77,0.3);
+}
+.dock-status-chip.crit{
+  color:var(--red);background:rgba(255,92,92,0.12);border:1px solid rgba(255,92,92,0.35);
+}
+.dock-status-chip.ready{
+  color:var(--phosphor);background:rgba(101,242,165,0.1);border:1px solid rgba(101,242,165,0.35);
+}
+.dock-right{
+  display:flex;align-items:center;gap:14px;min-width:200px;justify-content:flex-end;
+}
+.dock-btn-back{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 18px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;
+  color:var(--bone);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);
+  border-radius:4px;cursor:pointer;transition:all .15s;
+}
+.dock-btn-back:hover{
+  background:rgba(75,130,215,0.2);border-color:var(--ds-blue-hi);color:#fff;
+}
+.dock-btn-primary{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 28px;font-family:var(--disp);font-size:14px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;border-radius:4px;transition:all .18s;cursor:pointer;
+}
+.dock-btn-primary:not(:disabled){
+  background:var(--phosphor);color:#040810;border:1px solid var(--phosphor);
+  box-shadow:0 0 18px rgba(101,242,165,0.45);
+}
+.dock-btn-primary:not(:disabled):hover{
+  background:#7effb9;box-shadow:0 0 26px rgba(101,242,165,0.7);transform:translateY(-1px);
+}
+.dock-btn-primary:disabled{
+  background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.32);
+  border:1px solid rgba(255,255,255,0.1);cursor:not-allowed;box-shadow:none;
+}
+
+/* ── ACCORDION PANELS (Build Systems) ────── */
+.accordion-group{
+  display:flex;flex-direction:column;gap:10px;
+}
+.accordion-item{
+  border:1px solid rgba(255,255,255,0.07);border-radius:6px;
+  background:rgba(8,14,24,0.7);overflow:hidden;transition:border-color .15s;
+}
+.accordion-item.open{
+  border-color:rgba(75,130,215,0.4);background:rgba(10,18,32,0.85);
+}
+.accordion-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.02);
+  transition:background .15s;
+}
+.accordion-header:hover{
+  background:rgba(75,130,215,0.1);
+}
+.accordion-title-wrap{
+  display:flex;align-items:center;gap:10px;
+}
+.accordion-title{
+  font-family:var(--disp);font-size:14px;font-weight:600;letter-spacing:.08em;color:var(--bone);
+}
+.accordion-badge{
+  font-family:var(--mono);font-size:11.5px;color:var(--phosphor);background:rgba(101,242,165,0.1);
+  padding:2px 8px;border-radius:3px;border:1px solid rgba(101,242,165,0.25);
+}
+.accordion-badge.warn{
+  color:var(--amber);background:rgba(255,183,77,0.12);border-color:rgba(255,183,77,0.35);
+}
+.accordion-chevron{
+  font-family:var(--mono);font-size:12px;color:var(--ds-dim);transition:transform .2s;
+}
+.accordion-item.open .accordion-chevron{
+  transform:rotate(180deg);color:var(--ds-blue-hi);
+}
+.accordion-content{
+  display:none;padding:12px 14px;border-top:1px solid rgba(255,255,255,0.05);
+}
+.accordion-item.open .accordion-content{
+  display:block;
+}
+
+/* ── VISUAL BUDGET BARS (Delta-V, Margins) ── */
+.budget-bar-wrap{
+  display:flex;flex-direction:column;gap:6px;padding:10px 12px;
+  background:rgba(8,16,28,0.6);border:1px solid rgba(255,255,255,0.05);border-radius:4px;
+}
+.budget-bar-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-family:var(--mono);font-size:12px;color:var(--bone);
+}
+.budget-bar-track{
+  height:7px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative;
+}
+.budget-bar-fill{
+  height:100%;border-radius:3px;transition:width .35s ease;
+}
+.budget-bar-fill.nominal{background:var(--phosphor)}
+.budget-bar-fill.warn{background:var(--amber)}
+.budget-bar-fill.crit{background:var(--red)}
+
+/* ── SITE COMPARISON MATRIX (Formulate) ── */
+.site-matrix-table{
+  width:100%;border-collapse:collapse;margin-top:8px;font-family:var(--mono);font-size:11.5px;
+}
+.site-matrix-table th{
+  text-align:left;color:var(--ds-dim);padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.08);
+  font-size:11px;letter-spacing:.08em;
+}
+.site-matrix-table td{
+  padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--bone);
+}
+
+/* ── ROVER STATUS STRIP (Surface Ops) ── */
+.rover-status-strip{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:30;
+  display:flex;align-items:center;gap:16px;padding:6px 18px;border-radius:4px;
+  background:rgba(6,10,18,0.92);border:1px solid rgba(75,130,215,0.3);
+  backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,0.6);
+  font-family:var(--mono);font-size:12.5px;color:var(--bone);
+}
+.rover-status-item{
+  display:flex;align-items:baseline;gap:6px;
+}
+.rover-status-item .lbl{
+  font-size:10.5px;color:var(--ds-dim);letter-spacing:.1em;
+}
+.rover-status-item .val{
+  font-weight:600;font-variant-numeric:tabular-nums;
+}
+.rover-status-item.warn .val{color:var(--amber)}
+.rover-status-item.crit .val{color:var(--red)}
+

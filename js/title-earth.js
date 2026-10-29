@@ -1,22 +1,23 @@
 /* MARGIN title vista — thin adapter over js/orrery.js.
    The starting page shows the LIVE solar-system Earth (same buildSolarSystem
    scene, same Blue Marble / Black Marble / MODIS-cloud material, same decay-2
-   sunlight rig, same Hipparcos sky, same simDays clock as the mission-select
-   and briefing views) in a zoomed cinematic framing: huge dark limb across
-   the lower frame, disc horizontally centered, limb top just above center —
-   with the REAL presentation Sun rising half-eclipsed behind the upper-left
-   limb. No fake flare sprite anywhere: the glare, the corona, and the
-   terminator sweep are the live system. The Sun carries its own triple-layer
-   halo parented to the disc (core + skirt + aura, depth-tested so the limb
-   occults it), because the one post-processing experiment fogged the frame
-   and geometry glow is deterministic. The camera flows continuously
-   through four FIXED angles (eclipse limb, terminator side, blue marble,
-   far side — ~14 s each, ~56 s per revolution) while the Earth spins on
-   its own, so the surface visibly rotates beneath each viewpoint and the
-   disc phases night through crescent to day and back. There is deliberately
-   NO solver, NO iteration, and NO frame-to-frame feedback in the framing:
-   the pose is a pure function of a monotonic clock plus the live Earth
-   vector, so it cannot diverge or fling (see PRESETS).
+   sunlight rig, same simDays clock as the mission-select and briefing views)
+   in a zoomed cinematic framing — with the REAL presentation Sun rising
+   half-eclipsed beside the limb. Starfield is HYG-catalog star points ONLY
+   (real catalog stars, true B-V colors): no photo skybox on this screen, so
+   there is no JPEG macroblocking in the blacks. No fake flare sprite
+   anywhere: the glare, the corona, and the terminator sweep are the live
+   system. The Sun carries its own triple-layer halo parented to the disc
+   (core + skirt + aura, depth-tested so the limb occults it), because the
+   one post-processing experiment fogged the frame and geometry glow is
+   deterministic. The camera flows continuously through four FIXED angles
+   (sunside limb, terminator side, blue marble, far side — ~14 s each, ~56 s
+   per revolution) while the Earth spins on its own, so the surface visibly
+   rotates beneath each viewpoint and the disc phases night through crescent
+   to day and back. There is deliberately NO solver, NO iteration, and NO
+   frame-to-frame feedback in the framing: the pose is a pure function of a
+   monotonic clock plus the live Earth vector, so it cannot diverge or fling
+   (see PRESETS).
    Link contract (what keeps the title -> select cut seamless):
    - simDays starts at todayDays() and advances at DAYS_PER_SEC, exactly like
      every other orrery view; each frame publishes window.__MARGIN_SIMDAYS
@@ -43,7 +44,7 @@
      right on the day side, but it would crush the night hemisphere to black.
      The title snaps between that metered value (anything past a sliver of
      day) and 1.0 (deep night) by the live sunlit fraction, with the same
-     1/exposure counter-boosts select uses (stars, skybox, ambient, city
+     1/exposure counter-boosts select uses (stars, ambient, city
      lights), so both hemispheres read and the terminator crossing never
      washes out.
    NEVER touches simulation state. Silent CSS fallback (.earth-fallback)
@@ -51,7 +52,7 @@
 import * as THREE from 'three';
 import {
   DPR_CAP, DAYS_PER_SEC, BODY_STYLE, radiusWorld,
-  buildStars, loadSpaceSkybox, buildSolarSystem, todayDays,
+  buildStars, buildSolarSystem, todayDays,
   bodyWorldUnified, exposureForBody, isPhysicalMode, UNITS_PER_KM
 } from './orrery.js';
 
@@ -64,7 +65,12 @@ const TAN_V = Math.tan(FOV_DEG * Math.PI / 360);
    camera pose is a pure function of the live Earth vector: nothing in here
    can diverge, slam to a clamp, or flip discontinuously. */
 const PRESETS = [
-  { dir: [1.00, -0.30, 0.30], dist: 2.20, tgt: [0.85, -0.60, 0.20] }, // eclipse limb
+  /* sunside limb (opening frame): camera mostly anti-sunward but sidestepped,
+     aim nudged so Earth sits lower-right as a huge limb while the REAL Sun
+     burns upper-left, clear of the disc — side by side, verified numerically
+     (Sun NDC inside frame, disc-edge clearance positive in true-scale mode;
+     verified for true-scale mode). Same no-solver arithmetic as the rest. */
+  { dir: [0.90, -0.44, 0.18], dist: 3.20, tgt: [0.20, -0.20, -0.60] },
   { dir: [0.30, 0.90, 0.30], dist: 3.20, tgt: [0, 0, 0] },            // terminator side
   { dir: [-1.00, 0.25, 0.40], dist: 5.00, tgt: [0, 0, 0] },           // blue marble
   { dir: [-0.20, -0.85, 0.35], dist: 3.20, tgt: [0, 0, 0] }           // far side
@@ -240,9 +246,6 @@ function applyIris(dt) {
     if (V.starMat && V.starMat.uniforms && V.starMat.uniforms.uBoost) {
       V.starMat.uniforms.uBoost.value = Math.min(600, 1.1 * inv);
     }
-    if (V.scene && ('backgroundIntensity' in V.scene)) {
-      V.scene.backgroundIntensity = Math.min(400, 0.06 * inv);
-    }
     if (V.ambient) V.ambient.intensity = Math.min(75, 0.22 * inv);
     /* city lights ride the iris so they hold constant into the night side. */
     if (V.bodies && V.bodies.earth) {
@@ -368,9 +371,10 @@ function start(cv) {
   V.camera = new THREE.PerspectiveCamera(FOV_DEG, 16 / 9, 0.001, 1000);
   V.scene.add(V.camera);
   try {
-    const skybox = loadSpaceSkybox();
-    if (skybox) V.scene.background = skybox;
-    if ('backgroundIntensity' in V.scene) V.scene.backgroundIntensity = 0.7;
+    /* catalog star points ONLY on this screen — no photo skybox (its JPEG
+       blacks macroblocked under the title iris). scene.background stays
+       null; the clear color is the void. Select/brief keep their sky. */
+    V.scene.background = null;
   } catch (e) {}
   /* the live solar system — same assembly the select/brief views fly,
      REAL Sun included. */

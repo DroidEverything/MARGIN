@@ -75,6 +75,8 @@ function stop() {
   if (V.onFocus) document.removeEventListener('focusin', V.onFocus);
   if (V.onClick) document.removeEventListener('click', V.onClick);
   if (V.onKey) window.removeEventListener('keydown', V.onKey);
+  if (V._cbsDocClick) document.removeEventListener('click', V._cbsDocClick);
+  V._cbsDocClick = null;
   V.onHover = V.onFocus = V.onClick = V.onKey = null;
   if (V.hudEl && V.hudEl.parentNode) V.hudEl.parentNode.removeChild(V.hudEl);
   if (V.infoEl && V.infoEl.parentNode) V.infoEl.parentNode.removeChild(V.infoEl);
@@ -94,6 +96,8 @@ function stop() {
   V.built = null;
   V.diving = false; V.W = 0; V.H = 0; V.cur = null; V.toKey = null; V.failed = false;
   V.isPhys = false; V.originKm = [0, 0, 0]; V.raycastTargets = [];
+  V.sysView = false;
+  try { document.body.classList.remove('sysview'); } catch (e) {}
 }
 
 /* Cinematic overview camera position (isometric angle displaying all planetary orbits) */
@@ -158,13 +162,13 @@ function capHTML(L, B) {
     <div class="sc-name">${esc_(L.name)}</div>
     <div class="sc-sub">${esc_(L.sub)}</div>
     <div class="sc-stats">
-      <span>${B.au ? B.au.toFixed(2) + ' AU' : '—'}</span>
-      <span>${L.years} YR</span>
-      <span>$${L.capM}M CAP</span>
-      <span>${L.dose} KRAD/YR</span>
+      <span><b>DIST</b>${B.au ? B.au.toFixed(2) + ' AU' : '—'}</span>
+      <span><b>CRUISE</b>${L.years} YR</span>
+      <span><b>BUDGET</b>$${L.capM}M CAP</span>
+      <span><b>DOSE</b>${L.dose} KRAD/YR</span>
       ${tag}
     </div>
-    <div style="margin:4px 0;font-size:10px;opacity:0.7;">${modeTag} · ${V.isPhys ? 'physical' : 'presentation'}</div>
+    <div class="sc-harness" style="margin:4px 0;font-size:10px;opacity:0.7;">${modeTag} · ${V.isPhys ? 'physical' : 'presentation'}</div>
     <div id="selstatus" style="margin:2px 0 4px;font-size:10px;"></div>
     <div class="sc-actions">
       <button class="sysbtn" data-act="sysview">${V.sysView ? 'RETURN TO MISSION' : 'FULL SYSTEM'}</button>
@@ -182,18 +186,9 @@ function levelById(id) {
 
 function setCaption(id) {
   const cap = document.getElementById('selcap'); if (!cap) return;
-  if (V.sysView) {
-    cap.innerHTML = `
-      <div class="sc-row"><span class="sc-dest">SOLAR SYSTEM · HELIOCENTRIC OVERVIEW</span></div>
-      <div class="sc-name">Full Solar System View</div>
-      <div class="sc-sub">Heliocentric perspective showing all 8 planetary orbits & celestial bodies</div>
-      <div class="sc-actions">
-        <button class="sysbtn" data-act="sysview">RETURN TO MISSION</button>
-      </div>
-    `;
-    return;
-  }
-  const L = levelById(id); if (!L) return;
+  if (V.sysView) return;
+  const L = levelById(id || V.cur);
+  if (!L) return;
   let B = { n: '—' }; try { B = BODY[L.body] || B; } catch (e) {}
   cap.innerHTML = capHTML(L, B);
 }
@@ -249,6 +244,7 @@ function updateFocusClamp(key){
 
 function commitFly(toKey) {
   V.sysView = false;
+  try { document.body.classList.remove('sysview'); } catch (e) {}
   V.selectedPlanet = null;
   V.trackAnchor = null;
   V.isMovingTowardsPlanet = false;
@@ -307,6 +303,7 @@ function setBody(id) {
   const key = LEVEL_BODY[id] || 'mars';
   if (V.sysView) {
     V.sysView = false;
+    try { document.body.classList.remove('sysview'); } catch (e) {}
     if (V.nameGroup) V.nameGroup.visible = false;
   }
   markCard(id);
@@ -354,6 +351,9 @@ function toggleSystem() {
   let still = false;
   try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   V.sysView = !V.sysView;
+  /* full-system mode clears the mission UI (cards, title, dossier extras) —
+     exit paths stay: caption RETURN, nav ↩ RETURN, Escape. Cleared in stop(). */
+  try { document.body.classList.toggle('sysview', V.sysView); } catch (e) {}
   /* Labels stay on in both modes. */
 
   const btnFullSys = document.getElementById('btnFullSys');
@@ -363,10 +363,8 @@ function toggleSystem() {
   }
 
   if (V.sysView) {
-    /* Clean full system view: clear card selection, close planet card, show heliocentric overview */
+    /* Clean full system view: clear card selection, show heliocentric overview with planet card */
     document.querySelectorAll('.lvcard.selviewing').forEach((el) => el.classList.remove('selviewing'));
-    closeInfo();
-    setCaption(null);
     V.originKm = [0, 0, 0];
     toggleFullscreen(true);
     if (still) {
@@ -378,8 +376,10 @@ function toggleSystem() {
     } else {
       flyWide();
     }
+    showPlanetInfo(V.selectedPlanet || 'sun');
   } else {
     toggleFullscreen(false);
+    closeInfo();
     if (V.toKey) {
       commitFly(V.toKey);
       setCaption(V.cur);
@@ -473,6 +473,14 @@ function size() {
   if (w === V.W && h === V.H) return;
   V.W = w; V.H = h;
   V.camera.aspect = w / h;
+  /* center-right composition (fullscreen harmonious UI): the focused body
+     renders at ~65% frame width, leaving the left dossier and bottom strip
+     over open space. Pure projection shift (negative offsetX moves the
+     frustum window left, so the subject sits right) — flights, controls,
+     raycast (inverse matrix carries the offset) and clipping untouched. */
+  try {
+    V.camera.setViewOffset(w, h, (w >= 768) ? -Math.round(w * 0.15) : 0, 0, w, h);
+  } catch (e) {}
   V.camera.updateProjectionMatrix();
   const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
   V.renderer.setPixelRatio(dpr);
@@ -495,6 +503,12 @@ function showPlanetInfo(planetKey) {
   const content = V.infoEl.querySelector('.planet-info-content');
   if (!content) return;
 
+  const returnBtn = V.sysView ? `
+    <div class="pi-actions">
+      <button class="sysbtn" data-act="sysview">RETURN TO MISSION</button>
+    </div>
+  ` : '';
+
   content.innerHTML = `
     <button class="close-btn" data-act="close-info" title="Close & Return to Solar System">&times;</button>
     <div class="pi-header">
@@ -510,6 +524,7 @@ function showPlanetInfo(planetKey) {
       <div class="pi-item"><span class="pi-lbl">MOONS</span><span class="pi-val">${esc_(data.moons)}</span></div>
     </div>
     <div class="pi-desc">${esc_(data.info)}</div>
+    ${returnBtn}
   `;
   V.infoEl.style.display = 'block';
 }
@@ -624,31 +639,95 @@ function flyToPlanetDirect(bodyKey) {
   }
 }
 
+const CELESTIAL_MENU_GROUPS = [
+  {
+    label: 'STAR & INNER WORLDS',
+    items: [
+      { key: 'sun', icon: '☀️', name: 'Sun', tag: 'STAR' },
+      { key: 'mercury', icon: '☿', name: 'Mercury', tag: 'PLANET' },
+      { key: 'venus', icon: '♀', name: 'Venus', tag: 'PLANET' },
+      { key: 'earth', icon: '🜨', name: 'Earth', tag: 'PLANET' },
+      { key: 'moon', icon: '🌔', name: 'Moon', tag: 'MOON', sub: true },
+      { key: 'mars', icon: '♂', name: 'Mars', tag: 'PLANET' },
+      { key: 'phobos', icon: '◈', name: 'Phobos', tag: 'MOON', sub: true },
+      { key: 'deimos', icon: '◈', name: 'Deimos', tag: 'MOON', sub: true }
+    ]
+  },
+  {
+    label: 'GAS GIANTS & MOONS',
+    items: [
+      { key: 'jupiter', icon: '♃', name: 'Jupiter', tag: 'PLANET' },
+      { key: 'io', icon: '◈', name: 'Io', tag: 'MOON', sub: true },
+      { key: 'europa', icon: '◈', name: 'Europa', tag: 'MOON', sub: true },
+      { key: 'ganymede', icon: '◈', name: 'Ganymede', tag: 'MOON', sub: true },
+      { key: 'callisto', icon: '◈', name: 'Callisto', tag: 'MOON', sub: true },
+      { key: 'saturn', icon: '♄', name: 'Saturn', tag: 'PLANET' },
+      { key: 'uranus', icon: '⛢', name: 'Uranus', tag: 'PLANET' },
+      { key: 'neptune', icon: '♆', name: 'Neptune', tag: 'PLANET' }
+    ]
+  },
+  {
+    label: 'OUTER & SMALL BODIES',
+    items: [
+      { key: 'pluto', icon: '♇', name: 'Pluto', tag: 'DWARF' },
+      { key: 'bennu', icon: '◈', name: 'Bennu', tag: 'ASTEROID' }
+    ]
+  }
+];
+
+function renderCelestialDropdown() {
+  return CELESTIAL_MENU_GROUPS.map((g) => `
+    <div class="cbs-group">
+      <div class="cbs-group-title">${esc_(g.label)}</div>
+      ${g.items.map((it) => `
+        <button type="button" class="cbs-item ${it.sub ? 'is-sub' : ''}" data-body="${it.key}" role="option">
+          <span class="cbs-item-left">
+            ${it.sub ? '<span class="cbs-sub-indent" aria-hidden="true">└</span>' : ''}
+            <span class="cbs-item-icon" aria-hidden="true">${it.icon}</span>
+            <span class="cbs-item-name">${esc_(it.name)}</span>
+          </span>
+          <span class="cbs-tag cbs-tag-${it.tag.toLowerCase()}">${it.tag}</span>
+        </button>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
 /* Build Navigation Bar with Planet Selector Dropdown, Tiny Orbit Toggle, Full System & Fullscreen */
 function createHUD(host) {
   const navBar = document.createElement('div');
   navBar.className = 'orrery-nav-bar';
   navBar.innerHTML = `
-    <select id="selPlanetJump" class="planet-select-dropdown" aria-label="Select Celestial Body">
+    <div class="cbs-wrap" id="cbsWrap">
+      <button type="button" class="cbs-trigger" id="cbsTrigger" aria-haspopup="listbox" aria-expanded="false" title="Focus Celestial Body">
+        <span class="cbs-trig-icon">🪐</span>
+        <span class="cbs-trig-label">Focus Celestial Body...</span>
+        <span class="cbs-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="cbs-menu" id="cbsMenu" role="listbox" aria-label="Celestial Bodies" tabindex="-1">
+        ${renderCelestialDropdown()}
+      </div>
+    </div>
+    <select id="selPlanetJump" class="planet-select-dropdown" style="display:none;" aria-hidden="true">
       <option value="">🪐 Focus Celestial Body...</option>
-      <option value="sun">☀️ Sun</option>
-      <option value="mercury">☿ Mercury</option>
-      <option value="venus">♀ Venus</option>
-      <option value="earth">🜨 Earth</option>
-      <option value="moon">&nbsp;&nbsp;└ Moon</option>
-      <option value="mars">♂ Mars</option>
-      <option value="phobos">&nbsp;&nbsp;├ Phobos</option>
-      <option value="deimos">&nbsp;&nbsp;└ Deimos</option>
-      <option value="jupiter">♃ Jupiter</option>
-      <option value="io">&nbsp;&nbsp;├ Io</option>
-      <option value="europa">&nbsp;&nbsp;├ Europa</option>
-      <option value="ganymede">&nbsp;&nbsp;├ Ganymede</option>
-      <option value="callisto">&nbsp;&nbsp;└ Callisto</option>
-      <option value="saturn">♄ Saturn</option>
-      <option value="uranus">⛢ Uranus</option>
-      <option value="neptune">♆ Neptune</option>
-      <option value="pluto">♇ Pluto</option>
-      <option value="bennu">◈ Bennu (Asteroid)</option>
+      <option value="sun">Sun</option>
+      <option value="mercury">Mercury</option>
+      <option value="venus">Venus</option>
+      <option value="earth">Earth</option>
+      <option value="moon">Moon</option>
+      <option value="mars">Mars</option>
+      <option value="phobos">Phobos</option>
+      <option value="deimos">Deimos</option>
+      <option value="jupiter">Jupiter</option>
+      <option value="io">Io</option>
+      <option value="europa">Europa</option>
+      <option value="ganymede">Ganymede</option>
+      <option value="callisto">Callisto</option>
+      <option value="saturn">Saturn</option>
+      <option value="uranus">Uranus</option>
+      <option value="neptune">Neptune</option>
+      <option value="pluto">Pluto</option>
+      <option value="bennu">Bennu</option>
     </select>
     <button class="orrery-toggle-btn ${ORRERY_SETTINGS.showOrbitLines ? 'active' : ''}" id="btnToggleOrbits" title="Show / Hide Orbit Lines" aria-pressed="${ORRERY_SETTINGS.showOrbitLines}">
       <span class="toggle-dot"></span>ORBITS
@@ -661,19 +740,88 @@ function createHUD(host) {
       ${V.isFullscreen ? '🗗 EXIT' : '⛶ FULLSCREEN'}
     </button>
   `;
-  host.appendChild(navBar);
+  /* dock into the header control row when the select screen provides its
+     slot; otherwise fall back to the 3D host (unchanged legacy path). */
+  const slot = document.getElementById('selcontrols');
+  (slot || host).appendChild(navBar);
   V.hudEl = navBar;
+
+  const cbsWrap = navBar.querySelector('#cbsWrap');
+  const cbsTrigger = navBar.querySelector('#cbsTrigger');
+  const cbsMenu = navBar.querySelector('#cbsMenu');
+
+  function openCBS() {
+    if (!cbsWrap) return;
+    cbsWrap.classList.add('open');
+    if (cbsTrigger) cbsTrigger.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeCBS() {
+    if (!cbsWrap) return;
+    cbsWrap.classList.remove('open');
+    if (cbsTrigger) cbsTrigger.setAttribute('aria-expanded', 'false');
+  }
+
+  function toggleCBS() {
+    if (cbsWrap && cbsWrap.classList.contains('open')) closeCBS();
+    else openCBS();
+  }
+
+  if (cbsTrigger) {
+    cbsTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCBS();
+    });
+  }
+
+  if (cbsMenu) {
+    cbsMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-body]');
+      if (!item) return;
+      const key = item.dataset.body;
+      closeCBS();
+      if (key) {
+        flyToPlanetDirect(key);
+        const hiddenSel = navBar.querySelector('#selPlanetJump');
+        if (hiddenSel) hiddenSel.value = key;
+      }
+    });
+  }
+
+  const onDocClick = (e) => {
+    if (cbsWrap && !cbsWrap.contains(e.target)) {
+      closeCBS();
+    }
+  };
+  document.addEventListener('click', onDocClick);
+  V._cbsDocClick = onDocClick;
+
+  if (cbsWrap) {
+    cbsWrap.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeCBS();
+        if (cbsTrigger) cbsTrigger.focus();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!cbsWrap.classList.contains('open')) {
+          openCBS();
+          return;
+        }
+        const items = Array.from(cbsMenu.querySelectorAll('.cbs-item'));
+        const activeIdx = items.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') {
+          const next = activeIdx < items.length - 1 ? items[activeIdx + 1] : items[0];
+          if (next) next.focus();
+        } else {
+          const prev = activeIdx > 0 ? items[activeIdx - 1] : items[items.length - 1];
+          if (prev) prev.focus();
+        }
+      }
+    });
+  }
 
   navBar.querySelector('#selPlanetJump').addEventListener('change', (e) => {
     if (e.target.value) {
-      if (V.sysView) {
-        V.sysView = false;
-        const btnFullSys = document.getElementById('btnFullSys');
-        if (btnFullSys) {
-          btnFullSys.innerHTML = '🌐 FULL SYSTEM';
-          btnFullSys.title = 'Explore Full Solar System';
-        }
-      }
       flyToPlanetDirect(e.target.value);
       e.target.value = '';
     }
@@ -715,16 +863,16 @@ function createHUD(host) {
   host.appendChild(info);
   V.infoEl = info;
   info.addEventListener('click', (e) => {
+    if (e.target && e.target.closest && e.target.closest('[data-act="sysview"]')) {
+      toggleSystem();
+      return;
+    }
     if (e.target && e.target.closest && e.target.closest('[data-act="close-info"]')) {
       closeInfo();
-      flyWide();
-      V.sysView = true;
-      if (V.nameGroup) V.nameGroup.visible = true;
-      setCaption(null);
-      const btnFullSys = document.getElementById('btnFullSys');
-      if (btnFullSys) {
-        btnFullSys.innerHTML = '↩ RETURN';
-        btnFullSys.title = 'Return to Mission Focus';
+      if (V.sysView) {
+        flyWide();
+      } else {
+        if (V.toKey) commitFly(V.toKey);
       }
     }
   });
@@ -863,7 +1011,7 @@ function frame(now) {
       V.approachT = 0;
       V.trackAnchor = V.targetLookAt.clone(); // hand off to steady tracking below
     }
-  } else if (V.selectedPlanet && V.bodies && V.bodies[V.selectedPlanet] && !V.fly && !V.dive && !V.sysView) {
+  } else if (V.selectedPlanet && V.bodies && V.bodies[V.selectedPlanet] && !V.fly && !V.dive) {
     // Steady follow: carry the camera along with the body's per-frame motion
     // so the selection stays centered, while preserving the user's orbit offset.
     const m = V.bodies[V.selectedPlanet];
@@ -1488,6 +1636,23 @@ window.SelView = {
       } else o.sun = null;
     } catch (e) { o.sun = null; }
     try { o.sunLightPos = V.sunLight ? V.sunLight.position.toArray().map((v) => +v.toFixed(4)) : null; } catch (e) { o.sunLightPos = null; }
+    /* center-right composition probe: view-offset state + focused-subject
+       NDC (x > 0 confirms right-of-center). Verification only. */
+    try {
+      const vw = V.camera ? V.camera.view : null;
+      o.viewOffset = (vw && vw.enabled) ? { x: vw.offsetX, y: vw.offsetY } : null;
+    } catch (e) { o.viewOffset = null; }
+    try {
+      const fk = V.selectedPlanet || V.toKey || 'earth';
+      const m = V.bodies && V.bodies[fk];
+      if (m && V.camera) {
+        const wp = new (V.camera.position.constructor)();
+        m.getWorldPosition(wp);
+        V.camera.updateMatrixWorld();
+        wp.project(V.camera);
+        o.subject = { key: fk, ndc: [+wp.x.toFixed(3), +wp.y.toFixed(3)] };
+      } else o.subject = null;
+    } catch (e) { o.subject = null; }
     try { o.corona = (V.built && V.built.corona) ? +V.built.corona.scale.x.toExponential(2) : null; } catch (e) { o.corona = null; }
     try {
       const n0 = V.nameList && V.nameList[0];

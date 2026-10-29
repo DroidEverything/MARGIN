@@ -20,10 +20,14 @@
     <button class="tb-btn" id="btnSound" aria-pressed="false" title="Toggle sound">SOUND</button>
     <button class="tb-btn" id="btnMode" title="Toggle difficulty">CADET</button>
     <button class="tb-btn" id="btnHome" title="Mission select">MISSIONS</button>
+    <button class="tb-btn title-only" data-act="how" title="How it works">HOW IT WORKS</button>
+    <button class="tb-btn title-only" data-act="devjump" title="Dev scene jump menu (?s= shortcuts)">DEV</button>
+    <button class="tb-btn select-only" data-act="gohome" title="Back to homescreen">HOME</button>
   </header>
   <main id="screen" tabindex="-1"></main>
+  <div id="dock" class="action-dock hidden"></div>
   <div id="hud" class="hidden"></div>
-  <footer id="telem"><div class="run" id="telemRun"></div></footer>
+  <footer id="telem"><button id="btnTelemToggle" class="telem-btn" title="Toggle telemetry ticker">TICKER</button><div class="run" id="telemRun"></div></footer>
 </div>
 <div id="veil" aria-hidden="true"></div>
 <div id="tip" role="tooltip"></div>
@@ -37,6 +41,7 @@
 <script src="js/astronomy-jpl-data-bennu.js"></script>
 <script src="js/astronomy.js"></script>
 <script src="js/surface-data.js"></script>
+<script src="js/mars-surface-data.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

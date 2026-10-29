@@ -4408,6 +4408,26 @@ function updateHud(f, prof, clk) {
         else el.classList.remove('badge-on');
       }
     });
+
+    // Milestone progression tracker
+    const met = (prof && prof.met) || 0;
+    const msList = [
+      { id: 'ms-t0', t: 0 },
+      { id: 'ms-maxq', t: 72 },
+      { id: 'ms-meco', t: 155 },
+      { id: 'ms-fairing', t: 195 },
+      { id: 'ms-orbit', t: 480 }
+    ];
+    msList.forEach(m => {
+      const el = V.hud.querySelector('#' + m.id);
+      if (el) {
+        if (clk && clk.phase === 'countdown') {
+          el.classList.toggle('passed', m.id === 'ms-t0' && clk.tMinus <= 1);
+        } else {
+          el.classList.toggle('passed', met >= m.t);
+        }
+      }
+    });
   } catch (e) {}
 }
 
@@ -4423,11 +4443,19 @@ function ensureHud() {
         '<div class="lh-sub" id="lhSub">FLAME TRENCH DELUGE & MAIN ENGINE IGNITION</div>' +
       '</div>' +
     '</div>' +
+    '<div class="lh-subhead">VEHICLE STAGE INTEGRITY</div>' +
     '<div class="lh-stages-bar">' +
-      '<span class="lh-stage-badge" id="badge-b">BOOSTERS</span>' +
-      '<span class="lh-stage-badge" id="badge-s1">STAGE 1</span>' +
-      '<span class="lh-stage-badge" id="badge-s2">STAGE 2</span>' +
-      '<span class="lh-stage-badge" id="badge-sc">PAYLOAD</span>' +
+      '<span class="lh-stage-badge" id="badge-b" title="Booster telemetry status"><span class="badge-dot">●</span> BOOSTERS</span>' +
+      '<span class="lh-stage-badge" id="badge-s1" title="Stage 1 telemetry status"><span class="badge-dot">●</span> STAGE 1</span>' +
+      '<span class="lh-stage-badge" id="badge-s2" title="Stage 2 telemetry status"><span class="badge-dot">●</span> STAGE 2</span>' +
+      '<span class="lh-stage-badge" id="badge-sc" title="Payload telemetry status"><span class="badge-dot">●</span> PAYLOAD</span>' +
+    '</div>' +
+    '<div class="lh-milestones-track">' +
+      '<span class="lh-ms-item" id="ms-t0">T-0</span>' +
+      '<span class="lh-ms-item" id="ms-maxq">MAX-Q</span>' +
+      '<span class="lh-ms-item" id="ms-meco">MECO</span>' +
+      '<span class="lh-ms-item" id="ms-fairing">FAIRING</span>' +
+      '<span class="lh-ms-item" id="ms-orbit">ORBIT</span>' +
     '</div>' +
     '<div class="lh-tele-grid">' +
       '<div class="lh-tele-cell"><span class="lh-label">ALTITUDE</span><b id="lhAlt">0.0 km</b></div>' +
@@ -4436,14 +4464,29 @@ function ensureHud() {
       '<div class="lh-tele-cell"><span class="lh-label">ACCEL</span><b id="lhG">1.0 G</b></div>' +
     '</div>' +
     '<div class="lh-note">Vehicle: ' + String(V.vehicleName || 'Launch vehicle') + ' &middot; ' +
-      'Terminal count T-10:00 compressed illustration (built-in hold + GLS/ALS handoff) then ascent. ' +
-      'Performance anchored to NASA LSP data.</div>' +
-    '<button class="btn ghost lh-skip" id="lhSkip">SKIP TO ORBIT &#9656;</button>';
+      'Performance anchored to NASA LSP flight curves.</div>' +
+    '<div class="lh-ctrl-row">' +
+      '<div class="lh-speed-bar">' +
+        '<span class="lh-speed-label">WARP:</span>' +
+        '<button type="button" class="lh-spd-btn on" data-spd="1">1&times;</button>' +
+        '<button type="button" class="lh-spd-btn" data-spd="2.5">2.5&times;</button>' +
+        '<button type="button" class="lh-spd-btn" data-spd="5">5&times;</button>' +
+      '</div>' +
+      '<button class="btn ghost lh-skip" id="lhSkip">Skip Launch (to Orbit) &#9656;</button>' +
+    '</div>';
 
   V.mount.appendChild(d);
   V.hud = d;
   const skip = d.querySelector('#lhSkip');
   if (skip) skip.addEventListener('click', (e) => { e.stopPropagation(); finish(); });
+  d.querySelectorAll('.lh-spd-btn').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const s = parseFloat(b.dataset.spd) || 1;
+      V._timeWarp = s;
+      d.querySelectorAll('.lh-spd-btn').forEach(btn => btn.classList.toggle('on', btn === b));
+    });
+  });
   return d;
 }
 
@@ -4589,13 +4632,13 @@ function directCountdownCam(tEl, now) {
   let lx, ly, lz;
   const stackH = Math.max(1, topY - baseY); // live stack height (SLS ≈ F9 × 1.6)
   if (sh.frameWide) {
-    // Expert correction (measurable target): stack fills 85% frame height,
-    // vehicle ~51% width, tower a 58–69% strip, crown cropped. Distance solved
-    // per vehicle from live stack height — not a hardcoded dolly.
-    const dist = (stackH / 0.85 / 2) / Math.tan((sh.fov * Math.PI / 180) / 2) * (sh.zoom || 1);
+    // Expert correction: stack fills ~68% frame height so full vehicle, pad deck,
+    // and flame trench are visible without base cutoffs.
+    const fillFactor = sh.fillH || 0.68;
+    const dist = (stackH / fillFactor / 2) / Math.tan((sh.fov * Math.PI / 180) / 2) * (sh.zoom || 1);
     const ax = 0.59, ay = 0.10, az = 0.80;
     const al = Math.sqrt(ax * ax + ay * ay + az * az);
-    lx = -0.4; ly = baseY + stackH * (sh.lookH || 0.52); lz = 0;
+    lx = -0.4; ly = baseY + stackH * (sh.lookH || 0.44); lz = 0;
     px = lx + ax / al * dist; py = ly + ay / al * dist; pz = lz + az / al * dist;
   } else if (sh.lookT === 'topWide') {
     // Low-up that survives tall stacks: horizontal offset scales with height
@@ -4816,8 +4859,13 @@ function perfSample(ms) {
 function frame(now) {
   if (!V.active) return;
   V.raf = requestAnimationFrame(frame);
+  const rawDt = (V._lastNow != null && isFinite(V._lastNow)) ? Math.min(0.1, Math.max(0, (now - V._lastNow) / 1000)) : 0.016;
+  V._lastNow = now;
   const dt = 0.016;
-  let tEl = (now - V.t0) / 1000;
+  const warp = V._timeWarp || 1.0;
+  if (V._simTime == null) V._simTime = 0;
+  V._simTime += rawDt * warp;
+  let tEl = V._simTime;
   // ?shot=1..6 capture aid (URL-gated, zero normal-load effect): freeze the
   // count at the cut midpoint so each of the six cuts can be screenshotted.
   if (V._shotHold != null && V._shotHold >= 0 && V._shotHold < COUNT_SHOTS.length) {
@@ -4844,8 +4892,6 @@ function frame(now) {
     : ascentProfile(f, V.lvId);
   // Smoke wall clock (expert smoke method): measured frame delta, clamped for
   // hitches, scaled so reduced-motion preserves shape (nomScale = 1 normal).
-  const rawDt = (V._lastNow != null && isFinite(V._lastNow)) ? Math.max(0, (now - V._lastNow) / 1000) : 0.016;
-  V._lastNow = now;
   V.nomScale = clk.phase === 'countdown' ? COUNT_S / (V.countS || COUNT_S) : ASCENT_S / (V.ascS || ASCENT_S);
   const sdt = smokeDt(rawDt);
   // Nominal ascent-wall seconds (expert bankAge domain): negative pre-release,
@@ -5279,8 +5325,8 @@ function start(mountParent, opts) {
     if (!V.raf) V.raf = requestAnimationFrame(frame);
     return true;
   } catch (e) {
+    console.error("[LAUNCH-VIEW.start ERROR]:", e, e && e.stack);
     stop();
-    try { if (V.onDone) V.onDone(); } catch (e2) {}
     return false;
   }
 }

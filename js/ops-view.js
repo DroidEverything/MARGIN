@@ -1324,8 +1324,8 @@ function animate(now) {
     if (V.satTick) { try { if (V.satTick(dt)) V.satTick = null; } catch (e) {} }
     if (V.deployT >= 0 && V.deployPivots && V.deployPivots.length) {
       V.deployT += dt;
-      const k = Math.max(0, Math.min(1, V.deployT / 7));
-      const s = k * k * (3 - 2 * k); // smoothstep over the 7 s deploy beat
+      const k = Math.max(0, Math.min(1, V.deployT / (V.deployDur || 7)));
+      const s = k * k * (3 - 2 * k); // smoothstep over the deploy beat
       for (let pi = 0; pi < V.deployPivots.length; pi++) {
         const pv = V.deployPivots[pi];
         pv.p.rotation[pv.rotAxis || 'z'] = pv.stow * (1 - s);
@@ -1540,9 +1540,17 @@ function animate(now) {
        read exactly as they do in the other views (see Earth iris parity note). */
     updateEarthIris();
   }
-  /* Surface diorama frame (Phase 5): same renderer/camera, metre-unit scene,
-     same exposure law evaluated for the Moon. Swap is exact — no rebuild. */
-  if (V.surfActive && V.surf && V.surf.scene) {
+  if (V.dz3dOn && DZ3D.scene && DZ3D.camera && V.renderer) {
+    // C2 descent scene owns the frame (own metre-unit scene/camera).
+    V._mblurWasSurf = false;
+    const exp = (typeof exposureForBody === 'function') ? exposureForBody('moon', WORLD_PER_AU) : 0.00346;
+    V.renderer.toneMappingExposure = exp;
+    const _pf0 = PERF ? performance.now() : 0;
+    if (PERF && V._gpuT) { try { V._gpuT.begin(); } catch (e) {} }
+    V.renderer.render(DZ3D.scene, DZ3D.camera);
+    if (PERF && V._gpuT) { try { V._gpuT.end(); } catch (e) {} }
+    if (PERF) perfSample(performance.now() - _pf0);
+  } else if (V.surfActive && V.surf && V.surf.scene) {
     try {
       const auLen = (V.targetWorldPos && V.targetWorldPos.length() > 1e-9)
         ? V.targetWorldPos.length() : WORLD_PER_AU;
@@ -1612,14 +1620,6 @@ function animate(now) {
         V.renderer.render(V.surf.scene, V.camera);
       }
     }
-  } else if (V.dz3dOn && DZ3D.scene && DZ3D.camera && V.renderer) {
-    // C2 descent scene owns the frame (own metre-unit scene/camera).
-    V._mblurWasSurf = false;
-    const _pf0 = PERF ? performance.now() : 0;
-    if (PERF && V._gpuT) { try { V._gpuT.begin(); } catch (e) {} }
-    V.renderer.render(DZ3D.scene, DZ3D.camera);
-    if (PERF && V._gpuT) { try { V._gpuT.end(); } catch (e) {} }
-    if (PERF) perfSample(performance.now() - _pf0);
   } else if (V.renderer && V.scene && V.camera) {
     V._mblurWasSurf = false; // orbital frames never accumulate into the shutter
     const _pf0 = PERF ? performance.now() : 0;
@@ -1743,6 +1743,7 @@ function startCameraGlide(mode) {
 
 function updateCamera(dt) {
   if (!V.camera || !V.controls) return;
+  if (V.dz3dOn) return; // 3D descent sequence owns the viewport & camera
 
   /* Surface diorama owns the camera (Phase 5): mast-cam and walkaround orbit
      run here; orbital tracking below is skipped wholesale. Rover is static in
@@ -2039,8 +2040,19 @@ function refreshDynamicFrame(nowMs) {
           V.targetWorldPos.z + Math.sin(orbSpeed) * orbR
         );
       } else {
-        V.craftWorldPos.lerpVectors(V.earthWorldPos, V.targetWorldPos, D.frac || 0);
-        V.craftWorldPos.y += Math.sin((D.frac || 0) * Math.PI) * 0.04;
+        const dir = new THREE.Vector3().subVectors(V.targetWorldPos, V.earthWorldPos);
+        const dist = dir.length();
+        const normDir = (dist > 1e-6) ? dir.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
+        const rE = (phys ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
+        const rM = (phys ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
+        const p0 = new THREE.Vector3().copy(V.earthWorldPos).addScaledVector(normDir, rE);
+        const p1 = new THREE.Vector3().copy(V.targetWorldPos).addScaledVector(normDir, -rM);
+        const frac = D.frac || 0;
+        V.craftWorldPos.lerpVectors(p0, p1, frac);
+        V.craftWorldPos.y += Math.sin(frac * Math.PI) * 0.04;
+        const side = Math.sin(frac * Math.PI) * (dist * 0.07);
+        V.craftWorldPos.x += -normDir.z * side;
+        V.craftWorldPos.z += normDir.x * side;
       }
     } else {
       if (D.arrived) {
@@ -2201,10 +2213,19 @@ function update(state) {
       );
       V.orbitEllipse = { key: 'moon', fx: 1, fy: 0, fz: 0, rx: orbR, ry: orbR * 0.35, rz: orbR };
     } else {
-      V.craftWorldPos.lerpVectors(V.earthWorldPos, V.targetWorldPos, frac);
-      // Add realistic translunar elevation arc
-      const arcHeight = Math.sin(frac * Math.PI) * 0.04;
-      V.craftWorldPos.y += arcHeight;
+      const dir = new THREE.Vector3().subVectors(V.targetWorldPos, V.earthWorldPos);
+      const dist = dir.length();
+      const normDir = (dist > 1e-6) ? dir.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
+      const rE = (isPhysicalMode() ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
+      const rM = (isPhysicalMode() ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
+      const p0 = new THREE.Vector3().copy(V.earthWorldPos).addScaledVector(normDir, rE);
+      const p1 = new THREE.Vector3().copy(V.targetWorldPos).addScaledVector(normDir, -rM);
+
+      V.craftWorldPos.lerpVectors(p0, p1, frac);
+      V.craftWorldPos.y += Math.sin(frac * Math.PI) * 0.04;
+      const side = Math.sin(frac * Math.PI) * (dist * 0.07);
+      V.craftWorldPos.x += -normDir.z * side;
+      V.craftWorldPos.z += normDir.x * side;
       V.orbitEllipse = null;
     }
   } else {
@@ -2337,41 +2358,76 @@ function update(state) {
 
 /* ── Update Trajectory Arc Geometry ── */
 function updateTrajectoryGeometry(state) {
-  if (!state || !state.els || !V.plannedLine || !V.historyLine) return;
+  if (!state || !V.plannedLine || !V.historyLine) return;
 
-  const N = 80;
-  const u = UNITS_PER_KM;
-  const tofSec = (state.tofDays || 300) * 86400;
-  const histCount = Math.max(2, Math.floor(N * V.frac));
+  if (state.els) {
+    const N = 80;
+    const u = UNITS_PER_KM;
+    const tofSec = (state.tofDays || 300) * 86400;
+    const histCount = Math.max(2, Math.floor(N * V.frac));
 
-  const histPos = [];
-  const planPos = [];
+    const histPos = [];
+    const planPos = [];
 
-  for (let i = 0; i <= N; i++) {
-    const t = (i / N);
-    const dtSec = tofSec * t;
+    for (let i = 0; i <= N; i++) {
+      const t = (i / N);
+      const dtSec = tofSec * t;
 
-    // Evaluate coplanar orbit position from elements
-    let M = state.els.M0 + state.els.n * dtSec;
-    let E = M;
-    for (let k = 0; k < 15; k++) E = E - (E - state.els.e * Math.sin(E) - M) / (1 - state.els.e * Math.cos(E));
-    const nu = 2 * Math.atan2(Math.sqrt(1 + state.els.e) * Math.sin(E / 2), Math.sqrt(1 - state.els.e) * Math.cos(E / 2));
-    const r = state.els.a * (1 - state.els.e * Math.cos(E));
-    const th = nu + state.els.argp;
+      // Evaluate coplanar orbit position from elements
+      let M = state.els.M0 + state.els.n * dtSec;
+      let E = M;
+      for (let k = 0; k < 15; k++) E = E - (E - state.els.e * Math.sin(E) - M) / (1 - state.els.e * Math.cos(E));
+      const nu = 2 * Math.atan2(Math.sqrt(1 + state.els.e) * Math.sin(E / 2), Math.sqrt(1 - state.els.e) * Math.cos(E / 2));
+      const r = state.els.a * (1 - state.els.e * Math.cos(E));
+      const th = nu + state.els.argp;
 
-    const x3d = r * Math.cos(th) * u;
-    const z3d = r * Math.sin(th) * u;
-    const y3d = THREE.MathUtils.lerp(V.earthWorldPos.y, V.targetWorldPos.y, t);
+      const x3d = r * Math.cos(th) * u;
+      const z3d = r * Math.sin(th) * u;
+      const y3d = THREE.MathUtils.lerp(V.earthWorldPos.y, V.targetWorldPos.y, t);
 
-    const pt = new THREE.Vector3(x3d, y3d, z3d);
+      const pt = new THREE.Vector3(x3d, y3d, z3d);
 
-    if (i <= histCount) histPos.push(pt);
-    if (i >= histCount) planPos.push(pt);
+      if (i <= histCount) histPos.push(pt);
+      if (i >= histCount) planPos.push(pt);
+    }
+
+    V.historyLine.geometry.setFromPoints(histPos);
+    V.plannedLine.geometry.setFromPoints(planPos);
+    V.plannedLine.computeLineDistances();
+  } else if ((state.mode === 'fixedC3' || state.targetKey === 'moon') && !V.arrived) {
+    const N = 80;
+    const histCount = Math.max(2, Math.floor(N * V.frac));
+    const histPos = [];
+    const planPos = [];
+
+    const dir = new THREE.Vector3().subVectors(V.targetWorldPos, V.earthWorldPos);
+    const dist = dir.length();
+    const normDir = (dist > 1e-6) ? dir.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
+    const rE = (isPhysicalMode() ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
+    const rM = (isPhysicalMode() ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
+
+    const p0 = new THREE.Vector3().copy(V.earthWorldPos).addScaledVector(normDir, rE);
+    const p1 = new THREE.Vector3().copy(V.targetWorldPos).addScaledVector(normDir, -rM);
+
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const pt = new THREE.Vector3().lerpVectors(p0, p1, t);
+      pt.y += Math.sin(t * Math.PI) * 0.04;
+      const side = Math.sin(t * Math.PI) * (dist * 0.07);
+      pt.x += -normDir.z * side;
+      pt.z += normDir.x * side;
+
+      if (i <= histCount) histPos.push(pt);
+      if (i >= histCount) planPos.push(pt);
+    }
+
+    V.historyLine.geometry.setFromPoints(histPos);
+    V.plannedLine.geometry.setFromPoints(planPos);
+    V.plannedLine.computeLineDistances();
+  } else {
+    V.historyLine.geometry.setFromPoints([]);
+    V.plannedLine.geometry.setFromPoints([]);
   }
-
-  V.historyLine.geometry.setFromPoints(histPos);
-  V.plannedLine.geometry.setFromPoints(planPos);
-  V.plannedLine.computeLineDistances();
 
   // Arrival orbit ring: draws the branch's own tilted ellipse (V.orbitEllipse)
   // around the live target centre — the craft visibly rides the line.
@@ -2608,23 +2664,46 @@ function buildCruiseTrail() {
 function backfillCruiseTrail(els, frac, tofDays) {
   try {
     const line = buildCruiseTrail();
-    if (!line || !els || !isFinite(els.a)) return;
+    if (!line) return;
     const attr = line.geometry.getAttribute('position');
     const arr = attr.array;
-    const u = UNITS_PER_KM;
-    const tofSec = (tofDays || 300) * 86400;
     const n = Math.max(2, Math.min(128, Math.floor(128 * (frac || 0))));
-    for (let k = 0; k < n; k++) {
-      const t = n <= 1 ? 0 : (k / (n - 1)) * (frac || 0);
-      const dtSec = tofSec * t;
-      let M = els.M0 + els.n * dtSec, E = M;
-      for (let j = 0; j < 12; j++) E = E - (E - els.e * Math.sin(E) - M) / (1 - els.e * Math.cos(E));
-      const nu = 2 * Math.atan2(Math.sqrt(1 + els.e) * Math.sin(E / 2), Math.sqrt(1 - els.e) * Math.cos(E / 2));
-      const r = els.a * (1 - els.e * Math.cos(E));
-      const th = nu + els.argp;
-      arr[k * 3] = r * Math.cos(th) * u;
-      arr[k * 3 + 1] = THREE.MathUtils.lerp(V.earthWorldPos.y, V.targetWorldPos.y, t);
-      arr[k * 3 + 2] = r * Math.sin(th) * u;
+    if (els && isFinite(els.a)) {
+      const u = UNITS_PER_KM;
+      const tofSec = (tofDays || 300) * 86400;
+      for (let k = 0; k < n; k++) {
+        const t = n <= 1 ? 0 : (k / (n - 1)) * (frac || 0);
+        const dtSec = tofSec * t;
+        let M = els.M0 + els.n * dtSec, E = M;
+        for (let j = 0; j < 12; j++) E = E - (E - els.e * Math.sin(E) - M) / (1 - els.e * Math.cos(E));
+        const nu = 2 * Math.atan2(Math.sqrt(1 + els.e) * Math.sin(E / 2), Math.sqrt(1 - els.e) * Math.cos(E / 2));
+        const r = els.a * (1 - els.e * Math.cos(E));
+        const th = nu + els.argp;
+        arr[k * 3] = r * Math.cos(th) * u;
+        arr[k * 3 + 1] = THREE.MathUtils.lerp(V.earthWorldPos.y, V.targetWorldPos.y, t);
+        arr[k * 3 + 2] = r * Math.sin(th) * u;
+      }
+    } else if (V.targetKey === 'moon' || (typeof S !== 'undefined' && S.levelId === 'l2')) {
+      const dir = new THREE.Vector3().subVectors(V.targetWorldPos, V.earthWorldPos);
+      const dist = dir.length();
+      const normDir = (dist > 1e-6) ? dir.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
+      const rE = (isPhysicalMode() ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
+      const rM = (isPhysicalMode() ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
+      const p0 = new THREE.Vector3().copy(V.earthWorldPos).addScaledVector(normDir, rE);
+      const p1 = new THREE.Vector3().copy(V.targetWorldPos).addScaledVector(normDir, -rM);
+      for (let k = 0; k < n; k++) {
+        const t = (n <= 1 ? 0 : (k / (n - 1))) * (frac || 0);
+        const pt = new THREE.Vector3().lerpVectors(p0, p1, t);
+        pt.y += Math.sin(t * Math.PI) * 0.04;
+        const side = Math.sin(t * Math.PI) * (dist * 0.07);
+        pt.x += -normDir.z * side;
+        pt.z += normDir.x * side;
+        arr[k * 3] = pt.x;
+        arr[k * 3 + 1] = pt.y;
+        arr[k * 3 + 2] = pt.z;
+      }
+    } else {
+      return;
     }
     V.cruiseCount = n; V.cruiseHead = n % 128;
     // Chronological order: backfilled head-to-tail; live pushes append via copyWithin.
@@ -2704,7 +2783,7 @@ function satPhaseB(state) {
   try {
     if (!V.cruiseTrail) {
       buildCruiseTrail();
-      if (state.els && !state.arrived) backfillCruiseTrail(state.els, state.frac || 0, state.tofDays);
+      if (!state.arrived) backfillCruiseTrail(state.els, state.frac || 0, state.tofDays);
     }
     if (!state.arrived) pushCruiseTrail();
   } catch (e) {}
@@ -2717,6 +2796,7 @@ function satPhaseB(state) {
     if (fresh && satLatchRead()) { V._satDone = true; /* replay suppressed */ }
     if (!V.satTick && !V._satDone && fresh && satRunnerAllowed(outcome) && !satLatchRead()) {
       satLatchWrite(); // written at construction (presentation-only, never S)
+      const isMoon = (state.targetKey === 'moon' || (typeof S !== 'undefined' && S.levelId === 'l2'));
       const reduced = (() => {
         try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
         catch (e) { return false; }
@@ -2745,7 +2825,8 @@ function satPhaseB(state) {
             V.deployT = -1;
             return;
           }
-          V.deployT = 0; // 7 s smoothstep in animate(); stowed angles set at build
+          V.deployDur = isMoon ? 4.6 : 7.0;
+          V.deployT = 0; // smoothstep in animate(); stowed angles set at build
         },
         onDone: () => {
           V._satDone = true;
@@ -2753,7 +2834,10 @@ function satPhaseB(state) {
           removeSatSkip(); // sequence over: skip control + Esc listener go away
         }
       };
-      V.satTick = runSatBeats(SAT_BEATS, ctx);
+      const beats = isMoon
+        ? SAT_BEATS.map(b => ({ ...b, dur: +(b.dur * 0.65).toFixed(1) }))
+        : SAT_BEATS;
+      V.satTick = runSatBeats(beats, ctx);
     }
   } catch (e) {}
   // Cruise ticker (post-beats; during beats the chip shows the beat line).
@@ -2903,14 +2987,122 @@ function dzPreload() {
     });
   } catch (e) { DZ3D.status = 'failed'; }
 }
+
+
+
+/* ── Lunar Descent Supersonic Engine Plume (Physics-based ray contour) ── */
+const LM_PLUME_VERT = [
+  'uniform float uTime, uExpand;',
+  'varying vec3 vLocal; varying float vAx; varying vec3 vN; varying vec3 vV;',
+  'void main(){',
+  '  float v = 1.0 - uv.y;',
+  '  vec3 p = position;',
+  '  float flare = 1.0 + (uExpand - 1.0) * (1.0 - exp(-3.0 * v));',
+  '  float taper = 1.0 - 0.55 * smoothstep(0.6, 1.0, v);',
+  '  p.xz *= flare * taper;',
+  '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+  '  vLocal = p; vAx = v;',
+  '  vN = normalize(normalMatrix * normal);',
+  '  vV = normalize(-mv.xyz);',
+  '  gl_Position = projectionMatrix * mv;',
+  '}'
+].join('\n');
+
+const LM_PLUME_FRAG = [
+  'float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }',
+  'float vnoise(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);',
+  '  float a = hash21(i); float b = hash21(i+vec2(1.0,0.0));',
+  '  float c = hash21(i+vec2(0.0,1.0)); float d = hash21(i+vec2(1.0,1.0));',
+  '  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }',
+  'float fbm4(vec2 p){ float v = 0.0; float a = 0.5;',
+  '  for(int i=0;i<4;i++){ v += a*vnoise(p); p *= 2.03; a *= 0.5; } return v; }',
+  'uniform float uTime, uThrottle, uExposure, uTurb, uSoft;',
+  'uniform vec3 uMidCol, uCoreCol;',
+  'varying vec3 vLocal; varying float vAx; varying vec3 vN; varying vec3 vV;',
+  'void main(){',
+  '  float v = vAx;',
+  '  float ndv = abs(dot(normalize(vN), normalize(vV)));',
+  '  float r = sqrt(max(0.0, 1.0 - ndv * ndv));',
+  '  float q = r * 1.3;',
+  '  vec2 c = normalize(vLocal.xz + 1e-5);',
+  '  float T = uTime;',
+  '  vec2 p1 = vec2(c.x*2.0 + c.y*1.1 + T*1.5, v*6.0 - T*24.0);',
+  '  vec2 p2 = vec2(c.y*3.5 - c.x*2.1 - T*1.8, v*14.0 - T*36.0);',
+  '  float nm = 0.6*fbm4(p1) + 0.4*fbm4(p2);',
+  '  float pulse = 0.90 + 0.20 * vnoise(vec2(T*38.0 - v*12.0, 3.7));',
+  '  float f = exp(-(q*q*q*1.8));',
+  '  float s = mix(0.15, 0.45, smoothstep(0.0, 0.5, v)) * uTurb;',
+  '  float J = f * (1.0 + s*(nm - 0.5)*2.0) * pulse * exp(-1.6 * v) * (0.4 + 0.6*uThrottle);',
+  '  J *= 1.0 + 0.25 * pow(0.5 + 0.5*cos(v*48.0), 3.0) * exp(-3.0*v) * (1.0 - r);',
+  '  J *= 1.0 - smoothstep(0.70, 1.0, v + 0.25*r);',
+  '  float w = 0.06 * uSoft;',
+  '  float a = smoothstep(0.20 - w, 0.20 + w, J) * (1.0 - smoothstep(0.85, 0.99, r));',
+  '  if (a < 0.005) discard;',
+  '  float I = uExposure * J;',
+  '  vec3 col = mix(uMidCol, uCoreCol, smoothstep(0.8, 2.5, I));',
+  '  col += vec3(0.9, 0.95, 1.0) * smoothstep(2.0, 4.0, I) * 0.4;',
+  '  gl_FragColor = vec4(col, a * 0.75 * min(1.0, uThrottle * 1.5));',
+  '}'
+].join('\n');
+
+function makeLmPlumeMesh() {
+  const over = 1.4;
+  const topR = 0.52 * over, botR = 1.35 * over, len = 5.2;
+  const geo = new THREE.CylinderGeometry(topR, botR, len, 32, 16, true);
+  const aspect = len / (((topR + botR) * 0.5));
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: LM_PLUME_VERT,
+    fragmentShader: LM_PLUME_FRAG,
+    uniforms: {
+      uTime: { value: 0 },
+      uThrottle: { value: 1.0 },
+      uExpand: { value: 1.6 },
+      uCoreCol: { value: new THREE.Color(0xffffff) },
+      uMidCol: { value: new THREE.Color(0xffaa44) },
+      uExposure: { value: 6.0 },
+      uTurb: { value: 0.35 },
+      uSoft: { value: 2.5 },
+      uAspect: { value: aspect }
+    },
+    transparent: true, depthWrite: false, depthTest: true,
+    side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.y = -len / 2;
+  return m;
+}
+
+function makeSmokeTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const ctx = c.getContext('2d');
+  let seed = 9876543;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let i = 0; i < 28; i++) {
+    const x = 128 + (rnd() - 0.5) * 140;
+    const y = 128 + (rnd() - 0.5) * 140;
+    const r = 12 + rnd() * 26;
+    const a = 0.18 + rnd() * 0.22;
+    const g = ctx.createRadialGradient(x, y, 1, x, y, r);
+    g.addColorStop(0, 'rgba(220,215,205,' + a.toFixed(3) + ')');
+    g.addColorStop(0.55, 'rgba(180,175,165,' + (a * 0.5).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(150,145,135,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /* Own metre-unit descent scene (built once per 3D descent from the preloaded
    raw; disposed in dzCleanup so memory returns to baseline). Camera shots:
    A high-chase 0–35%, B low-lateral 35–80%, C footpad cam 80–100%. */
 function dzBuildScene(prof, land) {
   dzDisposeScene();
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x020304);
-  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 20000);
+  scene.background = new THREE.Color(0x010206); // Pitch-black cosmic vacuum
+  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.8, 800000);
   try {
     if (V.canvas) {
       const w = V.canvas.clientWidth || 800, h = V.canvas.clientHeight || 450;
@@ -2918,29 +3110,111 @@ function dzBuildScene(prof, land) {
     }
     camera.updateProjectionMatrix();
   } catch (e) {}
-  // Fixed rig (stable by construction — the nightF latch equivalent: nothing
-  // varies with sun angle during the beat) + one-time environment probe so the
-  // PBR metals (gold 0.9, steel 0.6) read instead of going black. scene-local
-  // only — no shared GLB to contaminate.
+
+  // 1. High-contrast Apollo solar illumination: 1361 W/m² direct airless sunlight + subtle 3.5 ambient fill
   try {
-    scene.add(new THREE.HemisphereLight(0x8fa0c0, 0x0a0c10, 0.5));
-    const sun = new THREE.DirectionalLight(0xdfe8ff, 1.5);
-    sun.position.set(40, 55, 25);
+    const sun = new THREE.DirectionalLight(0xfffcf8, SOLAR_CONSTANT_W_M2);
+    sun.position.set(300, 500, 200);
+    sun.castShadow = true;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 1200;
+    sun.shadow.camera.left = -16;
+    sun.shadow.camera.right = 16;
+    sun.shadow.camera.top = 16;
+    sun.shadow.camera.bottom = -16;
+    sun.shadow.bias = -0.0003;
     scene.add(sun);
+    scene.add(sun.target);
+    DZ3D.sun = sun;
+
+    const amb = new THREE.AmbientLight(0x1a2636, 3.5);
+    scene.add(amb);
+    DZ3D.amb = amb;
+
+    // 2. Sun Disc and Glare Billboard at astronomical distance (650 km, subtends 0.53 deg)
+    const sunDir = new THREE.Vector3(0.55, 0.65, -0.45).normalize();
+    const sunDist = 650000;
+    const sunDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(3000, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfff9ee, depthWrite: false, toneMapped: false })
+    );
+    sunDisc.position.copy(sunDir).multiplyScalar(sunDist);
+    sunDisc.lookAt(0, 0, 0);
+    scene.add(sunDisc);
+    DZ3D.sunDisc = sunDisc;
+
+    const dotCanvas = document.createElement('canvas'); dotCanvas.width = dotCanvas.height = 64;
+    const dctx = dotCanvas.getContext('2d');
+    const dg = dctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    dg.addColorStop(0, 'rgba(255,255,255,1)');
+    dg.addColorStop(0.35, 'rgba(255,245,220,0.55)');
+    dg.addColorStop(1, 'rgba(255,230,190,0)');
+    dctx.fillStyle = dg; dctx.fillRect(0, 0, 64, 64);
+    const dotTex = new THREE.CanvasTexture(dotCanvas);
+    const glare = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: dotTex, color: 0xfff5dd, transparent: true, opacity: 0.45,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    }));
+    glare.scale.set(28000, 28000, 1);
+    glare.position.copy(sunDisc.position);
+    scene.add(glare);
+    DZ3D.glare = glare;
+    DZ3D.dotTex = dotTex;
+
+    // 3. Earth hanging in the black lunar sky (600 km distance, subtends 1.91 deg)
+    try {
+      const earthTex = new THREE.TextureLoader().load('assets/textures/earth_day.jpg');
+      earthTex.colorSpace = THREE.SRGBColorSpace;
+      const earthGeo = new THREE.SphereGeometry(10000, 32, 24);
+      const earthMat = new THREE.MeshStandardMaterial({
+        map: earthTex, roughness: 0.8, metalness: 0, toneMapped: false
+      });
+      const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+      // Position Earth ~14 deg above the horizon in direct line of sight:
+      const earthDir = new THREE.Vector3(-0.41, 0.17, -0.90).normalize();
+      earthMesh.position.copy(earthDir).multiplyScalar(600000);
+      earthMesh.rotation.z = -23.44 * Math.PI / 180;
+      scene.add(earthMesh);
+      DZ3D.earth = earthMesh;
+      DZ3D.earthTex = earthTex;
+    } catch (e) {}
+
+    // 4. Uniform Pinpoint Celestial Stars at 700 km (beyond horizon globe, zero terrain clipping)
+    const starCount = 2000;
+    const starPos = new Float32Array(starCount * 3);
+    let sSeed = 1337;
+    const sRnd = () => { sSeed = (sSeed * 1664525 + 1013904223) >>> 0; return sSeed / 4294967296; };
+    for (let i = 0; i < starCount; i++) {
+      const u = sRnd();
+      const v = sRnd();
+      const theta = u * Math.PI * 2;
+      const elev = Math.asin(Math.sqrt(v)); // uniform upper hemisphere
+      const r = 700000;
+      starPos[i * 3]     = r * Math.cos(elev) * Math.cos(theta);
+      starPos[i * 3 + 1] = r * Math.sin(elev) + 500;
+      starPos[i * 3 + 2] = r * Math.cos(elev) * Math.sin(theta);
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({
+      color: 0xffffff, size: 1.5, sizeAttenuation: false, transparent: true, opacity: 0.95, toneMapped: false
+    });
+    const starPoints = new THREE.Points(starGeo, starMat);
+    scene.add(starPoints);
+    DZ3D.stars = starPoints;
+
+    // 5. Reflection probe for gold foil and metallic alloy components
     const probe = new THREE.Scene();
-    const skyGeo = new THREE.SphereGeometry(50, 8, 6);
-    const skyMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide });
-    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
-    skyMesh.material.color.setRGB(0.10, 0.13, 0.18);
-    probe.add(skyMesh);
     const panelMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    panelMat.color.setRGB(5, 4.6, 4.0);
+    panelMat.color.setRGB(1200, 1100, 1000);
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(20, 10), panelMat);
     panel.position.set(18, 22, 8);
     panel.lookAt(0, 0, 0);
     probe.add(panel);
     const gndMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    gndMat.color.setRGB(0.35, 0.34, 0.33);
+    gndMat.color.setRGB(25, 24, 23);
     const gnd = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), gndMat);
     gnd.rotation.x = -Math.PI / 2;
     gnd.position.y = -10;
@@ -2950,14 +3224,11 @@ function dzBuildScene(prof, land) {
     scene.environment = rt.texture;
     DZ3D.envTex = rt.texture;
     DZ3D.pmrem = pmrem;
-    skyGeo.dispose(); skyMat.dispose();
     panel.geometry.dispose(); panelMat.dispose();
     gnd.geometry.dispose(); gndMat.dispose();
   } catch (e) {}
-  // Selected-site terrain (the gray stand-in is gone): decode the SAME LOLA bake
-  // the diorama uses (no second dataset, no invented relief) at descent weight
-  // (160² ≈ 26k verts, one-time). Touchdown datum = true local height at (0,0);
-  // the wrap flies h(t) above it. Falls back to a flat disc when undecodable.
+
+  // 6. Decoded site elevation (inner LOLA patch + 48 km outer LOLA context)
   let siteId = null;
   try {
     siteId = (land && land.site) || ((typeof S !== 'undefined') ? S.site : null) || null;
@@ -2971,62 +3242,228 @@ function dzBuildScene(prof, land) {
       else patch = null;
     }
   } catch (e) { patch = null; }
-  DZ3D.g0 = 0; // touchdown datum (relative; mesh baked relative to h0)
+  DZ3D.g0 = 0;
+
+  const R_MOON = 1737000;
+  const clamp1 = (v) => v < -1 ? -1 : v > 1 ? 1 : v;
+  const D2G = 180 / Math.PI;
+
   try {
     if (patch) {
-      const SEG = 160, SIZE = patch.sizeM || 3000, VN = SEG + 1;
-      const tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
-      tg.rotateX(-Math.PI / 2);
-      const tp = tg.attributes.position;
-      const vstep = SIZE / SEG;
+      // Decode outer LOLA context first if present to determine unified bounds and enable fringe blending
+      let oh = null, on = 200, osz = 48000, opost = 241.2;
+      let omn = 1e9, omx = -1e9;
+      if (patch.out && patch.out.h) {
+        try {
+          const bin = atob(patch.out.h), u = new Uint8Array(bin.length);
+          for (let bi = 0; bi < bin.length; bi++) u[bi] = bin.charCodeAt(bi);
+          oh = new Float32Array(u.buffer);
+          on = patch.out.n || 200;
+          osz = patch.out.sizeM || 48000;
+          opost = osz / (on - 1);
+          for (let oi = 0; oi < oh.length; oi++) {
+            const eh = oh[oi] - h0;
+            if (eh < omn) omn = eh;
+            if (eh > omx) omx = eh;
+          }
+        } catch (e) { oh = null; }
+      }
+
+      const outerHeightAt = (x, z) => {
+        if (!oh) return 0;
+        const fi = (x + osz / 2) / opost;
+        const fj = (z + osz / 2) / opost;
+        const i0 = Math.max(0, Math.min(on - 2, Math.floor(fi)));
+        const j0 = Math.max(0, Math.min(on - 2, Math.floor(fj)));
+        const fx = Math.max(0, Math.min(1, fi - i0));
+        const fz = Math.max(0, Math.min(1, fj - j0));
+        const g00 = oh[j0 * on + i0] - h0;
+        const g10 = oh[j0 * on + i0 + 1] - h0;
+        const g01 = oh[(j0 + 1) * on + i0] - h0;
+        const g11 = oh[(j0 + 1) * on + i0 + 1] - h0;
+        return g00 * (1 - fx) * (1 - fz) + g10 * fx * (1 - fz) + g01 * (1 - fx) * fz + g11 * fx * fz;
+      };
+
+      // 1. SINGLE UNIFIED CONTINUOUS PLANETARY TERRAIN (0 m -> 360 km)
+      // Completely eliminates square borders, circular boundaries, seams, and multi-mesh overlaps.
+      // Concentric radial geometry with high-density vertices at landing center (~15 m spacing)
+      // smoothly expanding outward to 360 km, curving naturally over the lunar horizon.
+      // 1. SINGLE UNIFIED CONTINUOUS PLANETARY TERRAIN (0 m -> 360 km)
+      // Completely eliminates square borders, circular boundaries, seams, and multi-mesh overlaps.
+      // Concentric radial geometry with high-density vertices at landing center (~15 m spacing)
+      // smoothly expanding outward to 360 km, curving naturally over the lunar horizon.
+      const rings = 180, segs = 180;
+      const geo = new THREE.RingGeometry(0, 360000, segs, rings);
+      const pos = geo.attributes.position;
       let hmn = 1e9, hmx = -1e9;
-      const ys = new Float32Array(VN * VN);
-      for (let j = 0; j < VN; j++) for (let i = 0; i < VN; i++) {
-        const idx = j * VN + i;
-        const x = -SIZE / 2 + i * vstep, z = -SIZE / 2 + j * vstep;
-        let y = 0;
-        try { y = surfHeightAt(patch, x, z) - h0; } catch (e) {}
-        ys[idx] = y;
-        if (y < hmn) hmn = y;
-        if (y > hmx) hmx = y;
+
+      for (let k = 0; k <= rings; k++) {
+        const uNorm = k / rings;
+        const r = (k === 0) ? 0 : 360000 * (0.008 * uNorm + 0.04 * uNorm * uNorm + 0.952 * Math.pow(uNorm, 3.2));
+        const sphereDrop = Math.sqrt(Math.max(0, R_MOON * R_MOON - r * r)) - R_MOON;
+
+        for (let j = 0; j <= segs; j++) {
+          const idx = k * (segs + 1) + j;
+          const th = (j / segs) * Math.PI * 2;
+          const x = r * Math.cos(th), z = -r * Math.sin(th);
+
+          let relief = 0;
+          if (r <= 1500) {
+            relief = surfHeightAt(patch, x, z) - h0;
+          } else if (r < 2300) {
+            const w = (r - 1500) / 800;
+            const s = w * w * (3 - 2 * w);
+            relief = (surfHeightAt(patch, x, z) - h0) * (1 - s) + outerHeightAt(x, z) * s;
+          } else if (r <= 18000) {
+            relief = outerHeightAt(x, z);
+          } else if (r < 24000) {
+            const w = (r - 18000) / 6000;
+            const s = w * w * (3 - 2 * w);
+            const k1 = 0.00007, k2 = 0.00019, k3 = 0.00045;
+            const n1 = Math.sin(x * k1 + 1.2) * Math.cos(z * k1 + 0.8);
+            const n2 = Math.sin(x * k2 * 0.7 - z * k2 * 0.7 + 2.1) * Math.cos(x * k2 * 0.7 + z * k2 * 0.7);
+            const n3 = Math.sin(x * k3 + 3.7) * Math.sin(z * k3 + 1.4);
+            const distantTopo = Math.abs(n1) * 850 + n2 * 450 + n3 * 200;
+            relief = outerHeightAt(x, z) * (1 - s) + distantTopo * s;
+          } else {
+            const k1 = 0.00007, k2 = 0.00019, k3 = 0.00045;
+            const n1 = Math.sin(x * k1 + 1.2) * Math.cos(z * k1 + 0.8);
+            const n2 = Math.sin(x * k2 * 0.7 - z * k2 * 0.7 + 2.1) * Math.cos(x * k2 * 0.7 + z * k2 * 0.7);
+            const n3 = Math.sin(x * k3 + 3.7) * Math.sin(z * k3 + 1.4);
+            const fade = Math.max(0, 1 - (r - 24000) / 300000);
+            relief = (Math.abs(n1) * 850 + n2 * 450 + n3 * 200) * fade;
+          }
+
+          const y = sphereDrop + relief;
+          pos.setXYZ(idx, x, y, z);
+          if (y < hmn) hmn = y;
+          if (y > hmx) hmx = y;
+        }
       }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+
+      // Ensure center landing apex normals point cleanly upward
+      const norms = geo.attributes.normal;
+      for (let j = 0; j <= segs; j++) norms.setXYZ(j, 0, 1, 0);
+
+      // Continuous Apollo Regolith Color Grading across the entire planetary surface
       const hspan = Math.max(1, hmx - hmn);
-      const colArr = new Float32Array(VN * VN * 3);
-      for (let k = 0; k < VN * VN; k++) {
-        tp.setY(k, ys[k]);
-        const g = 0.42 + 0.22 * ((ys[k] - hmn) / hspan); // real relief shades itself
-        colArr[k * 3] = g; colArr[k * 3 + 1] = g; colArr[k * 3 + 2] = g;
+      const totalVerts = (rings + 1) * (segs + 1);
+      const colArr = new Float32Array(totalVerts * 3);
+
+      for (let k = 0; k <= rings; k++) {
+        for (let j = 0; j <= segs; j++) {
+          const idx = k * (segs + 1) + j;
+          const x = pos.getX(idx), y = pos.getY(idx), z = pos.getZ(idx);
+          const t = (y - hmn) / hspan;
+          const ny = Math.max(0, norms.getY(idx));
+          const sl = Math.acos(clamp1(ny)) * D2G;
+
+          // Planetary mare and highlands albedo variation
+          const s1 = Math.sin(x * 0.00004 + z * 0.00006) * 43758.5453;
+          const mareVal = Math.sin(x * 0.000012 + 0.5) * Math.cos(z * 0.000012 + 1.2);
+          const mareTint = mareVal > 0.2 ? -0.04 : 0.02;
+          const mNoise = (s1 - Math.floor(s1)) * 0.04 - 0.02;
+
+          // Micro-texture mottling
+          const s2 = Math.sin(k * 12.9898 + j * 78.233) * 43758.5453;
+          const mottling = (s2 - Math.floor(s2)) * 0.04 - 0.02;
+
+          let g = (0.54 + mareTint + mNoise) * (1.0 - Math.min(45, sl) / 45 * 0.32) + mottling;
+          g = Math.max(0.35, Math.min(0.85, g));
+          colArr[idx * 3] = g;
+          colArr[idx * 3 + 1] = g;
+          colArr[idx * 3 + 2] = g;
+        }
       }
-      tg.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
-      tg.computeVertexNormals();
-      const tm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
-      const terrain = new THREE.Mesh(tg, tm);
+      geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+
+      const tm = new THREE.MeshStandardMaterial({
+        color: 0x78787a,
+        vertexColors: true,
+        roughness: 1.0,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      });
+      const terrain = new THREE.Mesh(geo, tm);
       terrain.position.y = 0;
-      terrain.receiveShadow = false;
+      terrain.receiveShadow = true;
       scene.add(terrain);
       DZ3D.ground = terrain;
+      DZ3D.outer = null;
+      DZ3D.globe = null;
       DZ3D.siteId = siteId;
+
+      // 3. Boulders & Rocks on the lunar soil (illustrated ejecta field)
+      try {
+        const rockGeo = new THREE.IcosahedronGeometry(1, 1);
+        const rPos = rockGeo.attributes.position;
+        for (let k = 0; k < rPos.count; k++) {
+          const vx = rPos.getX(k), vy = rPos.getY(k), vz = rPos.getZ(k);
+          const s = 1 + (Math.sin(vx * 7.1 + vy * 5.3 + vz * 9.7) * 0.25);
+          rPos.setXYZ(k, vx * s, vy * s, vz * s);
+        }
+        rockGeo.computeVertexNormals();
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x48494c, roughness: 1.0, metalness: 0 });
+        const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, 120);
+        const dummy = new THREE.Object3D();
+        let rSeed = 4242;
+        const rRnd = () => { rSeed = (rSeed * 1664525 + 1013904223) >>> 0; return rSeed / 4294967296; };
+        for (let ri = 0; ri < 120; ri++) {
+          const rx = (rRnd() - 0.5) * 600;
+          const rz = (rRnd() - 0.5) * 600;
+          const ry = surfHeightAt(patch, rx, rz) - h0;
+          const sc = 0.3 + rRnd() * 1.4;
+          dummy.position.set(rx, ry + sc * 0.4, rz);
+          dummy.rotation.set(rRnd() * 6.28, rRnd() * 6.28, rRnd() * 6.28);
+          dummy.scale.set(sc, sc * (0.6 + rRnd() * 0.5), sc);
+          dummy.updateMatrix();
+          rockMesh.setMatrixAt(ri, dummy.matrix);
+        }
+        rockMesh.instanceMatrix.needsUpdate = true;
+        scene.add(rockMesh);
+        DZ3D.rocks = rockMesh;
+      } catch (e) {}
     } else {
-      const gg = new THREE.CircleGeometry(3000, 48);
-      gg.rotateX(-Math.PI / 2);
-      const gm = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness: 1, metalness: 0 });
+      // Seamless Fallback Globe (when no site patch is selected)
+      const rings = 128, segs = 128;
+      const gg = new THREE.RingGeometry(0, 360000, segs, rings);
+      const gp = gg.attributes.position;
+      const gcol = new Float32Array((rings + 1) * (segs + 1) * 3);
+      for (let k = 0; k <= rings; k++) {
+        const u = k / rings;
+        const r = (k === 0) ? 0 : 360000 * Math.pow(u, 2.5);
+        const sphereDrop = Math.sqrt(Math.max(0, R_MOON * R_MOON - r * r)) - R_MOON;
+        for (let j = 0; j <= segs; j++) {
+          const idx = k * (segs + 1) + j;
+          const th = (j / segs) * Math.PI * 2;
+          const x = r * Math.cos(th), z = -r * Math.sin(th);
+          const s1 = Math.sin(x * 0.0001 + z * 0.0001) * 43758.5453;
+          const g = 0.50 + (s1 - Math.floor(s1)) * 0.08 - 0.04;
+          gp.setXYZ(idx, x, sphereDrop, z);
+          gcol[idx * 3] = g; gcol[idx * 3 + 1] = g; gcol[idx * 3 + 2] = g;
+        }
+      }
+      gp.needsUpdate = true;
+      gg.computeVertexNormals();
+      const gnorms = gg.attributes.normal;
+      for (let j = 0; j <= segs; j++) gnorms.setXYZ(j, 0, 1, 0);
+      gg.setAttribute('color', new THREE.BufferAttribute(gcol, 3));
+      const gm = new THREE.MeshStandardMaterial({
+        color: 0x78787a, vertexColors: true, roughness: 1.0, metalness: 0, side: THREE.DoubleSide
+      });
       const ground = new THREE.Mesh(gg, gm);
       ground.position.y = 0;
-      ground.receiveShadow = false;
+      ground.receiveShadow = true;
       scene.add(ground);
       DZ3D.ground = ground;
+      DZ3D.globe = null;
       DZ3D.siteId = null;
     }
-    // Far skirt for the high opening shot (horizon under the 12 km start).
-    const skg = new THREE.CircleGeometry(12000, 32);
-    skg.rotateX(-Math.PI / 2);
-    const skm = new THREE.MeshBasicMaterial({ color: 0x3a3a3c });
-    const skirt = new THREE.Mesh(skg, skm);
-    skirt.position.y = patch ? -120 : -100;
-    scene.add(skirt);
-    DZ3D.skirt = skirt;
   } catch (e) { DZ3D.ground = null; }
-  // Lander wrap: inner offset seats measured footpad underside at group y=0.
+
+  // 9. Lander wrap: seated at touchdown datum
   const wrap = new THREE.Group();
   wrap.name = 'descent_lander';
   try {
@@ -3035,73 +3472,53 @@ function dzBuildScene(prof, land) {
     const box = new THREE.Box3().setFromObject(DZ3D.raw);
     DZ3D.box = box.clone();
     inner.position.y = -box.min.y;
-    while (DZ3D.raw.children.length) inner.add(DZ3D.raw.children[0]);
+    inner.add(DZ3D.raw.clone(true));
+    inner.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     wrap.add(inner);
-    // Whole-body tilt from touchdown slope (legs merged — no per-leg motion).
-    // Slope is degrees; tilt reads the grade without toppling the framing.
-    const slopeDeg = (land && isFinite(land.slope)) ? land.slope : 0;
-    wrap.rotation.z = THREE.MathUtils.degToRad(Math.max(-15, Math.min(15, slopeDeg)) * 0.5);
   } catch (e) {}
-  wrap.position.set(0, 12000, 0); // driver seats h(t) every frame; opens at tape top
+  wrap.position.set(0, 12000, 0);
   scene.add(wrap);
   DZ3D.wrap = wrap;
-  // Warm plume light: throttle × altitude (faint at küld start, strong low).
+
+  // 10. SUPERSONIC ROCKET DESCENT PLUME (from launch-view shader technology)
   try {
-    const pl = new THREE.PointLight(0xffb46b, 0, 90, 1.8);
-    pl.position.set(0, 1498, 0);
-    scene.add(pl);
-    DZ3D.plume = pl;
-  } catch (e) { DZ3D.plume = null; }
-  // Faint nozzle glow only (no billowing, no big flames — vacuum truth).
+    const plume = makeLmPlumeMesh();
+    const plumeGroup = new THREE.Group();
+    plumeGroup.position.set(0, 0.9, 0); // descent engine bell mouth
+    plumeGroup.add(plume);
+    wrap.add(plumeGroup);
+    DZ3D.plumeMesh = plume;
+    DZ3D.plumeGroup = plumeGroup;
+  } catch (e) { DZ3D.plumeMesh = null; }
+
+  // Dynamic warm plume illumination
   try {
-    const gc = document.createElement('canvas');
-    gc.width = 64; gc.height = 64;
-    const gx = gc.getContext('2d');
-    const grd = gx.createRadialGradient(32, 32, 1, 32, 32, 32);
-    grd.addColorStop(0, 'rgba(255,220,170,1)');
-    grd.addColorStop(0.4, 'rgba(255,160,80,0.5)');
-    grd.addColorStop(1, 'rgba(255,140,60,0)');
-    gx.fillStyle = grd;
-    gx.fillRect(0, 0, 64, 64);
-    const gt = new THREE.CanvasTexture(gc);
-    const gm2 = new THREE.SpriteMaterial({ map: gt, color: 0xffc890,
-      blending: THREE.AdditiveBlending, transparent: true, opacity: 0.5,
-      depthWrite: false, toneMapped: false });
-    const glow = new THREE.Sprite(gm2);
-    glow.scale.set(3, 3, 1);
-    glow.position.set(0, 1499, 0);
-    scene.add(glow);
-    DZ3D.glow = glow;
-    DZ3D.glowTex = gt;
-  } catch (e) { DZ3D.glow = null; }
-  // Dust pool: ≤200 preallocated ballistic-radial sprites (own texture).
+    const pl = new THREE.PointLight(0xffa855, 0, 90, 1.8);
+    pl.position.set(0, 0.5, 0);
+    wrap.add(pl);
+    DZ3D.plumeLight = pl;
+  } catch (e) { DZ3D.plumeLight = null; }
+
+  // 11. VOLUMETRIC CUMULUS LUNAR DUST & SMOKE POOL (launch-view cumulus banks)
   try {
-    const dc = document.createElement('canvas');
-    dc.width = 64; dc.height = 64;
-    const dx = dc.getContext('2d');
-    const dg = dx.createRadialGradient(32, 32, 1, 32, 32, 32);
-    dg.addColorStop(0, 'rgba(200,190,175,0.85)');
-    dg.addColorStop(0.6, 'rgba(180,170,155,0.35)');
-    dg.addColorStop(1, 'rgba(170,160,145,0)');
-    dx.fillStyle = dg;
-    dx.fillRect(0, 0, 64, 64);
-    const dt = new THREE.CanvasTexture(dc);
-    DZ3D.dustTex = dt;
-    DZ3D.dust = [];
+    const sTex = makeSmokeTexture();
+    DZ3D.smokeTex = sTex;
+    DZ3D.smokePool = [];
     let seed = 4242;
     const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-    for (let i = 0; i < 200; i++) {
-      const sm = new THREE.SpriteMaterial({ map: dt, transparent: true, opacity: 0,
-        depthWrite: false, toneMapped: false });
+    for (let i = 0; i < 70; i++) {
+      const sm = new THREE.SpriteMaterial({
+        map: sTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false
+      });
       const sp = new THREE.Sprite(sm);
       sp.visible = false;
       sp.renderOrder = 3;
       scene.add(sp);
-      DZ3D.dust.push({ sp, active: false, life: 0, vx: 0, vy: 0, vz: 0, seed: rnd() });
+      DZ3D.smokePool.push({ sp, active: false, life: 0, vx: 0, vy: 0, vz: 0, seed: rnd() });
     }
-  } catch (e) { DZ3D.dust = []; }
-  // Off-centre target marker (PRESENTATION proxy: true offsetKm is kilometres
-  // away — this plants a visible stake ≤40 m toward +X in the final shot).
+  } catch (e) { DZ3D.smokePool = []; }
+
+  // Off-centre target marker
   try {
     const offM = (land && isFinite(land.offsetKm)) ? Math.max(-40, Math.min(40, land.offsetKm * 1000)) : 0;
     if (Math.abs(offM) > 2) {
@@ -3115,23 +3532,11 @@ function dzBuildScene(prof, land) {
       DZ3D.marker = [pole, flag];
     } else DZ3D.marker = null;
   } catch (e) { DZ3D.marker = null; }
-  // Screen-reader altitude (visually hidden, ≤1 update/s, timeline untouched).
-  try {
-    const host = (V.canvas && V.canvas.parentElement) || document.body;
-    const ar = document.createElement('div');
-    ar.className = 'dz-aria';
-    ar.setAttribute('role', 'status');
-    ar.setAttribute('aria-live', 'polite');
-    ar.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);';
-    ar.textContent = 'Powered descent, time-compressed presentation';
-    host.appendChild(ar);
-    DZ3D.aria = ar;
-  } catch (e) { DZ3D.aria = null; }
-      DZ3D.scene = scene;
-      DZ3D.camera = camera;
+
+  DZ3D.scene = scene;
+  DZ3D.camera = camera;
 }
-/* Full disposal in dzCleanup: lander, dust pool, lights, textures — memory
-   returns to the 92/22 baseline. Raw cache is consumed (built once per run). */
+
 function dzDisposeScene() {
   try {
     if (DZ3D.aria && DZ3D.aria.parentNode) DZ3D.aria.parentNode.removeChild(DZ3D.aria);
@@ -3140,6 +3545,7 @@ function dzDisposeScene() {
   try {
     if (DZ3D.scene) {
       DZ3D.scene.traverse(o => {
+        if (DZ3D.wrap && (o === DZ3D.wrap || (DZ3D.wrap.getObjectById && DZ3D.wrap.getObjectById(o.id)))) return;
         try { if (o.geometry) o.geometry.dispose(); } catch (e) {}
         try {
           if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
@@ -3151,147 +3557,212 @@ function dzDisposeScene() {
     }
   } catch (e) {}
   DZ3D.scene = null; DZ3D.camera = null; DZ3D.wrap = null; DZ3D.ground = null;
-  DZ3D.skirt = null; DZ3D.siteId = null;
+  DZ3D.globe = null; DZ3D.outer = null; DZ3D.rocks = null; DZ3D.earth = null;
+  DZ3D.sunDisc = null; DZ3D.glare = null; DZ3D.stars = null;
+  DZ3D.plumeMesh = null; DZ3D.plumeGroup = null; DZ3D.plumeLight = null;
+  DZ3D.smokePool = []; DZ3D.marker = null;
+  try { if (DZ3D.smokeTex) DZ3D.smokeTex.dispose(); } catch (e) {}
+  try { if (DZ3D.dotTex) DZ3D.dotTex.dispose(); } catch (e) {}
+  try { if (DZ3D.earthTex) DZ3D.earthTex.dispose(); } catch (e) {}
+  try { if (DZ3D.lrocTex) DZ3D.lrocTex.dispose(); } catch (e) {}
   try { if (DZ3D.envTex) DZ3D.envTex.dispose(); } catch (e) {}
   try { if (DZ3D.pmrem) DZ3D.pmrem.dispose(); } catch (e) {}
+  DZ3D.smokeTex = null; DZ3D.dotTex = null; DZ3D.earthTex = null; DZ3D.lrocTex = null;
   DZ3D.envTex = null; DZ3D.pmrem = null;
-  DZ3D.plume = null; DZ3D.glow = null; DZ3D.dust = []; DZ3D.dustTex = null;
-  DZ3D.glowTex = null; DZ3D.marker = null;
   try { if (V) V.dz3dOn = false; } catch (e) {}
   DZ3D.t = 0; DZ3D.hold = 0; DZ3D.covered = false;
+  DZ3D.camOffset = null; DZ3D.camLookY = 0;
 }
 
-/* 3D descent driver (frame-driven, clamped dt — hidden tab pauses, never
-   skips; reduced motion damps shake/glow, timeline unchanged). Shots: A 0–35%
-   high chase, B 35–80% low lateral, C 80–100% footpad cam. Last 0.5 s: dust
-   cover →1 (0.35 s ramp) reuses the DOM .dz-dust layer, fireBlackout at full
-   cover, 0.4 s hold, then fireDone. No SKIP on this path (button removed). */
-const _dzV = { x: 0, y: 0, z: 0 }; // module scratch (zero per-frame alloc)
 function dzDrive3D(dt) {
   if (!DZ._3d || !DZ3D.scene || !DZ3D.camera || !DZ3D.wrap) return;
-  // Exposure is ours for the beat: the ops iris meters for the Moon and would
-  // strangle this dim scene (the black mid-descent). Ops resumes control on
-  // cleanup — it rewrites exposure every frame anyway.
-  try { if (V.renderer) V.renderer.toneMappingExposure = 1.15; } catch (e) {}
   const T = DZ3D.T || 10;
   DZ3D.t += Math.min(Math.max(0, dt), 0.1);
   const t = DZ3D.t, u = Math.max(0, Math.min(1.15, t / T));
   const uu = Math.max(0, Math.min(1, u));
-  descentCurve(uu, _dc, 12000); // opens at the 12 km tape top: the craft arrives
-  // from lunar orbit over the real site (transit continuity) instead of
-  // starting mid-air. Curve + T stay time-compressed PRESENTATION.
+  descentCurve(uu, _dc, 12000);
   const h = _dc.h, thr = _dc.throttle;
   const prof = DZ3D.prof || DZ_PROF.balanced;
   const land = DZ3D.land || {};
   const degraded = !!land.degraded;
-  try { DZ3D.wrap.position.y = h; } catch (e) {}
-  // Shots (smooth glide toward the shot pose; lookAt the lander). Poses are
-  // absolute (lander-frame): wide enough that the 9 m LM reads at 12 km out.
+  const isLanded = uu >= 0.96;
+  const effThr = isLanded ? 0 : thr;
+
   try {
-    const cam = DZ3D.camera;
-    let px, py, pz, lx, ly, lz;
-    if (uu < 0.35) { px = 30; py = h + 20; pz = 44; lx = 0; ly = h + 2; lz = 0; }
-    else if (uu < 0.8) { px = 24; py = h + 6; pz = 12; lx = 0; ly = h + 1; lz = 0; }
-    else { px = 7; py = h + 2; pz = 8; lx = 0; ly = h + 0.5; lz = 0; }
-    const k = 1 - Math.exp(-dt * 2.5);
-    cam.position.x += (px - cam.position.x) * k;
-    cam.position.y += (py - cam.position.y) * k;
-    cam.position.z += (pz - cam.position.z) * k;
-    // Shake (touchdown-speed proxy: degraded ×1.5, profile mult, reduced ×0.25).
-    const shMul = (prof.shakeMul || 1) * (degraded ? 1.5 : 1) * (DZ3D.reduced ? 0.25 : 1);
-    const shAmp = 0.15 * shMul * (h < 50 ? 1 : 0.3);
-    const tw = performance.now() * 0.001;
-    _dzV.x = lx; _dzV.y = ly; _dzV.z = lz;
-    cam.position.x += Math.sin(tw * 39.7) * shAmp;
-    cam.position.y += Math.sin(tw * 31.3 + 1.2) * shAmp;
-    cam.lookAt(_dzV.x, _dzV.y, _dzV.z);
-  } catch (e) {}
-  // Plume light + nozzle glow: throttle × altitude (reduced: glow ×0.5).
-  try {
-    const altK = 1.2 + 2 * Math.max(0, Math.min(1, 1 - h / 60));
-    if (DZ3D.plume) {
-      DZ3D.plume.intensity = 600 * Math.max(0.001, thr) * altK;
-      DZ3D.plume.position.set(0, Math.max(0.5, h - 1), 0);
+    DZ3D.wrap.position.y = h;
+    // Track sun position and direction to spacecraft to maintain crisp, high-contrast illumination & footpad shadows
+    if (DZ3D.sun && DZ3D.sun.target) {
+      DZ3D.sun.position.set(DZ3D.wrap.position.x + 80, DZ3D.wrap.position.y + 140, DZ3D.wrap.position.z + 65);
+      DZ3D.sun.target.position.copy(DZ3D.wrap.position);
+      DZ3D.sun.target.updateMatrixWorld();
     }
-    if (DZ3D.glow) {
-      DZ3D.glow.material.opacity = 0.5 * thr * (DZ3D.reduced ? 0.5 : 1);
-      DZ3D.glow.position.set(0, h + 1.0, 0);
-      const gs = 2 + thr * 2;
-      DZ3D.glow.scale.set(gs, gs, 1);
+    // Realistic lunar descent pitch angle: retro-braking (55 deg) -> pitchover -> vertical touchdown
+    let pitchDeg = 0;
+    if (uu < 0.35) {
+      pitchDeg = 55 - 20 * (uu / 0.35); // 55 deg -> 35 deg
+    } else if (uu < 0.75) {
+      const p = (uu - 0.35) / 0.40;
+      pitchDeg = 35 - 27 * (p * p * (3 - 2 * p)); // smooth rotation to 8 deg
+    } else if (uu < 0.96) {
+      const p = (uu - 0.75) / 0.21;
+      pitchDeg = 8 * (1 - p); // 8 deg -> 0 deg
+    } else {
+      pitchDeg = 0;
+    }
+    const finalSlopeZ = THREE.MathUtils.degToRad(Math.max(-15, Math.min(15, (land && land.slope) || 0)) * 0.5);
+    DZ3D.wrap.rotation.x = THREE.MathUtils.degToRad(pitchDeg);
+    DZ3D.wrap.rotation.z = (uu >= 0.96) ? finalSlopeZ : finalSlopeZ * (uu / 0.96);
+  } catch (e) {}
+
+  // SUPERSONIC DESCENT PLUME DRIVE (shock diamonds & supersonic flame)
+  try {
+    if (DZ3D.plumeMesh) {
+      const pmat = DZ3D.plumeMesh.material;
+      pmat.uniforms.uTime.value = performance.now() * 0.001;
+      pmat.uniforms.uThrottle.value = effThr;
+      DZ3D.plumeMesh.visible = effThr > 0.04;
+      const flameLen = Math.max(0.1, effThr);
+      DZ3D.plumeMesh.scale.set(1, flameLen, 1);
+    }
+    if (DZ3D.plumeLight) {
+      DZ3D.plumeLight.intensity = 350 * Math.max(0.001, effThr);
     }
   } catch (e) {}
-  // Dust: ballistic radial sheet below ~30 m (preallocated pool, ≤120 live,
-  // ~4-layer overdraw cap by count × low opacity; floor 0.12 while low).
+
+  // BALLISTIC REGOLITH DUST (Apollo physics: high-speed radial sweep hugging the ground)
   try {
-    const pool = DZ3D.dust;
+    const pool = DZ3D.smokePool;
     if (pool && pool.length) {
-      if (h < 30) {
-        DZ3D._acc = (DZ3D._acc || 0) + thr * (prof.dustMul || 1) * (1 - h / 30) * 18 * dt;
-        let active = 0;
-        for (let i = 0; i < pool.length; i++) if (pool[i].active) active++;
-        while (DZ3D._acc >= 1 && active < 70) {
-          DZ3D._acc -= 1;
+      if (h < 50 && effThr > 0.08) {
+        const spawnCount = h < 20 ? 3 : 1;
+        for (let sc = 0; sc < spawnCount; sc++) {
           for (let i = 0; i < pool.length; i++) {
             const d = pool[i];
-            if (d.active) continue;
-            d.active = true; d.life = 1;
-            const a = d.seed * 6.2832, rr = 2 + (d.seed * 7 % 1) * 4;
-            d.sp.position.set(Math.cos(a) * rr, Math.max(0.3, h * 0.15), Math.sin(a) * rr);
-            d.vx = Math.cos(a) * (3 + (d.seed * 13 % 1) * 5);
-            d.vz = Math.sin(a) * (3 + (d.seed * 13 % 1) * 5);
-            d.vy = 0.5 + (d.seed * 29 % 1) * 1.5;
-            d.sp.visible = true;
-            active++;
-            break;
+            if (!d.active) {
+              d.active = true;
+              d.life = 1.0;
+              const a = d.seed * 6.2832 + (performance.now() * 0.005 % 6.28);
+              const speed = 18 + (d.seed * 11 % 1) * 26; // rapid radial sweep across regolith
+              d.sp.position.set(DZ3D.wrap.position.x, Math.max(0.12, h * 0.05), DZ3D.wrap.position.z);
+              d.vx = Math.cos(a) * speed;
+              d.vz = Math.sin(a) * speed;
+              d.vy = 0.04 + (d.seed * 19 % 1) * 0.10; // stays low to the ground, never enters sky
+              d.sp.scale.set(1.5, 1.5, 1);
+              d.sp.visible = true;
+              break;
+            }
           }
         }
       }
       for (let i = 0; i < pool.length; i++) {
         const d = pool[i];
         if (!d.active) continue;
-        d.life -= dt / 1.5;
+        d.life -= isLanded ? dt * 4.5 : dt * 1.5;
         if (d.life <= 0) { d.active = false; d.sp.visible = false; d.sp.material.opacity = 0; continue; }
-        d.vy -= 1.62 * dt * 0.3;
         d.sp.position.x += d.vx * dt;
-        d.sp.position.y = Math.max(0.1, d.sp.position.y + d.vy * dt);
+        d.sp.position.y = Math.max(0.10, d.sp.position.y + d.vy * dt);
         d.sp.position.z += d.vz * dt;
-        const grow = 2 + (1 - d.life) * 6;
+        const grow = 1.5 + (1 - d.life) * 7;
         d.sp.scale.set(grow, grow, 1);
-        let op = 0.18 * Math.sin(d.life * Math.PI);
-        if (h < 15) op = Math.max(op, 0.06); // dust floor while low
-        d.sp.material.opacity = op;
+        d.sp.material.opacity = Math.max(0, d.life * 0.32);
       }
     }
   } catch (e) {}
-  // Tape + aria mirror (≤1/s) — overlay tape stays live on the 3D path.
+
+  // RIGID CRAFT-ATTACHED CHASE CAMERA FRAMING
   try {
-    if (DZ.els && DZ.els.alt) DZ.els.alt.textContent = (h / 1000).toFixed(2) + ' km';
+    const cam = DZ3D.camera;
+    const wrapPos = DZ3D.wrap.position;
+    let targetOffX, targetOffY, targetOffZ, lookY;
+
+    if (uu < 0.38) {
+      // Shot 1: Braking orbit phase (12 km -> 3.5 km)
+      // Elevated 3/4 chase view framing the retro-pitched lander against the sweeping lunar craters & curved globe below!
+      targetOffX = -15; targetOffY = 5.0; targetOffZ = 18; lookY = 2.0;
+    } else if (uu < 0.78) {
+      // Shot 2: Pitchover approach (3.5 km -> 300 m)
+      // Dynamic tracking angle showing the lander rotating upright, revealing ascent stage, RCS & landing gear
+      targetOffX = -12; targetOffY = 3.8; targetOffZ = 15; lookY = 2.0;
+    } else if (uu < 0.96) {
+      // Shot 3: Terminal vertical descent (300 m -> 2 m)
+      // Low dramatic angle tracking the footpads approaching the regolith, shadows connecting, dust blowing radially
+      targetOffX = -8; targetOffY = 2.8; targetOffZ = 12; lookY = 2.0;
+    } else {
+      // Shot 4: Touchdown contact & settled surface vantage point
+      // Observer on the lunar soil looking across at the landed spacecraft firmly planted on the Moon!
+      targetOffX = -8; targetOffY = 2.2; targetOffZ = 11; lookY = 2.0;
+    }
+
+    if (!DZ3D.camOffset) {
+      DZ3D.camOffset = { x: targetOffX, y: targetOffY, z: targetOffZ };
+      DZ3D.camLookY = lookY;
+    } else {
+      const k = 1 - Math.exp(-dt * 4.0);
+      DZ3D.camOffset.x += (targetOffX - DZ3D.camOffset.x) * k;
+      DZ3D.camOffset.y += (targetOffY - DZ3D.camOffset.y) * k;
+      DZ3D.camOffset.z += (targetOffZ - DZ3D.camOffset.z) * k;
+      DZ3D.camLookY += (lookY - DZ3D.camLookY) * k;
+    }
+
+    const shMul = (prof.shakeMul || 1) * (degraded ? 1.5 : 1) * (DZ3D.reduced ? 0.25 : 1);
+    const shAmp = isLanded ? 0.003 : 0.08 * shMul * (h < 50 ? 0.5 : 0.25);
+    const tw = performance.now() * 0.001;
+
+    cam.position.set(
+      wrapPos.x + DZ3D.camOffset.x + Math.sin(tw * 39.7) * shAmp,
+      wrapPos.y + DZ3D.camOffset.y + Math.sin(tw * 31.3 + 1.2) * shAmp,
+      wrapPos.z + DZ3D.camOffset.z
+    );
+    cam.lookAt(
+      wrapPos.x,
+      wrapPos.y + DZ3D.camLookY,
+      wrapPos.z
+    );
+  } catch (e) {}
+
+  // Tape + aria mirror (≤1/s)
+  try {
+    if (DZ.els && DZ.els.alt) DZ.els.alt.textContent = (h >= 1000 ? (h / 1000).toFixed(2) + ' km' : Math.max(0, h).toFixed(0) + ' m');
     if (DZ.els && DZ.els.vel) {
-      const vv = Math.max(3, 1600 * Math.pow(1 - uu, 2));
-      DZ.els.vel.textContent = '−' + vv.toFixed(0) + ' m/s';
+      const hvel = Math.max(0, 1680 * Math.pow(1 - uu, 1.8));
+      const vvel = uu < 0.4 ? (15 + 20 * (uu / 0.4)) : uu < 0.78 ? (35 - 23 * ((uu - 0.4) / 0.38)) : Math.max(1.5, 12 * (1 - (uu - 0.78) / 0.22));
+      DZ.els.vel.textContent = 'H:' + (uu >= 0.96 ? '0' : hvel.toFixed(0)) + ' V:−' + (uu >= 0.96 ? '0.0' : vvel.toFixed(1)) + ' m/s';
+    }
+    if (DZ.els && DZ.els.mode) {
+      if (uu >= 0.96) {
+        DZ.els.mode.textContent = 'CONTACT';
+        DZ.els.mode.style.color = '#5ce6a0';
+      } else if (uu >= 0.78) {
+        DZ.els.mode.textContent = 'TERMINAL';
+        DZ.els.mode.style.color = '#ffb000';
+      } else {
+        DZ.els.mode.textContent = 'POWERED';
+        DZ.els.mode.style.color = '#ffb000';
+      }
     }
     const nowA = performance.now();
     if (DZ3D.aria && nowA - (DZ3D.lastAria || 0) > 1000) {
       DZ3D.lastAria = nowA;
-      const lead = (uu < 0.15) ? 'Deorbit burn complete, lander away. ' : '';
-      DZ3D.aria.textContent = lead + 'Powered descent, altitude ' + Math.max(0, h).toFixed(0)
+      const phaseName = uu < 0.4 ? 'Braking phase' : uu < 0.78 ? 'Pitchover approach' : uu < 0.96 ? 'Terminal descent' : 'Touchdown contact';
+      DZ3D.aria.textContent = phaseName + ', altitude ' + Math.max(0, h).toFixed(0)
         + ' metres, time-compressed presentation';
     }
   } catch (e) {}
-  // Cover in the last 0.5 s (0.35 s ramp on the DOM dust layer), fire at full
-  // cover, hold 0.4 s behind cover, then converge through fireDone.
+
+  // Contact & transition: subtle dust vignette (max 0.28, never blinding the terrain),
+  // brief hold on the settled craft, then clean seamless handoff to surface view.
   try {
     if (!DZ3D.covered) {
-      const c = Math.max(0, Math.min(1, (t - (T - 0.35)) / 0.35));
-      if (DZ.els && DZ.els.dust) DZ.els.dust.style.opacity = c.toFixed(2);
+      const c = Math.max(0, Math.min(1, (t - (T - 0.4)) / 0.4));
+      if (DZ.els && DZ.els.dust) DZ.els.dust.style.opacity = (c * 0.28).toFixed(2);
       if (c >= 1) {
         DZ3D.covered = true;
         DZ3D.hold = 0;
-        fireBlackout(); // enterSurface swaps the diorama behind full cover
+        fireBlackout(); // enterSurface swaps the diorama behind clean view
       }
     } else {
       DZ3D.hold += Math.min(Math.max(0, dt), 0.1);
-      if (DZ3D.hold >= 0.4) { fireDone(); return; }
+      if (DZ3D.hold >= 0.6) { fireDone(); return; }
     }
   } catch (e) {}
 }
@@ -3317,10 +3788,15 @@ function dzBegin3D() {
     } catch (e) {}
     DZ3D.t = 0; DZ3D.hold = 0; DZ3D.covered = false; DZ3D._acc = 0; DZ3D.lastAria = 0;
     try { V.dz3dOn = true; } catch (e) {}
-    // Snap the camera to the Shot A pose: gliding up from the scene origin
-    // reads as seconds of black (camera starts inside the terrain).
+    // Snap camera and offsets immediately so the craft & lunar terrain are instantly framed with zero lag.
     try {
-      if (DZ3D.camera) DZ3D.camera.position.set(30, 12000 + 20, 44);
+      DZ3D.camOffset = { x: -15, y: 5.0, z: 18 };
+      DZ3D.camLookY = 2.0;
+      if (DZ3D.camera) {
+        const initH = 12000;
+        DZ3D.camera.position.set(-15, initH + 5.0, 18);
+        DZ3D.camera.lookAt(0, initH + 2.0, 0);
+      }
     } catch (e) {}
     return true;
   } catch (e) {
@@ -3533,15 +4009,37 @@ function startDescent(opts) {
   box.setAttribute('aria-label', 'Powered descent visualization');
   box.innerHTML = '<div class="dz-tape"><div class="dz-row"><span>ALT</span><b id="dzAlt">12.00 km</b></div>'
     + '<div class="dz-row"><span>VVEL</span><b id="dzVel">−1600 m/s</b></div>'
-    + '<div class="dz-row"><span>MODE</span><b>POWERED</b></div></div>'
+    + '<div class="dz-row"><span>MODE</span><b id="dzMode">POWERED</b></div></div>'
     + '<div class="dz-glow"></div><div class="dz-dust"></div>'
-    + '<button class="dz-skip" type="button">SKIP ▸▸</button>';
+    + '<div class="dz-controls">'
+    + '<button class="dz-divert-btn" id="dzDivert" type="button" title="Divert thruster guidance to smooth reserve terrain plateau">DIVERT TO RESERVE SITE</button>'
+    + '<button class="dz-skip" type="button">SKIP CINEMATIC ▸▸</button>'
+    + '</div>';
   try { host.appendChild(box); } catch (e) { dzFinish(); return; }
   DZ.els = { box,
     alt: box.querySelector('#dzAlt'), vel: box.querySelector('#dzVel'),
+    mode: box.querySelector('#dzMode'),
     glow: box.querySelector('.dz-glow'), dust: box.querySelector('.dz-dust') };
   const skip = box.querySelector('.dz-skip');
   if (skip) skip.addEventListener('click', () => dzFinish());
+  const divert = box.querySelector('#dzDivert');
+  if (divert) {
+    divert.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        if (DZ.land && !DZ._diverted) {
+          DZ._diverted = true;
+          DZ.land.slope = Math.max(0.5, DZ.land.slope - 1.2);
+          DZ.land.margin = Math.round((DZ.land.margin + 1.2) * 10) / 10;
+          divert.textContent = 'DIVERTED TO RESERVE (SLOPE -1.2°) ✓';
+          divert.classList.add('diverted');
+          if (typeof logLine === 'function') {
+            logLine((typeof S !== 'undefined' && S.ops && S.ops.day) || 0, 'Descent guidance: active divert to reserve plateau confirmed.', 'good');
+          }
+        }
+      } catch (err) {}
+    });
+  }
   // C1 input lock: capture-phase swallow of Esc/Space/Enter for the beat
   // duration (descent must not toggle pause or fire other shortcuts). Removed
   // in fireDone's finally. Phase C descent key capture layers on top of this
@@ -3683,19 +4181,21 @@ function dzCleanup() {
 }
 function dzPaint(el) {
   try {
-    const e = 1 - Math.pow(1 - el, 2); // ease-out: hot braking early, hover late
-    if (DZ.els.alt) DZ.els.alt.textContent = (12 * (1 - e)).toFixed(2) + ' km';
+    const e = 1 - Math.pow(1 - el, 2);
+    const h = 12000 * (1 - e);
+    if (DZ.els.alt) DZ.els.alt.textContent = (h >= 1000 ? (h / 1000).toFixed(2) + ' km' : Math.max(0, h).toFixed(0) + ' m');
     if (DZ.els.vel) {
-      const v = -(1600 * (1 - e) * (1 - e) + 3);
-      DZ.els.vel.textContent = '−' + Math.max(3, Math.abs(v)).toFixed(0) + ' m/s';
+      const hvel = Math.max(0, 1680 * Math.pow(1 - el, 1.8));
+      const vvel = el < 0.4 ? (15 + 20 * (el / 0.4)) : el < 0.78 ? (35 - 23 * ((el - 0.4) / 0.38)) : Math.max(1.5, 12 * (1 - (el - 0.78) / 0.22));
+      DZ.els.vel.textContent = 'H:' + hvel.toFixed(0) + ' V:−' + (el >= 0.98 ? '0.0' : vvel.toFixed(1)) + ' m/s';
     }
     const vp = document.getElementById('opsViewport');
     if (vp) {
-      vp.classList.toggle('dz-shake', el > 0.08 && el < 0.9);
+      vp.classList.toggle('dz-shake', el > 0.08 && el < 0.92);
       vp.style.setProperty('--dzAmp', (el < 0.5 ? el * 2 : (1 - el) * 2).toFixed(2));
     }
     if (DZ.els.glow) DZ.els.glow.style.opacity = (el < 0.7 ? (0.25 + el * 0.75) : (1 - el) * 3.3).toFixed(2);
-    if (DZ.els.dust) DZ.els.dust.style.opacity = el > 0.82 ? ((el - 0.82) / 0.18).toFixed(2) : '0';
+    if (DZ.els.dust) DZ.els.dust.style.opacity = el > 0.85 ? (((el - 0.85) / 0.15) * 0.28).toFixed(2) : '0';
   } catch (e) { /* overlay must never break the frame */ }
 }
 /* Finish (contact) or cancel (skip/exit/headless-cleanup): exactly once.
@@ -3717,6 +4217,9 @@ function dzFinish() { fireDone(); }
 /* Game-facing surface entry/exit (game.js contract): bound to this view's state. */
 function enterSurface(){ return surfEnterSurface(V); }
 function exitSurface(){ surfExitSurface(V); }
+export function loadLanderGltf() {
+  return dzLoader().loadAsync(LANDER_URL);
+}
 const OpsView = {
   start,
   stop,
