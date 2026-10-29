@@ -143,6 +143,7 @@ function stageWindow(kind) {
 }
 const _trenchFallback = { x: 0, y: -0.6, z: 0 };
 const _bq = new THREE.Quaternion(); // booster plume orientation scratch (follows SRB tilt)
+const _bAxis = new THREE.Vector3(); // booster staging tilt/tumble axis scratch (zero per-frame alloc)
 const _pp0 = new THREE.Vector3(); // plume anchor scratch (zero per-frame alloc)
 const _pp1 = new THREE.Vector3(); // plume anchor scratch 2
 const _pf = new THREE.Vector3(); // fire-light proximity scratch (zero per-frame alloc)
@@ -3501,7 +3502,7 @@ function updateStaging(f, now) {
   if (S.boosters && S.boosters.length > 0) {
     const W = stageWindow('booster');
     if (!W) {
-      S.boosters.forEach(b => { b.position.copy(b.userData.initPos); b.rotation.set(0, 0, 0); });
+      S.boosters.forEach(b => { b.position.copy(b.userData.initPos); b.quaternion.identity(); });
     } else {
       const B = ST.booster, dur = Math.max(1e-4, W[1] - W[0]);
       if (!S.boosterSoundPlayed && met >= W[2] && met < W[2] + 4) {
@@ -3514,7 +3515,7 @@ function updateStaging(f, now) {
         const dx = b.userData.dirX || 0, dz = b.userData.dirZ || 0;
         if (f < f0) {
           b.position.copy(b.userData.initPos);
-          b.rotation.set(0, 0, 0);
+          b.quaternion.identity();
           return;
         }
         const frac = Math.min(1, (f - f0) / dur);
@@ -3523,18 +3524,25 @@ function updateStaging(f, now) {
         const px = b.userData.initPos.x + dx * sep;
         const pz = b.userData.initPos.z + dz * sep;
         const py = b.userData.initPos.y - Math.pow(frac, 2) * 22.0;
+
+        // Tangential tilt axis: rotates nose (0, 1, 0) radially outward along (dx, 0, dz)
+        const on = Math.hypot(dx, dz) || 1;
+        _bAxis.set(dz / on, 0, -dx / on);
+
         if (!B.ballistic || f <= f1) {
           b.position.set(px, py, pz);
-          b.rotation.z = -dx * tilt; b.rotation.x = dz * tilt;
+          b.quaternion.setFromAxisAngle(_bAxis, tilt);
         } else {
           // Ballistic coast in the parent-local frame (pure in f).
           vehicleVel(f1, _vv);
-          const on = Math.hypot(dx, dz) || 1, dv = B.ballistic.dv;
+          const dv = B.ballistic.dv;
           const dtau = debrisBallistic({ x: px, y: py, z: pz }, _vv,
             [dx / on * dv[0], dv[1], dz / on * dv[0] + dv[2]], B.ballistic.g, f1, f);
           b.position.set(_db.x, _db.y, _db.z);
-          b.rotation.z = -dx * tilt; b.rotation.x = dz * tilt;
-          b.rotation.y += B.ballistic.spin * dtau;
+          // Realistic end-over-end aerodynamic pitch tumble continuing smoothly from outward tilt:
+          // Pure function of dtau (zero axial spin accumulation).
+          const postTilt = tilt + (B.ballistic.spin || 0.6) * dtau;
+          b.quaternion.setFromAxisAngle(_bAxis, postTilt);
         }
       });
     }
