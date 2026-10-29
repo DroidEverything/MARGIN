@@ -54,6 +54,7 @@ const PROV_ABSTRACTIONS=[
  "LV reliability figures and launch-outcome splits are gameplay numbers, not LSP data.",
  "The anomaly deck, DSN tiers (60/150%), extension ×1.2, aerobrake and proximity figures are balanced abstractions, not flight-certified models.",
  "C&DH and ADCS options are balanced subsystem abstractions anchored to NASA mission classes (RAD750, SpaceCube, reaction wheel clusters, CMGs), with zero-delta baselines against standard bus structure.",
+ "Battery storage and eclipse survival model dark-pass energy demand (loadAvg × tDark) for solar array missions in LEO, lunar, and planetary orbits, with zero-delta baseline bat_std.",
  "Porkchop solutions ignore inclination (understates C3 ~1–3 km²/s²) and render on a 90×70 grid."
 ];
 function sourcesModal(){
@@ -192,6 +193,19 @@ const ADCS = [
   d:"High-torque CMG package and fine guidance optical sensors for sub-arcsecond payload pointing stability."},
  {id:"adcs_micro", n:"Cold-Gas Micro-Thruster Slew Pack", g:"ADCS", dm:36, dw:12, dc:22, trl:8, her:"Pulsed cold-gas GN2 attitude package (OSIRIS-REx class)", p:SRC.techport,
   d:"Independent cold-gas attitude thruster cluster for rapid high-rate slew maneuvers and safe-hold authority."}
+];
+
+/* ── Secondary Battery (Energy Storage & Eclipse Survival) ──
+   D-19 / I-13: bat_std is a ZERO-DELTA baseline against the bus structure
+   and mass formulas already inside derive(). Default builds and legacy links
+   derive byte-identically. */
+const BATTERY = [
+ {id:"bat_std",  n:"Li-ion Bus Battery — 400 Wh",       g:"Battery", dm:0,  dw:0, dc:0,  wh:400,  trl:9, her:"Standard 28V Li-ion bus battery (absorbed into bus baseline)", p:SRC.techport,
+  d:"Standard spacecraft secondary battery pack. Absorbed into structural bus baseline."},
+ {id:"bat_ext",  n:"High-Capacity Battery — 1.2 kWh",   g:"Battery", dm:12, dw:0, dc:15, wh:1200, trl:9, her:"High-specific-energy spaceflight Li-ion cells", p:SRC.techport,
+  d:"Extended battery capacity for prolonged eclipse periods and high-draw dark passes."},
+ {id:"bat_deep", n:"Deep-Discharge Vault Pack — 3.2 kWh",g:"Battery", dm:28, dw:0, dc:28, wh:3200, trl:8, her:"Hardened deep-cycle battery vault (lunar night/eclipse)", p:SRC.techport,
+  d:"Heavy deep-cycle energy storage system for long shadow passes and low-illumination operations."}
 ];
 
 /* ── Targets ──
@@ -636,7 +650,8 @@ function derive(S){
 
   const cdh = byId(CDH, S.cdh) || CDH[0];
   const adcs = byId(ADCS, S.adcs) || ADCS[0];
-  const payloadMass0 = iMass + (pw?pw.m:0) + (cm?cm.m:0) + (pr?pr.m:0) + sh.m + cdh.dm + adcs.dm;
+  const bat = byId(BATTERY, S.bat) || BATTERY[0];
+  const payloadMass0 = iMass + (pw?pw.m:0) + (cm?cm.m:0) + (pr?pr.m:0) + sh.m + cdh.dm + adcs.dm + bat.dm;
   /* Phase-2 rover kit: mass/draw/cost flow through the standard books below.
      Null/invalid rover (old saves, other missions) = zero effect. */
   const rv = roverKit(S);
@@ -709,6 +724,18 @@ function derive(S){
     rvSci=rv.ry.sci*siteSci;
   }
 
+  // P4-2: Eclipse dark-pass survival model
+  let tDark = 0;
+  if(pw && pw.solar){
+    if(L.mode === "leo") tDark = 0.60;              // ~36 min max umbra in 98.5 min orbit
+    else if(L.body === "moon") tDark = (site ? (site.sun < 0.6 ? 24.0 : 4.0) : 0.75); // LLO eclipse ~45 min; polar grazing
+    else if(L.body === "mars") tDark = 0.45;        // low Mars orbit eclipse
+  }
+  const darkDemandWh = Math.round(loadAvg * tDark);
+  const batCapWh = (pw && !pw.solar) ? 99999 : (bat.wh || 400);
+  const batOk = batCapWh >= darkDemandWh;
+  const batMargin = darkDemandWh > 0 ? (batCapWh - darkDemandWh) / darkDemandWh : 1;
+
   // data
   const dsnClass = (L.body==="jupiter"||L.body==="bennu")?70:34;
   const linkAu = L.linkAu!==undefined ? L.linkAu : auDist;
@@ -718,7 +745,7 @@ function derive(S){
   const genMbPerDay  = iData*DATA_DUTY*DAY;           // Mbit per day at observing duty cycle
 
   // cost
-  const partsCost = iCost + (pw?pw.c:0) + (cm?cm.c:0) + (pr?pr.c:0) + sh.c + rvCost + cdh.dc + adcs.dc;
+  const partsCost = iCost + (pw?pw.c:0) + (cm?cm.c:0) + (pr?pr.c:0) + sh.c + rvCost + cdh.dc + adcs.dc + bat.dc;
   const busCost = 60 + 0.30*dryMass;
   const lowTrl = instr.filter(x=>x.trl<8).length;
   const months = 34 + 1.6*instr.length + (pw?pw.sch:0) + lowTrl*4 + (rv?3:0);
@@ -753,7 +780,7 @@ function derive(S){
     sched: 72-months
   };
 
-  return {L,b,instr,pw,cm,pr,sh,cdh,adcs,iMass,iPower,iData,iCost,payloadMass,busDry,dryMass,
+  return {L,b,instr,pw,cm,pr,sh,cdh,adcs,bat,batCapWh,darkDemandWh,batOk,batMargin,tDark,iMass,iPower,iData,iCost,payloadMass,busDry,dryMass,
           dv,dvTotal,propMass,wetMass,genBOL,genEOL,busLoad,loadPeak,loadAvg,
           rate,passH,downMbPerDay,genMbPerDay,partsCost,busCost,months,integCost,
           lvCost,opsCost,cost,cap,capability,c3,margins:m,years,auDist,linkAu,dsnClass,
@@ -809,7 +836,7 @@ function capText(L, mode){
    ══════════════════════════════════════════════════════════════ */
 const S = {
   screen:"title", mode:"cadet", levelId:null, seed:DEFAULT_SEED,
-  instruments:[], power:null, comms:null, prop:null, shield:"sh0", cdh:"cdh_std", adcs:"adcs_std",
+  instruments:[], power:null, comms:null, prop:null, shield:"sh0", cdh:"cdh_std", adcs:"adcs_std", bat:"bat_std", bat:"bat_std",
   missionName:"", targetSci:100, objectives:[],
   launch:null, ops:null, result:null, sound:false, sel:null, bstep:"payload", site:null, rover:null, landing:null,
   progress:{}, aerobrake:false, dsn:"standard",
@@ -840,7 +867,9 @@ function enterPhaseOnce(key){
   const P=ensurePhases();
   if(!P.plan[key]&&key!=="build"&&key!=="commit"&&key!=="launch"&&key!=="ascent"&&key!=="ops"&&key!=="report"&&key!=="extension") return false;
   if(P.done[key]) return false;
-  P.done[key]=true; return true;
+  P.done[key]=true;
+  if(key!=="build"&&key!=="commit"&&S.ops&&S.ops.day>0) saveSession();
+  return true;
 }
 function phaseRequired(key){
   const P=ensurePhases();
@@ -1302,6 +1331,11 @@ function scrTitle(){
     <div class="tagline">EVERY GRAM, EVERY WATT, EVERY BIT</div>
     <div class="modes hero">
       <button class="btn primary hero-start" data-act="start">START A MISSION</button>
+      ${(()=>{ const ses=readSession(), sesL=ses?byId(LEVELS,ses.levelId):null;
+        if(!sesL||!ses.ops) return "";
+        return `<button class="btn secondary" data-act="resumesession" style="margin-top:8px" title="Resume flight in progress from last phase boundary">
+          RESUME IN-PROGRESS FLIGHT &#183; L+${ses.ops.day} (${esc(BODY[sesL.body].n.toUpperCase())}) &#8594;</button>`;
+      })()}
     </div>
     <div class="title-foot">
       <button class="tlink" data-act="about">WHAT IS MARGIN?</button>
@@ -1357,7 +1391,12 @@ function scrSelect(){
       const n=(dr.i||[]).length;
       return `<div style="display:flex;justify-content:flex-end;margin:0 0 8px">
         <button class="btn ghost" data-act="resume" title="Restore the design you last worked on">
-          RESUME LAST DESIGN &#183; ${String(drL.num).padStart(2,"0")} ${esc(drL.name.toUpperCase())} &#183; ${n} INSTRUMENT${n===1?"":"S"} &#8594;</button></div>`;
+          RESUME LAST DESIGN &#183; ${String(drL.num).padStart(2,"0")} ${esc(drL.name.toUpperCase())} &#183; ${n} INSTRUMENT${n===1?"":"S"} &#8594;</button>
+        ${(()=>{ const ses=readSession(), sesL=ses?byId(LEVELS,ses.levelId):null;
+          if(!sesL||!ses.ops) return "";
+          return `<button class="btn ghost" data-act="resumesession" style="border-color:var(--phosphor);color:var(--phosphor);margin-left:8px" title="Resume active flight in progress">
+            RESUME ACTIVE FLIGHT &#183; L+${ses.ops.day} (${esc(BODY[sesL.body].n.toUpperCase())}) &#8594;</button>`;
+        })()}</div>`;
     })()}
     <div class="strip-head" aria-hidden="true"><span>MISSION TIMELINE</span><i></i><span>DRAG OR SCROLL &#8594;</span></div>
     <div class="strip-wrap"><div class="lvstrip" role="list">${LEVELS.map((L,idx)=>{
@@ -1740,6 +1779,7 @@ function scrBuild(){
       <div class="bay-col">
         <div class="accordion-group">
           ${pick("POWER SOURCE",tierList(L.power.map(id=>byId(POWER,id)),S.power),"power","PWR-02")}
+          ${pick("BATTERY & ECLIPSE STORAGE",BATTERY,"bat","BAT-03",D.darkDemandWh>0?`Eclipse ${D.tDark.toFixed(1)}h: need ${D.darkDemandWh} Wh ${D.batOk?"✓":"⚠ LOW"}`:null)}
           ${pick("PROPULSION",L.prop.map(id=>byId(PROP,id)),"prop","PRP-03")}
           ${L.dose>=2?pick("RADIATION SHIELDING",SHIELD,"shield","RAD-05"):""}
           ${pick("ONBOARD COMPUTER (C&DH)",CDH,"cdh","CDH-06")}
@@ -1820,6 +1860,7 @@ function scrBuild(){
     ["Objectives covered by instruments",S.objectives.every(o=>objMet(S,o)),
       S.objectives.filter(o=>!objMet(S,o)).length+" uncovered","payload"],
     ["Power positive at end of life",D.genEOL>=D.loadPeak,`${fmt(D.loadPeak)} W load vs ${fmt(D.genEOL)} W`,"systems"],
+    ["Eclipse battery survival",D.darkDemandWh===0||D.batOk,D.darkDemandWh>0?`${D.batCapWh} Wh vs ${D.darkDemandWh} Wh need (${D.tDark.toFixed(1)}h shadow)`:"Continuous sunlight / RTG","systems"],
     ["Within cost cap",D.cost<=D.cap,`$${fmt(D.cost)}M vs ${capText(D.L)}`,"systems"],
     ["Launch readiness within 72 months",D.months<=72,`${fmt(D.months)} months`,"systems"]
   ];
@@ -2775,6 +2816,7 @@ function auxPaint(){
 function stepDay(){
   const O=S.ops, D=derive(S), L=byId(LEVELS,S.levelId);
   O.day++;
+  if(O.day>0 && O.day%10===0) saveSession();
   /* Phase 8: nominal EOM gates a real extension review; only a GO decision earns the short loop. */
   if(!O.eomReviewed&&!O.ended&&O.day>(O.nominalDays||O.totalDays)){
     if(O.extDeclined){ endMission("complete"); return; }
@@ -2897,6 +2939,7 @@ function resolveEvent(i){
   logLine(O.day,`${ev.t}: ${ev.ch[i][0]}.`,ev.good?"good":"warn");
   /* EVENT→DECISION→RESULT→CONSEQUENCE: hold the sim on a result card until acknowledged. */
   showEvResult(ev,i,st);
+  saveSession();
 }
 function evResultLines(ev,i,st){
   const lines=[];
@@ -4870,7 +4913,7 @@ function verdict(D,R,O){
    ══════════════════════════════════════════════════════════════ */
 function shareState(){
   const d = {l:S.levelId,o:S.objectives,i:S.instruments,p:S.power,c:S.comms,r:S.prop,s:S.shield,a:S.assist,q:S.dsn,t:S.site||null,v:S.rover||null,
-             cdh:S.cdh||"cdh_std",adcs:S.adcs||"adcs_std",m:S.mode,sd:S.seed,w:S.launch?{v:S.launch.lv,i:S.launch.i,j:S.launch.j}:null};
+             cdh:S.cdh||"cdh_std",adcs:S.adcs||"adcs_std",bat:S.bat||"bat_std",m:S.mode,sd:S.seed,w:S.launch?{v:S.launch.lv,i:S.launch.i,j:S.launch.j}:null};
   if(S.missionName && S.missionName.trim()) d.nm = S.missionName.trim().slice(0, 32);
   if(S.targetSci != null && S.targetSci !== 100) d.tg = Math.round(S.targetSci);
   return d;
@@ -4937,6 +4980,7 @@ function applyShareObject(d){
   S.shield=okId(SHIELD,d.s)?d.s  :def.shield;
   S.cdh   =okId(CDH,d.cdh)  ?d.cdh:def.cdh;
   S.adcs  =okId(ADCS,d.adcs)?d.adcs:def.adcs;
+  S.bat   =okId(BATTERY,d.bat)?d.bat:def.bat;
   S.missionName = (d.nm && typeof d.nm === "string") ? d.nm.trim().slice(0, 32) : "";
   S.targetSci   = (d.tg != null && isFinite(d.tg)) ? Math.max(10, Math.min(200, Math.round(Number(d.tg)))) : 100;
   S.dsn   =okId(DSN,d.q)    ?d.q  :def.dsn;
@@ -5013,6 +5057,124 @@ function loadDraft(){
   if(!applyShareObject(d)) return false;
   enterRestoredBuild(); go("build"); return true;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SESSION RESTORE (P4-1, W2 Tier 2, A-15, D-20)
+   ──────────────────────────────────────────────────────────────
+   Snapshots in-flight mission state at phase boundaries (D-20).
+   Restores without calling initOpsState() to prevent double launch
+   penalties or event deck re-draws. Preserves the full launch tuple
+   (A-15) so derive(S) reproduces identical vinf/c3/margins.
+   Restores paused at speed 0.
+   ══════════════════════════════════════════════════════════════ */
+const SESSION_KEY = "margin.session";
+
+const OPS_SNAP_FIELDS = [
+  "day","totalDays","cruise","speed","evIdx","delivered","backlog","storageMb",
+  "dose","opsCost","lost","propUsed","powerMult","sciMult","doseMult","dsnFactor",
+  "blackout","dsnCut","dsnCutSoft","log","status","overflow","collectDuringBlackout",
+  "extend","ended","nominalDays","eomReviewed","extDeclined","extSnap",
+  "launchApplied","launch","scrubDelayMo","arrivalApplied","proxApplied","aeroApplied"
+];
+
+function serializeSession(){
+  if(!S.levelId || !S.ops || S.ops.day <= 0) return null;
+  const O = S.ops;
+  const ops = {};
+  OPS_SNAP_FIELDS.forEach(k => { if(O[k] !== undefined) ops[k] = O[k]; });
+  ops.dead = Array.from(O.dead || []);
+  ops.events = (O.events || []).map(e => ({ id: e.id, day: e.day }));
+
+  const launch = S.launch ? {
+    lv: S.launch.lv, i: S.launch.i, j: S.launch.j,
+    c3: S.launch.c3, vinf: S.launch.vinf, tof: S.launch.tof, tDep: S.launch.tDep,
+    set: !!S.launch.set, outcome: S.launch.outcome || null
+  } : null;
+
+  return {
+    v: 1,
+    ts: Date.now(),
+    levelId: S.levelId,
+    screen: S.screen,
+    mode: S.mode,
+    seed: S.seed,
+    spec: shareState(),
+    launch,
+    ops,
+    surface: S.surface ? { ...S.surface } : null,
+    landing: S.landing ? { ...S.landing } : null,
+    phases: S.phases ? JSON.parse(JSON.stringify(S.phases)) : null,
+    team: (S.team && S.team.size > 1) ? {
+      size: S.team.size, seat: S.team.seat, log: (S.team.log || []).slice(-100),
+      votes: S.team.votes, goAll: S.team.goAll
+    } : null
+  };
+}
+
+function saveSession(){
+  try{
+    if(!S.levelId || !S.ops || S.ops.day <= 0) return;
+    const snap = serializeSession();
+    if(snap) localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
+  }catch(e){}
+}
+
+function clearSession(){
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+}
+
+function readSession(){
+  try{
+    const v = localStorage.getItem(SESSION_KEY);
+    if(!v) return null;
+    const s = JSON.parse(v);
+    if(s && s.spec && byId(LEVELS, s.spec.l) && s.ops && s.ops.day > 0) return s;
+    return null;
+  }catch(e){ return null; }
+}
+
+function restoreSession(){
+  const snap = readSession();
+  if(!snap) return false;
+  if(!applyShareObject(snap.spec)) return false;
+
+  S.seed = (snap.seed !== undefined && isFinite(snap.seed)) ? (snap.seed | 0) : DEFAULT_SEED;
+  S.mode = (snap.mode === "fd") ? "fd" : "cadet";
+
+  /* A-15: restore the complete launch tuple so derive(S) keeps exact vinf/c3/margins */
+  if(snap.launch){
+    S.launch = { ...snap.launch };
+  }
+
+  /* D-20: build S.ops directly without initOpsState() to avoid double launch penalties */
+  const O = { ...snap.ops };
+  O.dead = new Set(snap.ops.dead || []);
+  O.events = (snap.ops.events || []).map(ev => {
+    const staticEv = EVENTS.find(x => x.id === ev.id);
+    return staticEv ? { ...staticEv, ...ev } : ev;
+  });
+  /* D-20: restore paused with speed 0 so player is not dropped into a blur */
+  O.running = false;
+  O.speed = 0;
+  S.ops = O;
+
+  S.surface = snap.surface ? { ...snap.surface } : null;
+  S.landing = snap.landing ? { ...snap.landing } : null;
+  S.phases = snap.phases ? snap.phases : { levelId: S.levelId, plan: phasePlanFor(S.levelId), done: { build: true, ops: true } };
+
+  if(snap.team && typeof makeTeam === "function"){
+    S.team = makeTeam(snap.team.size || 1);
+    S.team.seat = snap.team.seat || 0;
+    S.team.log = snap.team.log || [];
+    S.team.votes = snap.team.votes || {};
+    S.team.goAll = snap.team.goAll || null;
+  }
+
+  const targetScreen = (snap.screen && snap.screen !== "title" && snap.screen !== "report" && snap.screen !== "select") ? snap.screen : "ops";
+  go(targetScreen);
+  return true;
+}
+
 function saveProgress(){try{localStorage.setItem("margin.progress",JSON.stringify(S.progress))}catch(e){}}
 function loadProgress(){try{const v=localStorage.getItem("margin.progress");if(v)S.progress=JSON.parse(v)}catch(e){}}
 
@@ -5108,6 +5270,7 @@ function finishRun(){
     ok=saveRuns(list);
   }
   if(ok) S.lastRunId=rec.id;   /* lets the report compare against itself */
+  clearSession();
   return ok;
 }
 
@@ -5287,7 +5450,7 @@ const TEAM_GATE={
   obj:["science"], instr:["science"],
   site:["planner"], dsn:["planner"], pmode:["planner"], assist:["planner"], lv:["planner"],
   power:["engineer"], comms:["engineer"], prop:["engineer"], shield:["engineer"],
-  cdh:["engineer"], adcs:["engineer"], rover:["engineer"], sord:["engineer"], spce:["engineer"],
+  cdh:["engineer"], adcs:["engineer"], bat:["engineer"], rover:["engineer"], sord:["engineer"], spce:["engineer"],
   setname:["planner"], settarget:["science"],
   arrch:["science"],
   aeroch:["planner"], landch:["planner"],
@@ -5296,7 +5459,7 @@ const TEAM_GATE={
 /* Documented fallback (D-03): unknown actions are ALLOWED, so a future
    control cannot lock the player out. These are listed for the audit. */
 const TEAM_NEVER=["closeModal","sources","how","about","spd","cam-mode","toggle-minimap","toggle-hud",
-  "rep","copy","copyc","history","cmprun","home","gohome","start","resume","level","sysview","resetview",
+  "rep","copy","copyc","history","cmprun","home","gohome","start","resume","resumesession","level","sysview","resetview",
   "devjump","devm","devgo","tobuild","tolaunch","tobrief","rebuild","next","evack","filter-useful",
   "toggle-acc","handoff","seat","goseat","teamsize",
   /* Build step navigation is presentation, not a design decision: the
@@ -5510,6 +5673,7 @@ function resetRunState(){
 function startLevel(id){
   const L=byId(LEVELS,id), def=defaultBuild(L);
   resetRunState();
+  clearSession();
   /* Seed is attempt identity, not run state: a link's challenge seed survives
      a restore, but a fresh pick from the mission list is always the default
      deck (G5 / D-12 — new features never draw from the event stream). */
@@ -5518,7 +5682,7 @@ function startLevel(id){
   S.launch=null; S.ops=null; S.result=null; S.pmode="c3"; S.bstep="payload";
   S.commit=null; S.phases={levelId:id,plan:phasePlanFor(id),done:{build:true}};
   S.power=def.power; S.comms=def.comms; S.prop=def.prop; S.shield=def.shield;
-  S.cdh=def.cdh; S.adcs=def.adcs; S.missionName=def.missionName; S.targetSci=def.targetSci;
+  S.cdh=def.cdh; S.adcs=def.adcs; S.bat=def.bat; S.missionName=def.missionName; S.targetSci=def.targetSci;
   S.rover=def.rover; S.site=def.site; S.dsn=def.dsn; S.assist=def.assist;
   S.aerobrake=false;
   go("brief");
@@ -5538,6 +5702,7 @@ document.addEventListener("click",e=>{
   switch(a){
     case "start": go("select"); Audio_.click(); break;
     case "resume": if(!loadDraft()){ render(); } Audio_.click(); break;
+    case "resumesession": if(!restoreSession()){ render(); } Audio_.click(); break;
     case "about": aboutModal(); Audio_.click(); break;
     case "how": howModal(); break;
     case "seat": {
@@ -5670,6 +5835,7 @@ document.addEventListener("click",e=>{
     case "shield":S.shield=id;Audio_.click(); refreshBuild(prev); break;
     case "cdh": S.cdh=id; Audio_.click(); refreshBuild(prev); break;
     case "adcs": S.adcs=id; Audio_.click(); refreshBuild(prev); break;
+    case "bat": S.bat=id; Audio_.click(); refreshBuild(prev); break;
     case "setname": {
       const inp = document.getElementById("inMissionName");
       if(inp) S.missionName = inp.value.trim().slice(0, 32);
@@ -6425,7 +6591,7 @@ function applyTeamShortcut(){
    A FAIL is not a bug in the harness — either the change was unintended
    (stop, fix it) or it was intended (re-emit and document the baseline diff). Never widen a tolerance to make it pass.
    ══════════════════════════════════════════════════════════════ */
-let GOLDEN_ACTIVE=false;
+var GOLDEN_ACTIVE=false;
 const GOLDEN_V=3;
 /* Baseline v3 (2026-10-29 via ?golden=emit): deterministic snapshot baseline covering default builds, seeded event decks, and share links. */
 const GOLDEN={derive:{
