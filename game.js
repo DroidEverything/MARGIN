@@ -81,19 +81,19 @@ function sourcesModal(){
 /* ── Instruments ─────────────────────────── */
 const INSTR = [
  {id:"ctx",  n:"Context Camera",            g:"Imaging",     m:18, w:12, d:0.60, c:22, trl:9, tags:["surface","mapping"],     her:"MRO CTX class", p:SRC.techport},
- {id:"hires",n:"Telescopic Imager",         g:"Imaging",     m:65, w:60, d:6.00, c:85, trl:9, tags:["surface","geology"],     her:"MRO HiRISE class", p:SRC.techport},
+ {id:"hires",n:"Telescopic Imager",         g:"Imaging",     m:65, w:60, d:6.00, c:85, trl:9, tier:2, tags:["surface","geology"],     her:"MRO HiRISE class", p:SRC.techport},
  {id:"therm",n:"Thermal Imager",            g:"Imaging",     m:11, w:14, d:0.30, c:18, trl:9, tags:["surface","thermal"],     her:"Odyssey THEMIS class", p:SRC.techport},
  {id:"ocean",n:"Wide-Field Ocean Imager",   g:"Imaging",     m:45, w:40, d:3.20, c:60, trl:8, tags:["ocean","atmos"],         her:"PACE OCI class", p:SRC.techport},
  {id:"vnir", n:"VNIR Imaging Spectrometer", g:"Spectroscopy",m:32, w:44, d:2.10, c:55, trl:9, tags:["composition","geology","ice"], her:"OSIRIS-REx OVIRS class", p:SRC.techport},
- {id:"msp",  n:"Mass Spectrometer",         g:"Spectroscopy",m:40, w:55, d:0.05, c:70, trl:8, tags:["composition","organics","atmos"], her:"Curiosity SAM class", p:SRC.techport},
+ {id:"msp",  n:"Mass Spectrometer",         g:"Spectroscopy",m:40, w:55, d:0.05, c:70, trl:8, tier:2, tags:["composition","organics","atmos"], her:"Curiosity SAM class", p:SRC.techport},
  {id:"grns", n:"Gamma-Ray / Neutron Spec.", g:"Spectroscopy",m:30, w:32, d:0.02, c:38, trl:9, tags:["composition","ice"],     her:"Messenger GRNS class", p:SRC.techport},
  {id:"mag",  n:"Magnetometer + 3 m Boom",   g:"Fields",      m:9,  w:4,  d:0.01, c:12, trl:9, tags:["fields","interior"],     her:"Juno MAG class", p:SRC.techport},
  {id:"plas", n:"Plasma / Particle Analyser",g:"Fields",      m:14, w:12, d:0.03, c:20, trl:9, tags:["fields","radiation"],    her:"MAVEN SWIA class", p:SRC.techport},
  {id:"dust", n:"Dust Detector",             g:"Fields",      m:4,  w:3,  d:0.005,c:7,  trl:9, tags:["dust","fields"],         her:"New Horizons SDC class", p:SRC.techport},
- {id:"radar",n:"Ice-Penetrating Radar",     g:"Radar",       m:55, w:120,d:1.40, c:80, trl:7, tags:["ice","interior"],        her:"Europa Clipper REASON class", p:SRC.techport},
+ {id:"radar",n:"Ice-Penetrating Radar",     g:"Radar",       m:55, w:120,d:1.40, c:80, trl:7, tier:2, tags:["ice","interior"],        her:"Europa Clipper REASON class", p:SRC.techport},
  {id:"alt",  n:"Laser Altimeter",           g:"Radar",       m:25, w:34, d:0.10, c:30, trl:9, tags:["mapping","interior"],    her:"LRO LOLA class", p:SRC.techport},
  {id:"arm",  n:"Sample Acquisition Arm",    g:"In-situ",     m:78, w:90, d:0.02, c:110,trl:8, tags:["sample"],                her:"OSIRIS-REx TAGSAM class", p:SRC.techport},
- {id:"drill",n:"Drill + Sample Handling",   g:"In-situ",     m:65, w:110,d:0.02, c:95, trl:7, tags:["sample","organics"],     her:"Mars Sample Return class", p:SRC.techport},
+ {id:"drill",n:"Drill + Sample Handling",   g:"In-situ",     m:65, w:110,d:0.02, c:95, trl:7, tier:2, tags:["sample","organics"],     her:"Mars Sample Return class", p:SRC.techport},
  {id:"seis", n:"Seismometer",               g:"In-situ",     m:30, w:8,  d:0.01, c:42, trl:9, tags:["interior"],              her:"InSight SEIS class", p:SRC.techport},
  {id:"wx",   n:"Weather / Environment Stn", g:"In-situ",     m:12, w:10, d:0.005,c:15, trl:9, tags:["atmos","surface"],       her:"Perseverance MEDA class", p:SRC.techport},
  {id:"uso",  n:"Ultra-Stable Oscillator",   g:"Radio Sci.",  m:3,  w:6,  d:0.00, c:6,  trl:9, tags:["interior","atmos"],      her:"Radio science, many missions", p:SRC.techport},
@@ -105,9 +105,9 @@ const POWER = [
  {id:"sa1",n:"Fixed Solar Array — small",   m:18, bol:300, deg:0.020, c:8,  sch:0, solar:true,  p:SRC.techport},
  {id:"sa2",n:"Fixed Solar Array — medium",  m:34, bol:700, deg:0.020, c:14, sch:0, solar:true,  p:SRC.techport},
  {id:"sa3",n:"Deployable Array — large",    m:62, bol:1600,deg:0.021, c:26, sch:1, solar:true,  p:SRC.techport},
- {id:"sa4",n:"Very Large Array (Clipper class)",m:350,bol:20000,deg:0.022,c:70,sch:4, solar:true,  p:SRC.techport},
+ {id:"sa4",n:"Very Large Array (Clipper class)",m:350,bol:20000,deg:0.022,c:70,sch:4, solar:true,  tier:2, p:SRC.techport},
  {id:"rtg1",n:"MMRTG",                      m:45, bol:110, deg:0.016, c:145,sch:9, solar:false, p:SRC.rps},
- {id:"rtg2",n:"2 × MMRTG",                  m:90, bol:220, deg:0.016, c:265,sch:12,solar:false, p:SRC.rps}
+ {id:"rtg2",n:"2 × MMRTG",                  m:90, bol:220, deg:0.016, c:265,sch:12,tier:2,solar:false, p:SRC.rps}
 ];
 
 /* ── Comms ── gain in dBi ── */
@@ -116,7 +116,7 @@ const COMMS = [
  {id:"mga",n:"Medium-Gain Antenna",  m:6,  w:15, gain:22, c:6,  p:SRC.dsn},
  {id:"hga2",n:"2 m HGA — X-band",    m:22, w:50, gain:45, c:18, p:SRC.dsn},
  {id:"hga3",n:"3 m HGA — X/Ka",      m:38, w:100,gain:51, c:32, p:SRC.dsn},
- {id:"ka",  n:"3 m HGA + Ka package", m:46, w:130,gain:56, c:44, p:SRC.dsn}
+ {id:"ka",  n:"3 m HGA + Ka package", m:46, w:130,gain:56, c:44, tier:2, p:SRC.dsn}
 ];
 
 /* ── DSN allocation tiers — factor multiplies the mission's L.dsnHrs passes (derive passH),
@@ -689,18 +689,21 @@ function derive(S){
   // margins
   const massCap = capability||L.par.mass;
   const powerCap = genEOL||1;
+  /* D-16: the single effective cap. Everything downstream (rails, commit,
+     report, score) reads this, never the raw LEVELS figure. */
+  const cap = effCap(L,S.mode);
   const m = {
     mass:  massCap>0 ? (massCap-wetMass)/massCap : -1,
     power: powerCap>0 ? (powerCap-loadPeak)/powerCap : -1,
     data:  genMbPerDay>0 ? (downMbPerDay-genMbPerDay)/Math.max(genMbPerDay,downMbPerDay) : 1,
-    cost:  (L.capM-cost)/L.capM,
+    cost:  cap>0 ? (cap-cost)/cap : -1,
     sched: 72-months
   };
 
   return {L,b,instr,pw,cm,pr,sh,iMass,iPower,iData,iCost,payloadMass,busDry,dryMass,
           dv,dvTotal,propMass,wetMass,genBOL,genEOL,busLoad,loadPeak,loadAvg,
           rate,passH,downMbPerDay,genMbPerDay,partsCost,busCost,months,integCost,
-          lvCost,opsCost,cost,capability,c3,margins:m,years,auDist,linkAu,dsnClass,
+          lvCost,opsCost,cost,cap,capability,c3,margins:m,years,auDist,linkAu,dsnClass,
           site,siteSun,siteSci,siteOpsM,siteTravKm,
           rv,rvMass,rvDraw,rvCost,rvSlopeOk,rvSlopeMargin,rvNightOk,rvNightNeed,rvComOk,rvComNeed,rvSci};
 }
@@ -717,16 +720,50 @@ function objMet(S,oid){
 }
 
 /* ══════════════════════════════════════════════════════════════
+   DIFFICULTY / RULESET AUTHORITY  (D-08, D-15, D-16, A-03)
+   ──────────────────────────────────────────────────────────────
+   Difficulty is a simulation input: it changes the part tiers offered
+   (P1-9) and the budget cap. It changes nothing else.
+   `effCap` is the ONLY expression that multiplies a cap (the A-03 gate
+   greps for the raw cap token and must find it only in LEVELS and here), and
+   `derive()` is its only consumer, so the commit screen, the five rails, the
+   report and the score cannot disagree (Q3 option (a)).
+   ══════════════════════════════════════════════════════════════ */
+const DEFAULT_SEED = 12345;
+const RULES_V = 1;                       /* struck in every run record, D-15 */
+const CAP_MULT = { cadet:1.15, fd:1.00 };
+/* Screens where difficulty may still be changed (A-02). Anywhere later the
+   missions's margins would only be meaningful under the rules it was built
+   in, so the toggle is locked. */
+const MODE_FREE = ["title","select"];
+function effCap(L, mode){
+  if(!L) return 0;
+  /* An `uncapped` mission keeps its declared figure as the SCORING
+     REFERENCE (so the cost-margin bonus is still earned, A-14) but is never
+     scored as over budget — see isOverCap(). */
+  return L.capM * (L.uncapped ? 1 : (CAP_MULT[mode || S.mode] || 1));
+}
+function isOverCap(cost, L, mode){
+  return !(L && L.uncapped) && cost > effCap(L, mode);
+}
+function capText(L, mode){
+  if(L && L.uncapped) return "no cap";
+  return "$"+fmt(effCap(L, mode))+"M";
+}
+
+/* ══════════════════════════════════════════════════════════════
    APP STATE + SHELL
    ══════════════════════════════════════════════════════════════ */
 const S = {
-  screen:"title", mode:"cadet", levelId:null, seed:12345,
+  screen:"title", mode:"cadet", levelId:null, seed:DEFAULT_SEED,
   instruments:[], power:null, comms:null, prop:null, shield:"sh0", objectives:[],
   launch:null, ops:null, result:null, sound:false, sel:null, bstep:"payload", site:null, rover:null, landing:null,
   progress:{}, aerobrake:false, dsn:"standard",
   /* Phase 1 lifecycle integration: authoritative once-only phase ledger. */
-  phases:null, commit:null
-};
+  phases:null, commit:null,
+  /* Phase 1 remediation: run-scoped state that must never leak between
+     missions (A-11/R-13) and the exactly-once run-record latch (A-04). */
+  runRecorded:false, lastRunId:null, team:null, challenge:null};
 /* Ordered lifecycle: BUILD→COMMIT→LAUNCH→ASCENT→[ARRIVAL]→[PROXIMITY]→OPS→[EXTENSION]→REPORT */
 const LIFECYCLE=["build","commit","launch","ascent","arrival","proximity","ops","extension","report"];
 function phasePlanFor(lid){
@@ -847,7 +884,8 @@ function railValues(D){
            capLabel:D.capability?"launch capability":"design target"},
     power:{v:D.loadPeak, cap:D.genEOL, m:D.margins.power, d:0, u:"W", capLabel:"end-of-life generation"},
     data: {v:D.genMbPerDay/1000, cap:D.downMbPerDay/1000, m:D.margins.data, d:0, u:"Gb/d", capLabel:"daily downlink"},
-    cost: {v:D.cost, cap:D.L.capM, m:D.margins.cost, d:0, u:"$M", capLabel:"cost cap"},
+    cost: {v:D.cost, cap:D.cap, m:D.margins.cost, d:0, u:"$M",
+           capLabel:(D.L&&D.L.uncapped)?"no cap":"cost cap", uncapped:!!(D.L&&D.L.uncapped)},
     sched:{v:D.months, cap:72, m:D.margins.sched/72, d:0, u:"mo", capLabel:"launch readiness date"}
   };
 }
@@ -1142,9 +1180,30 @@ function render(){
     else if(S.screen!=="ops"&&window.OpsView&&OpsView.stop) OpsView.stop();
     if(window.OpsView&&OpsView.showFinal) OpsView.showFinal();
   }catch(e){}
+  /* W2 Tier 1 (P0-5): keep the last design warm while the player is still
+     designing. Screen-scoped so ops never rewrites it, and never on the title
+     or select screens where there is no design to save. */
+  if(S.screen==="brief"||S.screen==="build"||S.screen==="launch") saveDraft();
+  /* P1-10 / A-02: difficulty freezes once a mission is chosen. The toggle is
+     disabled rather than hidden so the player can see which ruleset is in
+     force and why it cannot change. */
+  try{
+    const mb=el("btnMode");
+    if(mb){
+      const locked=!MODE_FREE.includes(S.screen);
+      mb.disabled=locked;
+      mb.style.opacity=locked?"0.55":"";
+      mb.style.cursor=locked?"not-allowed":"";
+      mb.title=locked
+        ? "Difficulty is locked for this mission — the design's margins only mean something under the rules it was built in. Go back to mission select to change it."
+        : "Switch between Cadet (simple parts, +15% budget cap) and Flight Director (advanced parts, full budget, more anomalies).";
+    }
+  }catch(e){}
   s.scrollTop=0;
 }
 function go(screen){
+  /* Golden gate (dev, ?golden): the harness drives levels without rendering. */
+  if(GOLDEN_ACTIVE){ S.screen=screen; return; }
   const veil = document.getElementById("veil");
   let still = false;
   try { still = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
@@ -1190,7 +1249,21 @@ function scrTitle(){
 }
 
 /* ── MISSION SELECT (fullscreen solar-system stage) ── */
+/* G5/P1-12: shown on every screen where the player could still change the
+   design, so nobody spends 20 minutes building before discovering the run is
+   scored against a shared event deck. */
+function challengeBanner(){
+  const c=S.challenge; if(!c) return "";
+  return `<div class="panel" style="border-color:var(--blue-lift);background:rgba(75,130,215,.10);margin-bottom:10px">
+    <div class="pad" style="padding:9px 12px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+      <span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--blue-lift)">COMPETITIVE CHALLENGE</span>
+      <span class="hint" style="font-size:12px">Same objective, same anomaly deck (seed <b>${c.seed}</b>, ${c.mode==="fd"?"Flight Director":"Cadet"}). Your spacecraft is your own — everyone's runs are grouped under this seed so the scores mean the same thing.</span>
+    </div></div>`;
+}
 function scrSelect(){
+  /* A-17: exactly ONE read of `margin.runs` per select render — every card's
+     best, every badge and the history button share this array. */
+  const runs=loadRuns();
   return `<div class="sel-full">
     <div id="selview" role="img" aria-label="Solar system destination view"><div class="selview-fallback" aria-hidden="true"></div></div>
     <div class="sel-top">
@@ -1198,7 +1271,9 @@ function scrSelect(){
         <p class="hint">Each mission adds exactly one new constraint. Play them in order the first time.</p></div>
       <div class="sel-controls">
         <div id="selcontrols"></div>
-        <div class="sel-tools"><span class="tape">${S.mode==="cadet"?"CADET MODE":"FLIGHT DIRECTOR MODE"}</span></div>
+        <div class="sel-tools"><span class="tape">${S.mode==="cadet"?"CADET MODE":"FLIGHT DIRECTOR MODE"}</span>
+          <button class="btn ghost" data-act="history" title="Every run you have finished, with its design and outcome"
+            style="padding:3px 10px;font-size:10.5px;margin-left:8px">HISTORY${runs.length?" &#183; "+runs.length:""}</button></div>
       </div>
     </div>
     <div class="selcap-chip" id="selcap" aria-live="polite">
@@ -1208,9 +1283,19 @@ function scrSelect(){
       <div class="sc-stats"><span>1.00 AU</span><span>3 YR</span><span>$400M CAP</span><span>0.3 KRAD/YR</span></div>
     </div>
     <div class="sel-bottom">
+    ${(()=>{ const dr=readDraft(), drL=dr?byId(LEVELS,dr.l):null;
+      if(!drL) return "";
+      const n=(dr.i||[]).length;
+      return `<div style="display:flex;justify-content:flex-end;margin:0 0 8px">
+        <button class="btn ghost" data-act="resume" title="Restore the design you last worked on">
+          RESUME LAST DESIGN &#183; ${String(drL.num).padStart(2,"0")} ${esc(drL.name.toUpperCase())} &#183; ${n} INSTRUMENT${n===1?"":"S"} &#8594;</button></div>`;
+    })()}
     <div class="strip-head" aria-hidden="true"><span>MISSION TIMELINE</span><i></i><span>DRAG OR SCROLL &#8594;</span></div>
     <div class="strip-wrap"><div class="lvstrip" role="list">${LEVELS.map((L,idx)=>{
-      const done=S.progress[L.id];
+      /* P1-11: the card badge is the player's best under THIS difficulty and
+         seed, never a bare `margin.progress` grade from another ruleset. */
+      const done=gradeFor(L.id, S.mode, S.seed, runs);
+      const badge=done?`<span class="grade" title="${done.basis==="run"?"best recorded run":done.basis==="progress"?"previous run, difficulty unknown":"legacy record"}">${esc(done.grade)}</span>`:"";
       return `<button class="lvcard" role="listitem" data-act="level" data-id="${L.id}" style="--i:${idx}">
         <span class="top">
           <span class="krow"><span class="num">${String(L.num).padStart(2,"0")}</span><span class="destpill">${esc(BODY[L.body].n.toUpperCase())}</span></span>
@@ -1218,7 +1303,7 @@ function scrSelect(){
           <span class="sub">${esc(L.sub)}</span>
           <span class="newpill"><i></i><span>New: ${esc(L.newMech)}</span></span>
         </span>
-        <span class="bot"><span class="brow"><span class="spec">${L.years} yr &#183; cap $${fmt(L.capM)}M</span>${done?`<span class="grade">${done.grade}</span>`:""}<span class="go">FLY <b>&#8594;</b></span></span><span class="env">${L.dose} krad/yr &#183; dsn ${L.dsnHrs}h/day</span></span>
+        <span class="bot"><span class="brow"><span class="spec">${L.years} yr &#183; cap ${capText(L)}</span>${badge}<span class="go">FLY <b>&#8594;</b></span></span><span class="env">${L.dose} krad/yr &#183; dsn ${L.dsnHrs}h/day</span></span>
       </button>`}).join("")}</div></div>
     </div>
   </div>`;
@@ -1299,11 +1384,12 @@ function scrBrief(){
 
   return `<div class="wrap briefwrap">
   <div id="briefview" aria-hidden="true" style="opacity:0.4"><div class="briefview-fallback"></div></div>
+  ${challengeBanner()}
   <div class="briefdossier">
     <span class="kicker">MISSION ${L.num} &#183; DESTINATION ${esc(BODY[L.body].n.toUpperCase())}</span>
     <h1>${L.name}</h1>
     <span class="bsub">${esc(L.sub)}</span>
-    <div class="bstats"><span>${auStr}</span><span>${ltStr} ONE-WAY LIGHT</span><span>${L.years} YR</span><span>$${fmt(L.capM)}M CAP</span></div>
+    <div class="bstats"><span>${auStr}</span><span>${ltStr} ONE-WAY LIGHT</span><span>${L.years} YR</span><span>${capText(L).toUpperCase()} ${L.uncapped?"":"CAP"}</span></div>
   </div>
   <div class="brief">
     <div class="brief-col">${briefPanel}</div>
@@ -1346,10 +1432,33 @@ function roverPanels(){
 
 
 /* ── BUILD BAY ── */
+/* P1-9 / D-08: difficulty selects from a part tier. Tier 1 is the simple set
+   (a row without `tier` is tier 1); cadet never offers tier 2. `derive()` is
+   untouched — the same part costs the same thing in both modes, the harder
+   setting simply offers more of them. */
+function tierOk(x, mode){
+  if(!x) return false;
+  if((mode||S.mode)!=="cadet") return true;
+  return !x.tier || x.tier<2;
+}
+/* A list for a picker: tier-filtered, but never hides what is already
+   selected (a draft or a link can legitimately carry a tier-2 part). */
+function tierList(list, cur){
+  return list.filter(x=>x && (tierOk(x) || (cur && x.id===cur)));
+}
 function scrBuild(){
   const L=byId(LEVELS,S.levelId), D=derive(S);
   const groups={};
-  L.parts.forEach(id=>{const x=byId(INSTR,id); (groups[x.g]=groups[x.g]||[]).push(x)});
+  /* Forced objectives are exempt from the tier filter: an instrument that is
+     the only cover for a tag this mission forces stays visible in cadet, so
+     the easy setting can never make a mission unwinnable. */
+  const forced=new Set();
+  (L.force||[]).forEach(o=>{ const x=OBJ[o]; if(x) x.need.forEach(t=>forced.add(t)); });
+  L.parts.forEach(id=>{
+    const x=byId(INSTR,id); if(!x) return;
+    if(!tierOk(x) && !S.instruments.includes(x.id) && !x.tags.some(t=>forced.has(t))) return;
+    (groups[x.g]=groups[x.g]||[]).push(x);
+  });
   const need=new Set(); S.objectives.forEach(o=>OBJ[o].need.forEach(t=>need.add(t)));
   const have=objTags(S);
   const missing=[...need].filter(t=>!have.has(t));
@@ -1443,6 +1552,7 @@ function scrBuild(){
 
   if(S.bstep==="payload"){
     return `<div class="wrap buildwrap">
+    ${challengeBanner()}
     ${stepTabs}
     <div class="bay bay-payload">
       <div class="bay-col bay-cat-col">
@@ -1474,11 +1584,12 @@ function scrBuild(){
     const commsBottleneck=retFrac<0.5;
 
     return `<div class="wrap buildwrap">
+    ${challengeBanner()}
     ${stepTabs}
     <div class="bay bay-systems">
       <div class="bay-col">
         <div class="accordion-group">
-          ${pick("POWER SOURCE",L.power.map(id=>byId(POWER,id)),"power","PWR-02")}
+          ${pick("POWER SOURCE",tierList(L.power.map(id=>byId(POWER,id)),S.power),"power","PWR-02")}
           ${pick("PROPULSION",L.prop.map(id=>byId(PROP,id)),"prop","PRP-03")}
           ${L.dose>=2?pick("RADIATION SHIELDING",SHIELD,"shield","RAD-05"):""}
         </div>
@@ -1522,7 +1633,7 @@ function scrBuild(){
 
       <div class="bay-col">
         <div class="accordion-group">
-          ${pick("COMMUNICATIONS",L.comms.map(id=>byId(COMMS,id)),"comms","TLM-11",commsBottleneck?`${D.cm?D.cm.n:""} (BOTTLENECK: ${(retFrac*100).toFixed(0)}% RETURN ⚠)`:null)}
+          ${pick("COMMUNICATIONS",tierList(L.comms.map(id=>byId(COMMS,id)),S.comms),"comms","TLM-11",commsBottleneck?`${D.cm?D.cm.n:""} (BOTTLENECK: ${(retFrac*100).toFixed(0)}% RETURN ⚠)`:null)}
           <div class="accordion-item open" id="acc-dsn">
             <div class="accordion-header" data-act="toggle-acc" data-target="acc-dsn">
               <div class="accordion-title-wrap">
@@ -1557,7 +1668,7 @@ function scrBuild(){
     ["Objectives covered by instruments",S.objectives.every(o=>objMet(S,o)),
       S.objectives.filter(o=>!objMet(S,o)).length+" uncovered","payload"],
     ["Power positive at end of life",D.genEOL>=D.loadPeak,`${fmt(D.loadPeak)} W load vs ${fmt(D.genEOL)} W`,"systems"],
-    ["Within cost cap",D.cost<=L.capM,`$${fmt(D.cost)}M vs $${fmt(L.capM)}M`,"systems"],
+    ["Within cost cap",D.cost<=D.cap,`$${fmt(D.cost)}M vs ${capText(D.L)}`,"systems"],
     ["Launch readiness within 72 months",D.months<=72,`${fmt(D.months)} months`,"systems"]
   ];
   if((S.levelId==="l2"||S.levelId==="l3"||S.levelId==="sbx")&&S.rover&&landSite(S)){
@@ -1570,6 +1681,7 @@ function scrBuild(){
   const stampText = !allReady ? "NOT READY" : (retFrac < 0.9 ? "READY (with warnings)" : "READY");
 
   return `<div class="wrap buildwrap">
+    ${challengeBanner()}
     ${stepTabs}
     <div class="revgrid">
       <div class="rev-col">
@@ -1895,7 +2007,7 @@ function renderGo(){
   const checks=[
     ["Mass within launch capability", D.capability>=D.wetMass, `${fmt(D.wetMass)} kg vs ${fmt(D.capability)} kg`],
     ["Power positive at end of life", D.genEOL>=D.loadPeak, `${fmt(D.loadPeak)} W load vs ${fmt(D.genEOL)} W`],
-    ["Within cost cap", D.cost<=L.capM, `$${fmt(D.cost)}M vs $${fmt(L.capM)}M`],
+    ["Within cost cap", D.cost<=D.cap, `$${fmt(D.cost)}M vs ${capText(D.L)}`],
     ["Every objective has an instrument", S.objectives.every(o=>objMet(S,o)), S.objectives.filter(o=>!objMet(S,o)).length+" uncovered"],
     ["Launch readiness within 72 months", D.months<=72, `${fmt(D.months)} months`]
   ];
@@ -1919,7 +2031,7 @@ function renderGo(){
           <span>Launch Vehicle (${selLv?selLv.n:"Selected"}):</span><span class="num">$${fmt(lvCost)}M</span>
         </div>
         <div class="spread" style="font-size:12.5px;padding:4px 0 0;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;font-weight:600">
-          <span>Total Mission Commitment:</span><span class="num" style="color:${D.cost<=L.capM?'var(--phosphor)':'var(--red)'}">$${fmt(D.cost)}M / $${fmt(L.capM)}M</span>
+          <span>Total Mission Commitment:</span><span class="num" style="color:${D.cost<=D.cap?'var(--phosphor)':'var(--red)'}">$${fmt(D.cost)}M / ${capText(D.L)}</span>
         </div>
       </div>
 
@@ -2671,8 +2783,12 @@ function endMission(reason){
   const ret=wtot?sci/wtot:0;
   const cost=D.cost+O.opsCost;
   const L=byId(LEVELS,S.levelId);
-  const over=cost>L.capM;
-  let score = ret*100 - (over?(cost-L.capM)/L.capM*120:0) + Math.max(0,Math.min(D.margins.mass,D.margins.power,D.margins.cost))*22;
+  const cap=effCap(L,S.mode);
+  const over=isOverCap(cost,L,S.mode);
+  /* A-14: an uncapped mission is never penalised, but its cost margin is
+     still measured against the declared reference cap so the margin bonus
+     below is earned rather than free. */
+  let score = ret*100 - (over&&cap>0?(cost-cap)/cap*120:0) + Math.max(0,Math.min(D.margins.mass,D.margins.power,D.margins.cost))*22;
   if(reason==="prop") score*=0.5;
   /* Phase-7 surface grade (landed L2 only): three 0..1 components, meaned,
      worth up to +8 bonus points. Null-site/kit/landing/surface (other
@@ -2702,7 +2818,10 @@ function endMission(reason){
   if(O.dead.size===0) badges.push("NO HARDWARE LOST");
   if(surf&&surf.reached) badges.push("PRIME TARGET REACHED");
   S.result={ret,cost,grade,score,badges,reason,days:O.day,overflow:O.overflow,dose:O.dose,dead:[...O.dead],surf};
-  S.progress[S.levelId]={grade,ret:Math.round(ret*100)};
+  /* P1-11: `mode` is additive — an old entry without it is "unknown basis",
+     which is exactly what it is. */
+  S.progress[S.levelId]={grade,ret:Math.round(ret*100),mode:S.mode};
+  finishRun();                       /* A-04: must precede navigation */
   saveProgress();
   Audio_.go();
   go("report");
@@ -4245,6 +4364,21 @@ const REAL={
 function scrReport(){
   const R=S.result, D=derive(S), L=byId(LEVELS,S.levelId), O=S.ops, rm=REAL[L.id];
   replayIdx=-1;
+  /* The crossfade in go() re-reads S.screen ~190 ms after navigation, so a
+     stale report paint can land after RESULT/REBUILD has already cleared
+     S.result. Previously that threw on R.score. There is nothing to show in
+     that window, and the incoming screen replaces it immediately. */
+  if(!R) return `<div class="wrap"><div class="report"><div class="panel"><div class="pad">
+      <p class="hint">Preparing the next mission…</p>
+      <button class="btn ghost mt" data-act="home">MISSION SELECT</button>
+    </div></div></div></div>`;
+  /* P1-6: compare against the best OTHER run of this exact group. Comparing
+     a run with itself is noise, so the current record is excluded. */
+  let bestOther=null;
+  try{
+    const runs=loadRuns().filter(r=>r.id!==S.lastRunId);
+    bestOther=bestRun(runs, S.levelId, S.mode, S.seed);
+  }catch(e){}
   const gcol=R.score>=74?"var(--phosphor)":R.score>=44?"var(--amber)":"var(--red)";
   const reason={complete:"Nominal end of mission.",prop:"Loss of mission: propellant exhausted.",launch:"Loss of mission: launch vehicle failure.",
                 power:"Loss of mission: power shortfall."}[R.reason]||"";
@@ -4258,7 +4392,7 @@ function scrReport(){
         <h2>${esc(L.name)}</h2><p class="hint">${esc(L.sub)} &#183; ${esc(reason)}</p>
       </div>
       <div class="rrow"><span class="k">SCIENCE RETURN</span><span class="v" style="color:${gcol}">${(R.ret*100).toFixed(0)}%</span></div>
-      <div class="rrow"><span class="k">TOTAL COST</span><span class="v">$${fmt(R.cost)}M <span style="color:var(--dim);font-size:11px">/ $${fmt(L.capM)}M cap</span></span></div>
+      <div class="rrow"><span class="k">TOTAL COST</span><span class="v">$${fmt(R.cost)}M <span style="color:var(--dim);font-size:11px">/ ${capText(L)}${L.uncapped?"":" cap"}</span></span></div>
       <div class="rrow"><span class="k">MISSION DURATION</span><span class="v">${dayLabel(R.days)} &nbsp;<span style="color:var(--dim);font-size:11px">${(R.days/365.25).toFixed(1)} yr</span></span></div>
       ${S.assist&&L.assist?`<div class="rrow"><span class="k">TRAJECTORY</span><span class="v" style="font-size:12px">${esc(L.assist.label)}</span></div>`:""}
       <div class="rrow"><span class="k">LAUNCH OUTCOME</span><span class="v" style="font-size:12px">${esc(launchOutcomeLabel())}</span></div>
@@ -4280,6 +4414,11 @@ function scrReport(){
       <div class="share"><span>SHARE</span><input id="shareUrl" readonly value="${shareUrl()}"
         style="flex:1;min-width:180px;background:#04060B;border:1px solid var(--hairline);color:var(--dim);font-family:var(--mono);font-size:10.5px;padding:5px 7px">
         <button class="btn ghost" data-act="copy" style="padding:5px 11px">COPY</button></div>
+      <div class="share" style="margin-top:6px"><span>CHALLENGE</span><input id="challengeUrl" readonly value="${challengeUrl()}"
+        title="Mission, difficulty and anomaly seed only — the recipient designs their own spacecraft against the same events"
+        style="flex:1;min-width:180px;background:#04060B;border:1px solid var(--hairline);color:var(--dim);font-family:var(--mono);font-size:10.5px;padding:5px 7px">
+        <button class="btn ghost" data-act="copyc" style="padding:5px 11px">COPY</button></div>
+      <p class="hint" style="font-size:11px;margin-top:5px">SHARE sends this exact design. CHALLENGE sends only the objective, the difficulty and the anomaly seed — the other team builds their own and both runs land in the same ranking group.</p>
       <div class="row mt">
         <button class="btn ghost" data-act="sources" style="flex:1">MISSION DATA — WHERE NUMBERS COME FROM</button>
       </div>
@@ -4331,6 +4470,7 @@ function scrReport(){
     <div class="row mt">
       <button class="btn primary" data-act="rebuild">REBUILD WITH LESSONS LEARNED</button>
       <button class="btn" data-act="next">NEXT MISSION</button>
+      ${bestOther?`<button class="btn ghost" data-act="cmprun" data-id="${esc(bestOther.id)}" title="Line up this run against your best run of the same mission, difficulty and seed">COMPARE WITH BEST</button>`:""}
       <button class="btn ghost" data-act="home">MISSION SELECT</button>
     </div>
   </div></div>`;
@@ -4487,7 +4627,7 @@ function verdict(D,R,O){
   if(D.margins.power<0.1) out.push("Power margin was thin from the start, so the first anomaly forced you to shed duty cycle.");
   if(D.margins.mass<0.08) out.push("You launched with almost no mass margin. Real programmes hold 20% at this stage precisely because the spacecraft always grows.");
   if(R.dead.length) out.push(`You lost ${R.dead.length} instrument${R.dead.length>1?"s":""} to radiation. Shielding mass is cheap compared with losing an objective outright.`);
-  if(R.cost>byId(LEVELS,S.levelId).capM) out.push(`The mission came in $${fmt(R.cost-byId(LEVELS,S.levelId).capM)}M over cap, most of it operations overrun from anomaly response.`);
+  if(isOverCap(R.cost,D.L,S.mode)) out.push(`The mission came in $${fmt(R.cost-effCap(D.L,S.mode))}M over cap, most of it operations overrun from anomaly response.`);
   if(Math.min(D.margins.mass,D.margins.power,D.margins.cost)>=0.2) out.push("You held healthy margins on every budget, which is why the anomalies cost you so little.");
   return out.map(p=>`<p style="margin-bottom:8px">${p}</p>`).join("");
 }
@@ -4497,7 +4637,7 @@ function verdict(D,R,O){
    ══════════════════════════════════════════════════════════════ */
 function shareState(){
   return {l:S.levelId,o:S.objectives,i:S.instruments,p:S.power,c:S.comms,r:S.prop,s:S.shield,a:S.assist,q:S.dsn,t:S.site||null,v:S.rover||null,
-          m:S.mode,w:S.launch?{v:S.launch.lv,i:S.launch.i,j:S.launch.j}:null};
+          m:S.mode,sd:S.seed,w:S.launch?{v:S.launch.lv,i:S.launch.i,j:S.launch.j}:null};
 }
 function shareUrl(){
   try{
@@ -4506,44 +4646,404 @@ function shareUrl(){
     return location.href.split("#")[0]+"#m="+b;
   }catch(e){return location.href}
 }
+/* G5 competitive scenario: a challenge code names the mission, the difficulty
+   and the seed — and nothing else. No `i` key, so loadShare() treats it as a
+   challenge and applyShareObject() fills in defaultBuild(): the recipient
+   designs their own spacecraft against the identical objective set AND the
+   identical anomaly deck, which is what makes two runs comparable at all. */
+function challengePayload(L, mode, seed){
+  return {l:L.id, m:(mode==="fd"?"fd":"cadet"), sd:(seed|0)};
+}
+function challengeUrl(){
+  const L=byId(LEVELS,S.levelId); if(!L) return "";
+  try{
+    const b=btoa(unescape(encodeURIComponent(JSON.stringify(challengePayload(L,S.mode,S.seed)))))
+      .replace(/=+$/,"");
+    return location.href.split("#")[0]+"#m="+b;
+  }catch(e){return ""}
+}
+/* One default table, two callers (D-17): startLevel() for a fresh mission and
+   applyShareObject() for a payload that carries no design (challenge codes,
+   A-13). Values are exactly the pre-remediation startLevel defaults — this
+   refactor is behaviour-preserving for every existing link. */
+function defaultBuild(L){
+  return {
+    objectives:(L.force||[]).slice(),
+    instruments:[],
+    power:L.power[Math.min(1,L.power.length-1)],
+    comms:L.comms[Math.min(1,L.comms.length-1)],
+    prop:L.prop[0], shield:"sh0", dsn:"standard", site:null, assist:false,
+    /* Landing missions preselect the baseline rover kit; the player upgrades
+       from there. Every other mission carries no rover. */
+    rover:(L.id==="l2"||L.id==="l3"||L.id==="sbx")?{mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}:null
+  };
+}
+/* Catalogue membership test used by every loader (A-13). byId() is array-only,
+   so objectives (a map) are checked against OBJ + the mission's own list. */
+function okId(cat,id){ return !!(cat&&id&&byId(cat,id)); }
+/* Pure: applies a decoded share/challenge object to S, validates every id
+   against the catalogues, and never reads location or changes screen (A-10).
+   Returns false only when the payload names a mission that does not exist. */
+function applyShareObject(d){
+  const L=byId(LEVELS,d&&d.l); if(!L) return false;
+  const def=defaultBuild(L);
+  S.levelId=L.id;
+  /* Mission-owned lists only: a crafted payload cannot inject a part the
+     mission does not offer, and an id from a retired catalogue row is dropped
+     instead of reaching derive() as undefined. */
+  S.objectives=Array.isArray(d.o)?d.o.filter(id=>!!OBJ[id]&&(L.objs||[]).includes(id)):def.objectives;
+  S.instruments=Array.isArray(d.i)?d.i.filter(id=>(L.parts||[]).includes(id)&&okId(INSTR,id)):[];
+  S.power =(okId(POWER,d.p)&&L.power.includes(d.p))?d.p:def.power;
+  S.comms =(okId(COMMS,d.c)&&L.comms.includes(d.c))?d.c:def.comms;
+  S.prop  =(okId(PROP,d.r)&&L.prop.includes(d.r))?d.r:def.prop;
+  S.shield=okId(SHIELD,d.s)?d.s  :def.shield;
+  S.dsn   =okId(DSN,d.q)    ?d.q  :def.dsn;
+  S.assist=!!d.a;
+  S.mode=(d.m==="fd")?"fd":"cadet";
+  /* G5: the seed travels with the payload so the recipient faces the same
+     event deck (I-09). An absent or non-numeric key means the default deck —
+     exactly the behaviour of every pre-Phase-1 link. */
+  S.seed=(d.sd!==undefined&&isFinite(d.sd))?(d.sd|0):DEFAULT_SEED;
+  /* Site must belong to this mission's body. */
+  const site=byId(MOON_SITES,d.t)||byId(MARS_SITES,d.t)||null;
+  S.site=(site&&((L.body==="moon"&&byId(MOON_SITES,d.t))||(L.body!=="moon"&&byId(MARS_SITES,d.t))))?d.t:null;
+  /* `v` semantics: shareState() always writes the key (null = no rover), so an
+     explicit null keeps today's behaviour and an absent key takes the default
+     (the challenge-code case). */
+  if(!("v" in (d||{}))){
+    S.rover=def.rover;
+  }else{
+    const v=d.v, q=v?{mob:v.mob,pwr:v.pwr,com:v.com,pay:v.pay}:null;
+    S.rover=(q&&["l2","l3","sbx"].includes(L.id)
+             &&okId(ROVER_MOB,q.mob)&&okId(ROVER_PWR,q.pwr)
+             &&okId(ROVER_COM,q.com)&&okId(ROVER_PAY,q.pay))?q:null;
+  }
+  S.launch=null;
+  if(d.w&&okId(LV,d.w.v)&&(L.lvs||[]).includes(d.w.v)){
+    S.launch={lv:d.w.v,i:d.w.i|0,j:d.w.j|0,set:false};
+  }
+  return true;
+}
+/* Shared by every "put the player back into an existing design" path, so the
+   screen/phases discipline lives in exactly one place (A-10, D-17). */
+function enterRestoredBuild(){
+  resetRunState();
+  S.screen="build"; S.bstep="payload";
+  S.commit=null; S.result=null; S.ops=null;
+  S.phases={levelId:S.levelId,plan:phasePlanFor(S.levelId),done:{build:true}};
+}
 function loadShare(){
   const h=location.hash;
   if(!h.startsWith("#m="))return false;
   try{
     const d=JSON.parse(decodeURIComponent(escape(atob(h.slice(3)))));
-    if(!byId(LEVELS,d.l))return false;
-    S.levelId=d.l;S.objectives=d.o||[];S.instruments=d.i||[];
-    S.power=d.p;S.comms=d.c;S.prop=d.r;S.shield=d.s||"sh0";S.assist=!!d.a;S.mode=d.m||"cadet";S.dsn=d.q||"standard";S.site=d.t||null;
-    S.rover=null;
-    if(d.v&&(d.l==="l2"||d.l==="l3"||d.l==="sbx")){
-      const q={mob:d.v.mob,pwr:d.v.pwr,com:d.v.com,pay:d.v.pay};
-      if(byId(ROVER_MOB,q.mob)&&byId(ROVER_PWR,q.pwr)&&byId(ROVER_COM,q.com)&&byId(ROVER_PAY,q.pay)) S.rover=q;
-    }
-    if(d.w){ S.launch={lv:d.w.v,i:d.w.i,j:d.w.j,set:false}; }
-    S.screen="build"; S.bstep="payload";
-    S.commit=null; S.result=null; S.ops=null; S.phases={levelId:S.levelId,plan:phasePlanFor(S.levelId),done:{build:true}};
+    /* A challenge code is a payload that carries a seed but no build (A-07,
+       Q6). A shared *design* also carries `sd`, so the test has to be the
+       absence of `i`, not the presence of `sd`. */
+    const challenge=(d && d.sd!==undefined && !Array.isArray(d.i))
+      ? {seed:d.sd|0, mode:d.m==="fd"?"fd":"cadet"} : null;
+    if(!applyShareObject(d)) return false;
+    enterRestoredBuild();
+    S.challenge=challenge;
     return true;
   }catch(e){return false}
+}
+
+/* ── W2 Tier 1 draft (P0-5): the last design, in the same shape as a share
+   link, restored through the same validated loader. Best-effort storage —
+   private mode or a corrupt value must never break play. ── */
+const DRAFT_KEY="margin.draft";
+function saveDraft(){
+  try{
+    if(!S.levelId) return;
+    localStorage.setItem(DRAFT_KEY,JSON.stringify(shareState()));
+  }catch(e){}
+}
+function readDraft(){
+  try{
+    const v=localStorage.getItem(DRAFT_KEY); if(!v) return null;
+    const d=JSON.parse(v);
+    return byId(LEVELS,d&&d.l)?d:null;
+  }catch(e){ return null; }
+}
+function loadDraft(){
+  const d=readDraft(); if(!d) return false;
+  if(!applyShareObject(d)) return false;
+  enterRestoredBuild(); go("build"); return true;
 }
 function saveProgress(){try{localStorage.setItem("margin.progress",JSON.stringify(S.progress))}catch(e){}}
 function loadProgress(){try{const v=localStorage.getItem("margin.progress");if(v)S.progress=JSON.parse(v)}catch(e){}}
 
 /* ══════════════════════════════════════════════════════════════
+   RUN RECORDS (P1-3, P1-4) — one record type, written exactly once
+   ──────────────────────────────────────────────────────────────
+   `margin.runs` is the only durable history. `margin.progress` keeps its
+   exact old shape (plus an optional `mode` stamp) because it is the only
+   artifact older builds understand (D-11, I-07).
+   The record embeds: the build (shareState), the outcome (S.result), the
+   five rails captured AT WRITE TIME (A-05 — never recomputed at read time,
+   which would re-derive with a different S), the effective cap, and the full
+   launch tuple (A-15 — the share payload only carries the porkchop indices).
+   ══════════════════════════════════════════════════════════════ */
+const RUNS_KEY="margin.runs";
+const RUNS_CAP=60;         /* R-11 hard cap */
+const RUNS_RECENT=25;      /* R-11 keep-newest */
+let RUN_SEQ=0;
+/* Sandbox runs are never ranked (D-14). `sbx` is the sandbox row today; the
+   `uncapped` flag is what a future truly-open sandbox sets. */
+function isSandbox(L){ return !!(L && (L.id==="sbx"||L.uncapped)); }
+function loadRuns(){
+  try{
+    const v=localStorage.getItem(RUNS_KEY); if(!v) return [];
+    const a=JSON.parse(v);
+    if(!Array.isArray(a)) return [];
+    /* A corrupt entry must never break the select screen (I-07 policy). */
+    return a.filter(r=>r&&typeof r==="object"&&typeof r.level==="string");
+  }catch(e){ return []; }
+}
+function saveRuns(list){
+  try{ localStorage.setItem(RUNS_KEY,JSON.stringify(list)); return true; }
+  catch(e){ return false; }
+}
+function runGroup(r){ return (r.level||"?")+"|"+(r.mode||"?")+"|"+(r.seed==null?"?":r.seed); }
+/* A launch failure is a real, modelled outcome: it is recorded and shown in
+   history, but it can never be a player's "best" (Q4 (a), A-08). */
+function isRankable(r){
+  if(!r || isSandbox(byId(LEVELS,r.level))) return false;
+  const res=r.result||{};
+  return res.reason!=="launch" && isFinite(res.score);
+}
+function runScore(r){ const x=(r.result||{}).score; return isFinite(x)?x:-Infinity; }
+/* R-11: newest 25 + best of every (level,mode,seed) group, hard cap 60. */
+function pruneRuns(list){
+  const byNew=list.slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const keep=byNew.slice(0,RUNS_RECENT);
+  const kept=new Set(keep.map(r=>r.id));
+  const best={};
+  byNew.forEach(r=>{
+    if(!isRankable(r)) return;
+    const k=runGroup(r);
+    if(!best[k]||runScore(r)>runScore(best[k])) best[k]=r;
+  });
+  const bestIds=new Set();
+  Object.keys(best).forEach(k=>{ const r=best[k]; bestIds.add(r.id); if(!kept.has(r.id)){ keep.push(r); kept.add(r.id); } });
+  if(keep.length>RUNS_CAP){
+    const droppable=keep.filter(r=>!bestIds.has(r.id)).sort((a,b)=>(a.ts||0)-(b.ts||0));
+    while(keep.length>RUNS_CAP&&droppable.length){
+      const r=droppable.shift(); const i=keep.indexOf(r); if(i>=0) keep.splice(i,1);
+    }
+  }
+  return keep.sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
+/* A-04: the single funnel. Both result sites call this; the latch makes a
+   second call a no-op, so a consequence is never applied twice (I-08). */
+function finishRun(){
+  if(S.runRecorded) return false;
+  const L=byId(LEVELS,S.levelId);
+  if(!L||!S.result) return false;
+  S.runRecorded=true;
+  let rec=null;
+  try{
+    const D=derive(S), ts=Date.now();
+    rec={ v:RULES_V, id:"r"+ts.toString(36)+"-"+(++RUN_SEQ), ts,
+      level:L.id, mode:S.mode, seed:(S.seed|0),
+      sandbox:isSandbox(L),
+      cap:isFinite(D.cap)?D.cap:0,
+      launch:S.launch?{tDep:S.launch.tDep,c3:S.launch.c3,vinf:S.launch.vinf,tof:S.launch.tof}:null,
+      spec:shareState(),
+      rails:railValues(D),
+      result:S.result,
+      team:S.team?{size:(S.team.members||[]).length,log:(S.team.log||[]).slice(-100)}:null };
+  }catch(e){ return false; }
+  let list=pruneRuns([rec].concat(loadRuns()));
+  let ok=saveRuns(list);
+  /* R-11: on quota failure drop the oldest half and retry, never lose the
+     just-finished run. */
+  while(!ok&&list.length>1){
+    list=list.slice(0,Math.max(1,Math.floor(list.length/2)));
+    ok=saveRuns(list);
+  }
+  if(ok) S.lastRunId=rec.id;   /* lets the report compare against itself */
+  return ok;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RANKING + COMPARISON (P1-5 G3, P1-6 G4, P1-11, A-06, A-08, A-17)
+   ══════════════════════════════════════════════════════════════ */
+/* Best run of one exact (level, mode, seed) group. Sandbox and launch
+   failures are never "best" (D-14, Q4). */
+function bestRun(runs, level, mode, seed){
+  let best=null;
+  (runs||[]).forEach(r=>{
+    if(r.level!==level||r.mode!==mode||(r.seed|0)!==(seed|0)) return;
+    if(!isRankable(r)) return;
+    if(!best||runScore(r)>runScore(best)) best=r;
+  });
+  return best;
+}
+/* A-17: computed from ONE load of `margin.runs` per select render. A legacy
+   `margin.progress` entry is shown only when no run exists for this group and
+   only when its stamp does not contradict the current difficulty — otherwise
+   a Cadet grade would masquerade as a Flight Director one (A-08). */
+function gradeFor(level, mode, seed, runs){
+  const b=bestRun(runs, level, mode, seed);
+  if(b) return {grade:b.result.grade, score:b.result.score, run:b, basis:"run"};
+  const p=(S.progress||{})[level];
+  if(p&&p.grade&&(!p.mode||p.mode===mode))
+    return {grade:p.grade, score:null, run:null, basis:p.mode?"progress":"legacy"};
+  return null;
+}
+/* Human-readable view of a record's build. `spec.w` (porkchop indices) is
+   deliberately absent: A-06 — two different points on the same plot are the
+   same design, and the launch date comes from the record's full tuple. */
+function specView(rec){
+  const s=(rec&&rec.spec)||{};
+  const nm=(cat,id)=>{ const x=byId(cat,id); return x?x.n:(id||"—"); };
+  const site=(s.t&&(byId(MOON_SITES,s.t)||byId(MARS_SITES,s.t)))||null;
+  const r=s.v;
+  return {
+    objectives:(s.o||[]).map(id=>(OBJ[id]?OBJ[id].t:id)).join(", ")||"—",
+    instruments:(s.i||[]).map(id=>nm(INSTR,id)).join(", ")||"none",
+    power:nm(POWER,s.p), comms:nm(COMMS,s.c), prop:nm(PROP,s.r),
+    shield:nm(SHIELD,s.s||"sh0"), dsn:nm(DSN,s.q||"standard"),
+    site:site?site.n:"—",
+    rover:r?[nm(ROVER_MOB,r.mob),nm(ROVER_PWR,r.pwr),nm(ROVER_COM,r.com),nm(ROVER_PAY,r.pay)].join(" · "):"—",
+    trajectory:s.a?"gravity assist":"direct",
+    launch:(rec&&rec.launch&&isFinite(rec.launch.tDep))?yrToDate(rec.launch.tDep):"—"
+  };
+}
+const CMP_ROWS=[
+  ["objectives","OBJECTIVES"],["instruments","INSTRUMENTS"],["power","POWER SOURCE"],
+  ["comms","COMMUNICATIONS"],["prop","PROPULSION"],["shield","SHIELDING"],
+  ["dsn","DSN ALLOCATION"],["site","LANDING SITE"],["rover","ROVER KIT"],
+  ["trajectory","TRAJECTORY"],["launch","LAUNCH DATE"]
+];
+const RAIL_ROWS=[["mass","MASS","kg"],["power","POWER","W"],["data","DATA","Mb/d"],["cost","COST","$M"],["sched","SCHEDULE","mo"]];
+/* Returns the comparability verdict AND the diff, so the modal can warn and
+   still show the numbers (A-06, A-08, D-15, R-10). */
+function compareRuns(a,b){
+  const issues=[];
+  if(!a||!b) return {issues:["One of the runs is missing."],rows:[],grade:{}};
+  if(a.level!==b.level) issues.push("Different missions — objectives and physics are not the same.");
+  if((a.mode||"")!==(b.mode||"")) issues.push("Different difficulty — cadet and flight director do not share a budget cap or a part list.");
+  if((a.seed|0)!==(b.seed|0)) issues.push("Different anomaly seed — the event deck is not the same.");
+  if((a.v|0)!==(b.v|0)) issues.push("Recorded under different rule versions (v"+a.v+" vs v"+b.v+") — scores may not share a scale.");
+  const A=specView(a), B=specView(b), rows=[];
+  CMP_ROWS.forEach(([k,label])=>{
+    if(A[k]===undefined) return;
+    rows.push({k:label,a:A[k],b:B[k],same:A[k]===B[k]});
+  });
+  const ra=a.rails||{}, rb=b.rails||{};
+  RAIL_ROWS.forEach(([k,label,u])=>{
+    const x=(ra[k]||{}).v, y=(rb[k]||{}).v;
+    if(x===undefined&&y===undefined) return;
+    const f=v=>isFinite(v)?fmt(v):"—";
+    rows.push({k:label+" ("+u+")",a:f(x),b:f(y),same:Math.abs((x||0)-(y||0))<1e-6});
+  });
+  const oa=a.result||{}, ob=b.result||{};
+  rows.push({k:"SCIENCE RETURN",a:(oa.ret*100).toFixed(0)+"%",b:(ob.ret*100).toFixed(0)+"%",same:Math.abs((oa.ret||0)-(ob.ret||0))<1e-6});
+  rows.push({k:"TOTAL COST ($M)",a:fmt(oa.cost),b:fmt(ob.cost),same:Math.abs((oa.cost||0)-(ob.cost||0))<1e-6});
+  rows.push({k:"MISSION DURATION (d)",a:fmt(oa.days),b:fmt(ob.days),same:(oa.days||0)===(ob.days||0)});
+  rows.push({k:"SCORE",a:isFinite(oa.score)?oa.score.toFixed(1):"—",b:isFinite(ob.score)?ob.score.toFixed(1):"—",same:false});
+  rows.push({k:"GRADE",a:oa.grade||"—",b:ob.grade||"—",same:oa.grade===ob.grade});
+  return {issues,rows};
+}
+function runLabel(r){
+  if(!r) return "—";
+  const L=byId(LEVELS,r.level);
+  const g=(r.result||{}).grade||"?";
+  return (L?String(L.num).padStart(2,"0")+" "+L.name:"Mission "+(r.level||"?"))+
+    " · "+(r.mode==="fd"?"FD":"CADET")+" · "+g;
+}
+function compareModal(a,b){
+  const c=compareRuns(a,b);
+  const banner=c.issues.length
+    ? `<div style="border:1px solid var(--amber);background:rgba(240,180,41,.10);padding:9px 11px;border-radius:3px;margin-bottom:12px">
+         <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;color:var(--amber);margin-bottom:5px">NOT DIRECTLY COMPARABLE</div>
+         ${c.issues.map(x=>`<div class="hint" style="font-size:12px">· ${esc(x)}</div>`).join("")}
+       </div>`
+    : `<div style="border:1px solid var(--phosphor);background:rgba(101,242,165,.08);padding:8px 11px;border-radius:3px;margin-bottom:12px">
+         <div class="hint" style="font-size:12px;color:var(--phosphor)">Same mission, difficulty, seed and ruleset — directly comparable.</div>
+       </div>`;
+  const head=`<div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:6px;padding:6px 0;border-bottom:1px solid var(--hairline)">
+      <span class="hint" style="font-size:10.5px">FIELD</span>
+      <span class="hint" style="font-size:10.5px;color:var(--bone)">${esc(runLabel(a))}</span>
+      <span class="hint" style="font-size:10.5px;color:var(--bone)">${esc(runLabel(b))}</span></div>`;
+  const body=c.rows.map(r=>`<div style="display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:6px;padding:5px 0;border-bottom:1px solid rgba(28,36,51,.35);align-items:start">
+      <span style="font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em">${esc(r.k)}</span>
+      <span style="font-size:11.5px;color:${r.same?'var(--dim)':'var(--bone)'}">${esc(r.a)}</span>
+      <span style="font-size:11.5px;color:${r.same?'var(--dim)':'var(--bone)'}">${esc(r.b)}</span></div>`).join("");
+  el("mbox").innerHTML=`<h3>DESIGN COMPARISON <span class="code">CMP-RUN</span></h3>
+    <div class="mb" style="font-size:12.5px;max-height:64vh;overflow:auto">
+      ${banner}${head}${body}
+      <p class="hint mt-s" style="font-size:11.5px">Diverged rows are highlighted. Trajectory is compared by date, not by plot position — two points on the porkchop are the same design.</p>
+      <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
+  el("modal").classList.add("on");
+}
+function historyModal(){
+  const runs=loadRuns();
+  const rows=runs.length?runs.map(r=>{
+    const res=r.result||{}, L=byId(LEVELS,r.level);
+    const best=bestRun(runs,r.level,r.mode,r.seed);
+    const isBest=best&&best.id===r.id;
+    const failed=res.reason==="launch";
+    const sandbox=isSandbox(L);
+    /* Only offer a comparison when there is actually something to compare
+       against in the same (level, mode, seed) group. */
+    const other=(runs.filter(x=>x.id!==r.id&&x.level===r.level&&x.mode===r.mode&&(x.seed|0)===(r.seed|0))||[]).length>0;
+    const tag=isBest?'<span class="tag" style="border-color:var(--phosphor);color:var(--phosphor)">BEST</span>'
+      :failed?'<span class="tag" style="border-color:var(--red);color:var(--red)">LAUNCH FAILURE</span>'
+      :sandbox?'<span class="tag">SANDBOX</span>':"";
+    return `<div class="spread" style="gap:10px;padding:7px 0;border-bottom:1px solid rgba(28,36,51,.4);align-items:center">
+      <span style="flex:1;min-width:0">
+        <span style="display:block;font-size:12px;color:var(--bone)">${esc(runLabel(r))} ${tag}</span>
+        <span class="hint" style="font-size:10.5px">${esc((r.ts&&isFinite(r.ts))?new Date(r.ts).toISOString().slice(0,10):"")}${isFinite(res.score)?" · "+res.score.toFixed(1)+" pts":""} · stage:${esc(r.level)} · seed ${esc(String(r.seed))}</span>
+      </span>
+      ${other?`<button class="btn ghost" data-act="cmprun" data-id="${esc(r.id)}" style="padding:3px 9px;font-size:10.5px;flex:0 0 auto">COMPARE</button>`:""}
+    </div>`;
+  }).join(""):`<p class="hint">No completed runs yet. Finish a mission and it will appear here.</p>`;
+  el("mbox").innerHTML=`<h3>MISSION HISTORY <span class="code">HIST-01</span></h3>
+    <div class="mb" style="font-size:12.5px;max-height:62vh;overflow:auto">
+      <p class="hint" style="font-size:12px;margin-bottom:8px">Every run is kept with its build, its five rails and its outcome. COMPARE opens it against the best run of the same mission, difficulty and seed.</p>
+      ${rows}
+      <p class="hint mt-s" style="font-size:11px">Ranking reads only runs recorded under the current ruleset (v${RULES_V}). Sandbox runs and launch failures are stored and shown, but never become a best.</p>
+      <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
+  el("modal").classList.add("on");
+}
+
+/* ══════════════════════════════════════════════════════════════
    LEVEL SETUP + EVENT HANDLING
    ══════════════════════════════════════════════════════════════ */
+/* A-11 / D-18: one helper, four call points. Everything here is scoped to a
+   single attempt at a mission, so none of it may survive into the next one —
+   the decision log included (a leaked team log would be attributed to the
+   wrong run). The four points are startLevel, rebuild, the restore paths
+   (enterRestoredBuild) and the top-bar HOME button. */
+function resetRunState(){
+  S.runRecorded=false;              /* A-04: exactly-once run record */
+  S.lastRunId=null;                 /* id of the run this attempt recorded */
+  S.team=null;                      /* Phase 2 populates; R-13 */
+  S.landing=null;                   /* Phase-4 touchdown record */
+  S.surface=null;                   /* Phase-6 surface ops state */
+  /* `seed` and `challenge` are deliberately NOT cleared here: they are
+     attempt IDENTITY, chosen by whoever starts the attempt. startLevel()
+     resets them for a fresh mission; the restore paths (share, draft,
+     challenge) set them from the payload, so rebuilding inside a challenge
+     keeps that challenge's event deck. */
+}
 function startLevel(id){
-  const L=byId(LEVELS,id);
-  S.levelId=id; S.objectives=(L.force||[]).slice();
-  S.instruments=[]; S.launch=null; S.ops=null; S.result=null; S.assist=false; S.pmode="c3"; S.bstep="payload"; S.dsn="standard"; S.aerobrake=false; S.site=null;
+  const L=byId(LEVELS,id), def=defaultBuild(L);
+  resetRunState();
+  /* Seed is attempt identity, not run state: a link's challenge seed survives
+     a restore, but a fresh pick from the mission list is always the default
+     deck (G5 / D-12 — new features never draw from the event stream). */
+  S.seed=DEFAULT_SEED; S.challenge=null;
+  S.levelId=id; S.objectives=def.objectives; S.instruments=def.instruments;
+  S.launch=null; S.ops=null; S.result=null; S.pmode="c3"; S.bstep="payload";
   S.commit=null; S.phases={levelId:id,plan:phasePlanFor(id),done:{build:true}};
-  S.power=L.power[Math.min(1,L.power.length-1)];
-  S.comms=L.comms[Math.min(1,L.comms.length-1)];
-  S.prop=L.prop[0]; S.shield="sh0";
-  /* Phase-2: landing levels preselect the baseline rover kit (player upgrades
-     from here); every other mission carries no rover. Old saves behave as null. */
-  S.rover=(id==="l2"||id==="l3"||id==="sbx")?{mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}:null;
-  /* Phase-4: touchdown record, written once at LAND resolution. */
-  S.landing=null;
+  S.power=def.power; S.comms=def.comms; S.prop=def.prop; S.shield=def.shield;
+  S.rover=def.rover; S.site=def.site; S.dsn=def.dsn; S.assist=def.assist;
+  S.aerobrake=false;
   go("brief");
 }
 function toggle(arr,v){const i=arr.indexOf(v); if(i<0)arr.push(v); else arr.splice(i,1); return arr}
@@ -4555,6 +5055,7 @@ document.addEventListener("click",e=>{
 
   switch(a){
     case "start": go("select"); Audio_.click(); break;
+    case "resume": if(!loadDraft()){ render(); } Audio_.click(); break;
     case "about": aboutModal(); Audio_.click(); break;
     case "how": howModal(); break;
     case "home": try{ finishLanding(); }catch(e){} S.ops=null; go("select"); break;
@@ -4714,7 +5215,7 @@ document.addEventListener("click",e=>{
     case "arrch": resolveArrival(+t.dataset.i); break;
     case "proxch": resolveProx(+t.dataset.i); break;
     case "aeroch": resolveAero(+t.dataset.i); break;
-    case "rebuild": S.ops=null; S.result=null; S.bstep="payload"; go("build"); break;
+    case "rebuild": resetRunState(); S.ops=null; S.result=null; S.bstep="payload"; go("build"); break;
     case "next": {
       const i=LEVELS.findIndex(l=>l.id===S.levelId);
       if(i<LEVELS.length-1) startLevel(LEVELS[i+1].id); else go("select");
@@ -4725,7 +5226,24 @@ document.addEventListener("click",e=>{
       try{navigator.clipboard.writeText(inp.value)}catch(err){document.execCommand("copy")}
       t.textContent="COPIED"; setTimeout(()=>t.textContent="COPY",1400); break;
     }
+    case "copyc": {
+      const inp=el("challengeUrl"); if(!inp) break; inp.select();
+      try{navigator.clipboard.writeText(inp.value)}catch(err){document.execCommand("copy")}
+      t.textContent="COPIED"; setTimeout(()=>t.textContent="COPY",1400); break;
+    }
     case "closeModal": el("modal").classList.remove("on"); break;
+    case "history": historyModal(); break;
+    case "cmprun": {
+      /* One case, two entry points (A-06): the history row compares that run
+         against the best of its own group; the report compares this run
+         against the best. Both exclude the run being compared. */
+      const runs=loadRuns(), a=runs.find(r=>r.id===id);
+      if(a){
+        const b=bestRun(runs.filter(r=>r.id!==id), a.level, a.mode, a.seed);
+        compareModal(a,b);
+      }
+      break;
+    }
     case "devjump": Audio_.click(); showDevJump(); break;
     case "devm": S._devM=id; Audio_.click(); showDevJump(); break;
     case "devgo": {
@@ -4735,6 +5253,10 @@ document.addEventListener("click",e=>{
       break;
     }
   }
+  /* W2 Tier 1: every design action funnels through here, so this one call
+     keeps margin.draft current for the build/launch/brief screens (covers the
+     partial-repaint paths that never reach render()). */
+  if(S.screen==="brief"||S.screen==="build"||S.screen==="launch") saveDraft();
 });
 function refreshBuild(prev){
   const s=el("screen"), sc=s.scrollTop;
@@ -5052,7 +5574,11 @@ function failLaunchCatastrophic(out){
   events:[],evIdx:0,nominalDays:Math.round(L.years*365.25),eomReviewed:true,extDeclined:false,extSnap:null};
   S.ops.log.unshift({day:0,txt:`Launch failure on ${byId(LV,out.lv).n}. Vehicle lost during ascent.`,cls:"bad"});
   S.result={ret:0,cost:D.cost,grade:"F",score:0,badges:["LAUNCH FAILURE"],reason:"launch",days:0,overflow:0,dose:0,dead:[],launch:out};
-  S.progress[S.levelId]=S.progress[S.levelId]||{grade:"F",ret:0};
+  /* No progress write on the legacy path (the old code only filled a missing
+     entry), but the run IS recorded and flagged so history stays complete
+     while "best" stays meaningful (A-04, Q4). */
+  S.progress[S.levelId]=S.progress[S.levelId]||{grade:"F",ret:0,mode:S.mode};
+  finishRun();
   saveProgress(); Audio_.bad(); go("report");
 }
 /* ── liftoff beat: resolves launch reliability once, then ascent cinematic, then operations. ── */
@@ -5157,8 +5683,45 @@ function aboutModal(){
   el("modal").classList.add("on");
 }
 
+/* ── glossary (W5): plain-language definitions for every term the game uses
+   without explaining. Static strings only — no state, no maths. ── */
+const GLOSSARY=[
+ ["C3","Launch energy. How much speed the rocket must give the spacecraft beyond escape velocity, squared. Lower is cheaper."],
+ ["V-infinity (V∞)","How fast you arrive relative to the target. You must cancel it with propellant to stay, which is why arriving fast is expensive."],
+ ["Porkchop plot","A map of every departure date against every flight time, shaded by launch energy. The cheap valleys are your launch windows."],
+ ["Time of flight (TOF)","Days between launch and arrival. A short flight is fast but arrives hot; a long flight saves propellant and costs operations time."],
+ ["Delta-v (Δv)","Total change in velocity the spacecraft must supply. It sets how much propellant you need, through the rocket equation."],
+ ["Specific impulse (Isp)","Propellant efficiency, in seconds. Higher Isp means less propellant for the same delta-v."],
+ ["Rocket equation","Propellant mass grows exponentially with delta-v. Doubling delta-v is far worse than doubling the tank."],
+ ["Wet / dry mass","Wet is with propellant, dry is without. Launch vehicles lift the wet mass; every other budget uses the dry mass."],
+ ["Bus","Everything that is not payload or propellant: structure, avionics, thermal control, harness."],
+ ["Payload","The mass you actually came for: instruments, power source, antenna, propulsion hardware, shielding, rover."],
+ ["TRL","Technology readiness level, 1 to 9. Anything below 8 adds schedule and cost, because it still needs to be proven."],
+ ["Margin","The five rails: how much room is left against mass, power, data, cost and schedule. Negative means over budget."],
+ ["Cost cap","The mission's maximum cost. Exceeding it fails the mission regardless of the science."],
+ ["BOL / EOL power","Beginning and end of life. Solar arrays and radioisotope sources both degrade, so plan against end of life."],
+ ["Downlink","The data you can actually send home. An instrument can collect far more than the antenna can deliver."],
+ ["DSN","Deep Space Network: the NASA antennas that receive your data. Allocation is limited and time is money."],
+ ["Blackout","A period with no contact, usually around a critical event. Data waits or is lost."],
+ ["Solar conjunction","The Sun sits between you and Earth. The link is unusable for days."],
+ ["Dose","Accumulated radiation, in krad. Shielding reduces it; electronics and crews have limits."],
+ ["Sun-synchronous orbit","A low Earth orbit whose plane stays fixed relative to the Sun, so lighting is repeatable for imaging."],
+ ["Lambert solution","The orbital mechanics answer to how you get from one body to another in a fixed time. It is what the porkchop grid solves."],
+ ["Capture / rendezvous","Staying at the target instead of flying past. Capture costs the full arrival velocity; a flyby costs almost nothing."],
+ ["Flyby","Passing a body without stopping. Cheap, brief, and you only get one look."],
+ ["Gravity assist","Using a planet's motion to change your velocity for free. It costs years of flight time, not propellant."],
+ ["Aerobraking","Using atmosphere to shed velocity instead of propellant. Mars only, and it takes months of careful passes."],
+ ["EDL","Entry, descent and landing. The final minutes where the design either survives the surface or does not."],
+ ["Proximity operations","Flying close to a small body: matching its orbit, surveying, then touching or sampling."],
+ ["Surface ops","After touchdown: drive, dwell, drill, recharge or relay. Every order trades time against power and science."]
+];
 function howModal(){
+  const firstRun=!Object.keys(S.progress||{}).length;
+  const hint=firstRun?`<p class="mt-s" style="color:var(--amber);font-size:12px">
+    FIRST MISSION? Read the four steps, then open a brief. The five rails at the bottom of every
+    screen are the only scoreboard you need at first &mdash; they turn red before the mission does.</p>`:"";
   el("mbox").innerHTML=`<h3>HOW IT WORKS</h3><div class="mb" style="font-size:13px;line-height:1.7">
+    ${hint}
     <p><b>1. Formulate.</b> Pick science objectives. Each one names what it needs measured.</p>
     <p class="mt-s"><b>2. Build.</b> Add instruments, a power source, an antenna and a propulsion system.
     Nothing you add touches only one budget &mdash; watch the five rails at the bottom of the screen.</p>
@@ -5171,6 +5734,12 @@ function howModal(){
     what was simplified.</p>
     <p class="mt-s" style="color:var(--dim)">Shortcuts: <b>Space</b> pauses operations,
     <b>M</b> toggles sound.</p>
+    <p class="mt-s" style="color:var(--phosphor);font-size:12px;letter-spacing:.08em">GLOSSARY &mdash; ${GLOSSARY.length} TERMS</p>
+    <div style="max-height:230px;overflow:auto;border-top:1px solid rgba(28,36,51,.7);margin-top:6px">
+      ${GLOSSARY.map(g=>`<div class="spread" style="align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid rgba(28,36,51,.35)">
+        <span style="min-width:112px;color:var(--bone);font-size:12px">${esc(g[0])}</span>
+        <span style="flex:1;color:var(--dim);font-size:12px;line-height:1.5">${esc(g[1])}</span></div>`).join("")}
+    </div>
     <p class="mt-s"><button class="btn ghost" data-act="sources" style="width:100%">MISSION DATA — WHERE NUMBERS COME FROM</button></p>
     <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
   el("modal").classList.add("on");
@@ -5183,17 +5752,52 @@ el("btnSound").addEventListener("click",function(){
   try{localStorage.setItem("margin.sound",Audio_.on?"1":"0")}catch(e){}
 });
 el("btnMode").addEventListener("click",function(){
+  /* A-02 / R-12: flipping difficulty mid-mission was a free +15% cap and a
+     free grade. The lock lives here as well as on the button's disabled
+     state, because a disabled attribute is a presentation detail. */
+  if(!MODE_FREE.includes(S.screen)) return;
   S.mode=S.mode==="cadet"?"fd":"cadet";
   this.textContent=S.mode==="cadet"?"CADET":"FLIGHT DIR";
   render();
 });
-el("btnHome").addEventListener("click",()=>{S.ops=null;go(S.levelId?"select":"title")});
+/* A-11 note: the report's MISSION SELECT path calls finishLanding() first so a
+   landing in progress is committed; this listener must mirror it, then clear
+   the run. */
+el("btnHome").addEventListener("click",()=>{ try{ finishLanding(); }catch(e){} resetRunState(); S.ops=null; go(S.levelId?"select":"title") });
 
 /* ── dev scene shortcuts (?s=) for testing after hard refreshes.
    Usage: index.html?s=launch / ?s=ascent&lv=sls&m=l3 / ?s=ops&m=l2&no3d…
    Stateless screens jump directly; stateful ones seed a demo mission
    (startLevel defaults + porkchop-best trajectory + first-listed LV) without
    touching save/share behavior. Unknown values fall through to normal boot. */
+/* Demo-seed instruments (P0-3 / A-09). Picks, from the mission's own part
+   list, the fewest instruments that cover the tags its forced objectives need,
+   so ?s=ops does not open on "0/0 live". Seed only — every other design field
+   stays the startLevel default. */
+function seedInstrumentsFor(L,oids){
+  const parts=(L.parts||[]).map(id=>byId(INSTR,id)).filter(Boolean);
+  const picked=[];
+  const tagsOf=()=>new Set(picked.reduce((a,p)=>a.concat(p.tags),[]));
+  for(const oid of oids){
+    const need=(OBJ[oid]&&OBJ[oid].need)||[];
+    /* Keep adding the best-covering instrument until this objective's needs
+       are met — one instrument rarely covers a two-tag objective (o_mmap). */
+    for(;;){
+      const have=tagsOf();
+      const missing=need.filter(t=>!have.has(t));
+      if(!missing.length) break;
+      let best=null,bestHit=0;
+      for(const p of parts){
+        if(picked.indexOf(p)>=0) continue;
+        const hit=p.tags.filter(t=>missing.indexOf(t)>=0).length;
+        if(hit>bestHit){ best=p; bestHit=hit; }
+      }
+      if(!best) break;               /* this mission's parts cannot cover it */
+      picked.push(best);
+    }
+  }
+  return picked.map(p=>p.id);
+}
 function seedDemoLaunch(lv){
   const L=byId(LEVELS,S.levelId);
   if(!L) return false;
@@ -5210,6 +5814,12 @@ function seedDemoLaunch(lv){
   else { S.launch.c3=0;S.launch.vinf=0;S.launch.tof=0;S.launch.tDep=2029.0;S.launch.set=true; }
   S.launch.lv=(lv&&byId(LV,lv))?lv:(L.lvs&&L.lvs[0])||"f9";
   S.launch.outcome=null;S.launch.acked=false;
+  /* Demo build: forced objectives first, else the mission's own minimum-set
+     requirement — instruments only, launch/systems stay default. */
+  if(!S.instruments.length){
+    const oids=(L.force&&L.force.length)?L.force:(L.objs||[]).slice(0,L.req||1);
+    S.instruments=seedInstrumentsFor(L,oids);
+  }
   return true;
 }
 function jumpToScene(s,m,lv){
@@ -5244,7 +5854,189 @@ function applySceneShortcut(){
   return jumpToScene(s,m,q.get("lv")||null);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   GOLDEN DETERMINISM GATE  (P0-1 · D-21 · D-12 · D-19 · I-13)
+
+   Load with ?golden to run it (add &no3d to skip the 3D layer).
+   Load with ?golden=emit to print a fresh baseline literal.
+
+   It freezes three things and compares them against GOLDEN below:
+     1. derive() at every mission's DEFAULT build, in both modes
+     2. the seeded event deck (initOpsState) for every mission, both modes
+     3. three legacy #m= share links, decoded through the real loadShare()
+
+   Why it exists: every later phase adds catalogue rows, changes state
+   shape and touches the event RNG. I-13 says default builds must derive
+   byte-identically, D-12 says the event stream is never drawn from, and
+   I-06 says old links decode to the same state. This is the gate that
+   catches a silent shift while it is still findable.
+
+   A FAIL is not a bug in the harness — either the change was unintended
+   (stop, fix it) or it was intended (re-emit and document the baseline diff). Never widen a tolerance to make it pass.
+   ══════════════════════════════════════════════════════════════ */
+let GOLDEN_ACTIVE=false;
+const GOLDEN_V=2;
+/* Baseline v2 (2026-10-29 via ?golden=emit): deterministic snapshot baseline covering default builds, seeded event decks, and share links. */
+const GOLDEN={derive:{
+
+    "l1/cadet": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.514435,38.000000]",
+    "l1/fd": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.441600,38.000000]",
+    "l2/cadet": "wet=1066.555527 dry=684.600000 pay=234.000000 prop=381.955527 cost=642.380000 cap=3992.253889 peak=251.076000 genEOL=672.280000 gen=0.000000 down=1834.925943 mo=37.000000 m=[0.732844,0.626531,1.000000,0.301761,35.000000]",
+    "l2/fd": "wet=1066.555527 dry=684.600000 pay=234.000000 prop=381.955527 cost=642.380000 cap=3992.253889 peak=251.076000 genEOL=672.280000 gen=0.000000 down=1834.925943 mo=37.000000 m=[0.732844,0.626531,1.000000,0.197025,35.000000]",
+    "l3/cadet": "wet=1256.175388 dry=844.200000 pay=318.000000 prop=411.975388 cost=781.260000 cap=2865.986131 peak=295.652000 genEOL=636.155921 gen=0.000000 down=7923.213694 mo=38.000000 m=[0.561695,0.535252,1.000000,0.382403,34.000000]",
+    "l3/fd": "wet=1256.175388 dry=844.200000 pay=318.000000 prop=411.975388 cost=781.260000 cap=2865.986131 peak=295.652000 genEOL=636.155921 gen=0.000000 down=7923.213694 mo=38.000000 m=[0.561695,0.535252,1.000000,0.289764,34.000000]",
+    "l4/cadet": "wet=5283.116003 dry=561.100000 pay=169.000000 prop=4722.016003 cost=733.330000 cap=6464.898793 peak=178.666000 genEOL=1080.045218 gen=0.000000 down=31061.595524 mo=35.000000 m=[0.182800,0.834575,1.000000,0.574881,37.000000]",
+    "l4/fd": "wet=5283.116003 dry=561.100000 pay=169.000000 prop=4722.016003 cost=733.330000 cap=6464.898793 peak=178.666000 genEOL=1080.045218 gen=0.000000 down=31061.595524 mo=35.000000 m=[0.182800,0.834575,1.000000,0.511113,37.000000]",
+    "l5/cadet": "wet=1489.884317 dry=559.200000 pay=168.000000 prop=930.684317 cost=1029.760000 cap=1955.410554 peak=228.552000 genEOL=90.642916 gen=0.000000 down=9343.163364 mo=43.000000 m=[0.238071,-1.521455,1.000000,0.801013,29.000000]",
+    "l5/fd": "wet=1489.884317 dry=559.200000 pay=168.000000 prop=930.684317 cost=1029.760000 cap=1955.410554 peak=228.552000 genEOL=90.642916 gen=0.000000 down=9343.163364 mo=43.000000 m=[0.238071,-1.521455,1.000000,0.771164,29.000000]",
+    "sbx/cadet": "wet=1190.098444 dry=684.600000 pay=234.000000 prop=505.498444 cost=714.380000 cap=2865.986131 peak=251.076000 genEOL=273.867970 gen=0.000000 down=11.913041 mo=37.000000 m=[0.584751,0.083222,1.000000,0.792933,35.000000]",
+    "sbx/fd": "wet=1190.098444 dry=684.600000 pay=234.000000 prop=505.498444 cost=714.380000 cap=2865.986131 peak=251.076000 genEOL=273.867970 gen=0.000000 down=11.913041 mo=37.000000 m=[0.584751,0.083222,1.000000,0.761873,35.000000]",
+  },events:{
+    "l1/cadet": "total=1096 cruise=0 speed=4 ev=conj@183,dsn@327,rad@828,safe@841",
+    "l1/fd": "total=1096 cruise=0 speed=4 ev=conj@183,dsn@327,inst@468,rad@828,safe@841,ext@899",
+    "l2/cadet": "total=731 cruise=5 speed=1 ev=conj@133,rad@274,safe@289,mmod@361",
+    "l2/fd": "total=731 cruise=5 speed=1 ev=dsn@55,inst@88,conj@133,rad@274,safe@289,mmod@361",
+    "l3/cadet": "total=1461 cruise=299 speed=4 ev=thrust@301,dsn@580,safe@943,ext@1198",
+    "l3/fd": "total=1461 cruise=299 speed=4 ev=thrust@301,conj@483,dsn@580,safe@943,rad@1013,ext@1198",
+    "l4/cadet": "total=2557 cruise=341 speed=4 ev=thrust@343,conj@487,mmod@1219,safe@2479",
+    "l4/fd": "total=2557 cruise=341 speed=4 ev=thrust@343,conj@487,mmod@1219,rad@1913,ext@2097,safe@2479",
+    "l5/cadet": "total=4383 cruise=993 speed=4 ev=thrust@995,conj@1097,dsn@3599,safe@3736",
+    "l5/fd": "total=4383 cruise=993 speed=4 ev=thrust@995,conj@1097,mmod@2358,ext@3594,dsn@3599,safe@3736",
+    "sbx/cadet": "total=1826 cruise=299 speed=4 ev=conj@415,rad@999,dsn@1267,ext@1497",
+    "sbx/fd": "total=1826 cruise=299 speed=4 ev=thrust@301,conj@415,rad@999,dsn@1267,ext@1497,mmod@1551",
+  },links:{
+    "L1-cadet-leo": "l1 o_ocean+o_land ocean+vnir+ctx sa1 mga mono sh0 direct standard - - cadet launch=null wet=608.113303 dry=551.600000 pay=164.000000 prop=56.513303 cost=576.880000 cap=0.000000 peak=239.096000 genEOL=282.357600 gen=61171.200000 down=3211.120399 mo=38.800000 m=[0.679940,0.153216,-0.947506,0.331154,33.200000]",
+    "L2-fd-moon-rover": "l2 o_mmap+o_ice hires+therm+alt+rad sa2 hga2 bi sh1 direct standard shackleton rm2.rp2.rc2.ry2 fd launch=f9:20:15:unset wet=2219.708999 dry=1389.500000 pay=605.000000 prop=830.208999 cost=1260.650000 cap=3992.253889 peak=540.370000 genEOL=605.052000 gen=66375.936000 down=1220386.194612 mo=43.400000 m=[0.443996,0.106903,0.945611,-0.575812,28.600000]",
+    "L3-cadet-mars-pork": "l3 o_mmap+o_ice+o_geo ctx+vnir+msp+grns+radar sa2 hga3 bi sh1 direct standard jezero - cadet launch=f9:12:9:unset wet=1149.974640 dry=984.800000 pay=392.000000 prop=165.174640 cost=1021.240000 cap=3500.000000 peak=517.088000 genEOL=234.743974 gen=43234.560000 down=63085.763710 mo=46.000000 m=[0.671436,-1.202774,0.314670,0.192696,26.000000]",
+  }};
+const GOLDEN_MODES=["cadet","fd"];
+/* Frozen legacy links (pre-remediation share shape: {l,o,i,p,c,r,s,a,q,t,v,m,w}). */
+const GOLDEN_LINKS=[
+ {n:"L1-cadet-leo",
+  b64:"eyJsIjoibDEiLCJvIjpbIm9fb2NlYW4iLCJvX2xhbmQiXSwiaSI6WyJvY2VhbiIsInZuaXIiLCJjdHgiXSwicCI6InNhMSIsImMiOiJtZ2EiLCJyIjoibW9ubyIsInMiOiJzaDAiLCJhIjpmYWxzZSwicSI6InN0YW5kYXJkIiwidCI6bnVsbCwidiI6bnVsbCwibSI6ImNhZGV0IiwidyI6bnVsbH0"},
+ {n:"L2-fd-moon-rover",
+  b64:"eyJsIjoibDIiLCJvIjpbIm9fbW1hcCIsIm9faWNlIl0sImkiOlsiaGlyZXMiLCJ0aGVybSIsImFsdCIsInJhZCJdLCJwIjoic2EyIiwiYyI6ImhnYTIiLCJyIjoiYmkiLCJzIjoic2gxIiwiYSI6ZmFsc2UsInEiOiJzdGFuZGFyZCIsInQiOiJzaGFja2xldG9uIiwidiI6eyJtb2IiOiJybTIiLCJwd3IiOiJycDIiLCJjb20iOiJyYzIiLCJwYXkiOiJyeTIifSwibSI6ImZkIiwidyI6eyJ2IjoiZjkiLCJpIjoyMCwiaiI6MTV9fQ"},
+ {n:"L3-cadet-mars-pork",
+  b64:"eyJsIjoibDMiLCJvIjpbIm9fbW1hcCIsIm9faWNlIiwib19nZW8iXSwiaSI6WyJjdHgiLCJ2bmlyIiwibXNwIiwiZ3JucyIsInJhZGFyIl0sInAiOiJzYTIiLCJjIjoiaGdhMyIsInIiOiJiaSIsInMiOiJzaDEiLCJhIjpmYWxzZSwicSI6InN0YW5kYXJkIiwidCI6ImplemVybyIsInYiOm51bGwsIm0iOiJjYWRldCIsInciOnsidiI6ImY5IiwiaSI6MTIsImoiOjl9fQ"}
+];
+/* Numeric canonicalisation: fixed precision kills float last-bit noise while
+   still catching any real change to a mass, a cost or a margin. */
+function gnum(x){
+  if(typeof x!=="number"||!isFinite(x)) return String(x);
+  return (Math.round(x*1e6)/1e6).toFixed(6);
+}
+function gderive(D){
+  const m=D.margins;
+  return "wet="+gnum(D.wetMass)+" dry="+gnum(D.dryMass)+" pay="+gnum(D.payloadMass)
+    +" prop="+gnum(D.propMass)+" cost="+gnum(D.cost)+" cap="+gnum(D.capability)
+    +" peak="+gnum(D.loadPeak)+" genEOL="+gnum(D.genEOL)+" gen="+gnum(D.genMbPerDay)
+    +" down="+gnum(D.downMbPerDay)+" mo="+gnum(D.months)
+    +" m=["+gnum(m.mass)+","+gnum(m.power)+","+gnum(m.data)+","+gnum(m.cost)+","+gnum(m.sched)+"]";
+}
+function gevents(O){
+  return "total="+O.totalDays+" cruise="+O.cruise+" speed="+O.speed
+    +" ev="+O.events.map(e=>e.id+"@"+e.day).join(",");
+}
+function gdesign(){
+  const r=S.rover;
+  const D=derive(S);
+  return [S.levelId,(S.objectives||[]).join("+"),(S.instruments||[]).join("+"),
+    S.power,S.comms,S.prop,S.shield,S.assist?"assist":"direct",S.dsn,S.site||"-",
+    r?[r.mob,r.pwr,r.com,r.pay].join("."):"-",S.mode,
+    "launch="+(S.launch?[S.launch.lv,S.launch.i,S.launch.j,S.launch.set?"set":"unset"].join(":"):"null"),
+    gderive(D)].join(" ");
+}
+function goldenSnapshot(){
+  const backup=Object.assign({},S), hash0=location.hash, out={derive:{},events:{},links:{}};
+  GOLDEN_ACTIVE=true;
+  try{
+    for(const L of LEVELS){
+      startLevel(L.id);                       /* A-18: launch starts null */
+      if(!seedDemoLaunch(null)) throw new Error("seedDemoLaunch failed: "+L.id);
+      const launch=Object.assign({},S.launch);
+      /* The gate measures the DEFAULT build (startLevel defaults), not the
+         demo build: seedDemoLaunch also seeds demo instruments (P0-3), which
+         is a test affordance, not part of derive()'s baseline. */
+      S.instruments=[];
+      for(const mode of GOLDEN_MODES){
+        S.mode=mode; S.ops=null; S.launch=Object.assign({},launch);
+        const key=L.id+"/"+mode;
+        out.derive[key]=gderive(derive(S));
+        initOpsState();                       /* reads S.launch.tof — must be set */
+        out.events[key]=gevents(S.ops);
+      }
+    }
+    for(const ln of GOLDEN_LINKS){
+      /* Boot-faithful: at a real page load S.launch is null and loadShare()
+         only fills it when the link carries `w`. Leaving the previous
+         mission's tuple in place would silently change lvCost and vinf. */
+      S.launch=null; S.ops=null; S.result=null; S.commit=null;
+      location.hash="#m="+ln.b64;
+      if(!loadShare()) throw new Error("loadShare rejected legacy link: "+ln.n);
+      out.links[ln.n]=gdesign();
+    }
+  } finally{
+    GOLDEN_ACTIVE=false;
+    Object.assign(S,backup);
+    try{
+      if(hash0) location.hash=hash0;
+      else history.replaceState(null,"",location.pathname+location.search);
+    }catch(e){}
+  }
+  return out;
+}
+function goldenLiteral(o){
+  const rows=obj=>Object.keys(obj).map(k=>"    "+JSON.stringify(k)+": "+JSON.stringify(obj[k])+",").join("\n");
+  return "const GOLDEN={derive:{\n"+rows(o.derive)+"\n  },events:{\n"+rows(o.events)
+    +"\n  },links:{\n"+rows(o.links)+"\n  }};";
+}
+function goldenCompare(cur){
+  const fails=[], seen=new Set();
+  [["derive",GOLDEN.derive,cur.derive],["events",GOLDEN.events,cur.events],["links",GOLDEN.links,cur.links]]
+  .forEach(([g,exp,act])=>{
+    Object.keys(exp).forEach(k=>{
+      seen.add(g+":"+k);
+      if(exp[k]!==act[k]) fails.push({id:g+":"+k,exp:exp[k],act:act[k]});
+    });
+    Object.keys(act).forEach(k=>{
+      if(!seen.has(g+":"+k)&&!(k in exp)) fails.push({id:g+":"+k,exp:"(absent from baseline)",act:act[k]});
+    });
+  });
+  return {checks:seen.size,fails};
+}
+function goldenShow(txt){
+  const d=document.createElement("pre");
+  d.id="goldenOut";
+  d.textContent=txt;
+  d.style.cssText="position:fixed;inset:0;z-index:99999;margin:0;padding:18px;overflow:auto;"
+    +"background:#05070c;color:#cfe3ff;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap";
+  document.body.appendChild(d);
+}
+function goldenGate(){
+  let q=null; try{ q=new URLSearchParams(location.search); }catch(e){ return false; }
+  if(!q.has("golden")) return false;
+  const emit=q.get("golden")==="emit";
+  let cur=null;
+  try{ cur=goldenSnapshot(); }
+  catch(e){ goldenShow("GOLDEN — THREW\n\n"+(e&&e.stack||e)); return true; }
+  if(emit){ const lit=goldenLiteral(cur); console.log(lit); goldenShow("GOLDEN — EMIT (paste into game.js)\n\n"+lit); return true; }
+  const r=goldenCompare(cur);
+  if(!r.fails.length){
+    goldenShow("GOLDEN ✓ PASS — "+r.checks+" checks (baseline v"+GOLDEN_V+")\n\n"
+      +"derive: "+Object.keys(GOLDEN.derive).length+" builds · events: "+Object.keys(GOLDEN.events).length
+      +" decks · links: "+Object.keys(GOLDEN.links).length+" legacy shares\n\n"
+      +"Reload without ?golden to play.");
+    return true;
+  }
+  const body=r.fails.map((f,i)=>String(i+1).padStart(2," ")+". "+f.id+"\n    expected: "+f.exp+"\n    actual:   "+f.act).join("\n\n");
+  goldenShow("GOLDEN ✗ FAIL — "+r.fails.length+" of "+r.checks+" checks differ\n\n"+body
+    +"\n\nIf the change was intended, re-run with ?golden=emit and say why in the phase QA doc.");
+  console.error("GOLDEN FAIL",r.fails);
+  return true;
+}
+
 /* ── boot ── */
+goldenGate();
 loadProgress();
 el("telemRun").innerHTML=telemText();
 if(!loadShare()) S.screen="title";
