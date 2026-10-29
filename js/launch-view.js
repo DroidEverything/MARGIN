@@ -3519,11 +3519,12 @@ function updateStaging(f, now) {
           return;
         }
         const frac = Math.min(1, (f - f0) / dur);
-        const tilt = Math.min(0.85, frac * 1.2);
-        const sep = Math.pow(frac, 1.6) * B.out;
+        // Eased outward peel: smooth sinusoidal ramp reaching authentic ~28 deg (0.48 rad)
+        const tilt = Math.sin(frac * Math.PI * 0.5) * 0.48;
+        const sep = Math.pow(frac, 1.4) * B.out;
         const px = b.userData.initPos.x + dx * sep;
         const pz = b.userData.initPos.z + dz * sep;
-        const py = b.userData.initPos.y - Math.pow(frac, 2) * 22.0;
+        const py = b.userData.initPos.y - Math.pow(frac, 1.8) * 18.0;
 
         // Tangential tilt axis: rotates nose (0, 1, 0) radially outward along (dx, 0, dz)
         const on = Math.hypot(dx, dz) || 1;
@@ -3539,9 +3540,9 @@ function updateStaging(f, now) {
           const dtau = debrisBallistic({ x: px, y: py, z: pz }, _vv,
             [dx / on * dv[0], dv[1], dz / on * dv[0] + dv[2]], B.ballistic.g, f1, f);
           b.position.set(_db.x, _db.y, _db.z);
-          // Realistic end-over-end aerodynamic pitch tumble continuing smoothly from outward tilt:
-          // Pure function of dtau (zero axial spin accumulation).
-          const postTilt = tilt + (B.ballistic.spin || 0.6) * dtau;
+          // Majestic, stable separation: holds the realistic ~28 deg peel with a gentle drift
+          // (zero unwanted axial spin, clean broadcast staging separation).
+          const postTilt = tilt + 0.04 * Math.min(dtau, 15);
           b.quaternion.setFromAxisAngle(_bAxis, postTilt);
         }
       });
@@ -3564,13 +3565,13 @@ function updateStaging(f, now) {
         const px = Math.pow(frac, 1.5) * B.side, py = -Math.pow(frac, 1.8) * B.drop;
         if (!B.ballistic || f <= W[1]) {
           S.stage1.position.set(px, py, 0);
-          S.stage1.rotation.set(0, frac * 0.3, frac * 0.45);
+          S.stage1.rotation.set(0, 0, frac * 0.35);
         } else {
           vehicleVel(W[1], _vv);
           const dv = B.ballistic.dv;
           const dtau = debrisBallistic({ x: px, y: py, z: 0 }, _vv, [dv[0], dv[1], dv[2]], B.ballistic.g, W[1], f);
           S.stage1.position.set(_db.x, _db.y, _db.z);
-          S.stage1.rotation.set(0, frac * 0.3 + B.ballistic.spin * dtau, frac * 0.45);
+          S.stage1.rotation.set(0, 0, frac * 0.35 + 0.05 * Math.min(dtau, 15));
         }
       }
     }

@@ -6357,7 +6357,7 @@ function liftoff(){
     });
   };
   try {
-    import("./js/launch-view.js").then((mod) => {
+    import("./js/launch-view.js?v=" + Date.now()).then((mod) => {
       console.log("[LAUNCH] launch-view.js imported successfully", mod);
       const LV3 = (mod && mod.LaunchView) || window.LaunchView;
       if (!LV3 || !LV3.start) {
