@@ -1027,6 +1027,16 @@ function renderDock(){
       primaryLabel="COMMIT TO LAUNCH 🚀";
       primaryDisabled=false;
     }
+    /* D-04: the commit button is the roll call's consequence. Disabled until
+       every seat has called GO, so the rule is visible instead of a prompt. */
+    if(teamActive()&&!primaryDisabled){
+      const done=S.team.seats.filter(s=>!!(S.team.votes||{})[s.i]).length;
+      if(!S.team.goAll){
+        statusHtml=`<span class="dock-status-chip pending">○ ROLL CALL ${done}/${S.team.size} — every seat must call GO</span>`;
+        primaryLabel=`ROLL CALL ${done}/${S.team.size}`;
+        primaryDisabled=true;
+      }
+    }
   }
 
   dock.innerHTML=`
@@ -1199,6 +1209,9 @@ function render(){
         : "Switch between Cadet (simple parts, +15% budget cap) and Flight Director (advanced parts, full budget, more anomalies).";
     }
   }catch(e){}
+  /* Phase 2: seat badge + hot-seat hand-off. Both are DOM-only, so the 2D
+     fallback, `?no3d` and `file://` are untouched. */
+  try{ renderTeamBadge(); maybeTeamHandoff(); }catch(e){}
   s.scrollTop=0;
 }
 function go(screen){
@@ -1272,6 +1285,8 @@ function scrSelect(){
       <div class="sel-controls">
         <div id="selcontrols"></div>
         <div class="sel-tools"><span class="tape">${S.mode==="cadet"?"CADET MODE":"FLIGHT DIRECTOR MODE"}</span>
+          <button class="btn ghost" data-act="teamsize" title="One click: solo. Click again to add hot-seat seats (up to 4). Each seat owns a set of decisions; you can override, and every override is logged in the report."
+            style="padding:3px 10px;font-size:10.5px;margin-left:8px;--seat:${TEAM_SEAT_COL[0]}">${teamCfgSize()>1?"TEAM &#183; "+teamCfgSize():"SOLO"}</button>
           <button class="btn ghost" data-act="history" title="Every run you have finished, with its design and outcome"
             style="padding:3px 10px;font-size:10.5px;margin-left:8px">HISTORY${runs.length?" &#183; "+runs.length:""}</button></div>
       </div>
@@ -1850,6 +1865,11 @@ function scrLaunch(){
 }
 
 let PORK=null;
+/* A-01 / A-16: the porkchop is a direct drag listener, so a gate at the click
+   dispatcher never sees the launch-window decision. The log entry is queued
+   from applyPork() (the single funnel) and flushed once the gesture settles —
+   a drag that fires 60 `pointermove` events still records exactly one call. */
+let pickSig=null, lastPickSig="", lastPickAt=0, pickFlushTimer=null;
 function initLaunch(){
   const L=byId(LEVELS,S.levelId);
   if(!S.launch) S.launch={lv:null,c3:0,vinf:0,tof:0,tDep:0,i:0,j:0};
@@ -1886,7 +1906,41 @@ function applyPork(i,j,silent){
   if(!isFinite(p.c3))return;
   S.launch.i=p.i;S.launch.j=p.j;S.launch.c3=p.c3;S.launch.vinf=p.vinf;
   S.launch.tof=p.tof;S.launch.tDep=p.tDep;S.launch.set=true;S.launch.outcome=null;S.launch.acked=false;
+  /* A-01: decisions made by dragging are logged here, not at the dispatcher.
+     `silent` is the programmatic default pick on screen entry, which is not
+     a player decision and must never appear in the team log. */
+  if(!silent && teamActive()) queuePickLog();
 }
+function queuePickLog(){
+  if(!S.launch||!S.launch.set) return;
+  pickSig=String(S.launch.tDep)+"|"+String(S.launch.c3);
+  clearTimeout(pickFlushTimer);
+  pickFlushTimer=setTimeout(flushPickLog,260);
+}
+function flushPickLog(){
+  clearTimeout(pickFlushTimer); pickFlushTimer=null;
+  if(!pickSig) return;
+  const sig=pickSig; pickSig=null;
+  if(!teamActive()) return;
+  const now=Date.now();
+  /* A-16: `pointerup` on the window fires before the element `click`, so the
+     same point can arrive twice. Signature + a short guard collapses it. */
+  if(sig===lastPickSig&&now-lastPickAt<400) return;
+  lastPickSig=sig; lastPickAt=now;
+  const l=S.launch||{};
+  const joint=seatHas("planner")||seatHas("director");
+  teamLog("window",null,{
+    role:seatHas("planner")?"planner":(seatHas("director")?"director":null),
+    joint:true, offRole:!joint,
+    detail:(isFinite(l.tDep)?yrToDate(l.tDep):"?")+" · C3 "+Math.round(l.c3||0)
+  });
+}
+/* Gesture end. Deferred by a task on purpose: the browser dispatches `click`
+   immediately after `pointerup`, and that click re-applies the FINAL point.
+   Flushing synchronously here would log the last sampled move and then the
+   click position — the exact double entry A-16 warns about. */
+addEventListener("pointerup",()=>{ setTimeout(()=>{ if(pickSig) flushPickLog(); },0); });
+addEventListener("pointercancel",()=>{ clearTimeout(pickFlushTimer); pickFlushTimer=null; pickSig=null; });
 function c3Color(v,min,max){
   const t=clamp((v-min)/Math.max(1e-6,max-min),0,1);
   // deep blue -> teal -> phosphor -> amber -> red
@@ -2073,8 +2127,24 @@ function renderGo(){
         <span style="color:${c[1]?'var(--phosphor)':'var(--red)'}">${c[1]?"\u2713":"\u2715"} ${c[0]}</span>
         <span class="num hint" style="font-size:11px">${c[2]}</span></div>`).join("")}
 
+      ${teamRollCallHtml()}
       <div style="text-align:center;margin:16px 0 10px"><span class="stamp ${go?'go':'nogo'}">${go?"GO":"NO-GO"}</span></div>
     </div>`;
+}
+/* D-04: one GO/NO-GO roll call, recorded per seat. Any seat may change its
+   call until commit; `S.team.goAll` is set only while every seat is GO, and
+   `fly` consumes it as a one-shot token. */
+function teamRollCallHtml(){
+  if(!teamActive()) return "";
+  const T=S.team, votes=T.votes||{};
+  const done=T.seats.filter(s=>!!votes[s.i]).length;
+  return `<div class="team-roll">
+    <div class="tr-head">GO / NO-GO ROLL CALL <span class="code">TEAM-01</span></div>
+    <div class="tr-seats">${T.seats.map(s=>
+      `<button class="tr-seat ${votes[s.i]?"go":""}" data-act="goseat" data-id="${s.i}" style="--seat:${s.col}"
+        title="${esc(s.name)}">SEAT ${s.i+1} &#183; ${esc(s.code)}<b>${votes[s.i]?"GO \u2713":"NO-GO"}</b></button>`).join("")}</div>
+    <p class="hint" style="font-size:11px;margin-top:6px">${done}/${T.size} GO &#8212; ${done===T.size?"unanimous, cleared for commit":"every seat must call GO before the Flight Director can commit"}</p>
+  </div>`;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -4361,6 +4431,31 @@ const REAL={
  l5:{n:"Europa Clipper",mass:6065,cost:5200,yrs:12},
  sbx:{n:"Mars Reconnaissance Orbiter",mass:2180,cost:716,yrs:5}
 };
+/* P2-7 / D-05: derived data only. The score formula is untouched, so this
+   card can never inflate a grade; it reports who made each call and whether
+   the hand-offs were honoured. Solo runs render nothing at all. */
+function teamCardHtml(){
+  if(!S.team||S.team.size<2) return "";
+  const T=S.team, log=T.log||[];
+  const total=log.length, overrides=log.filter(e=>e.override).length;
+  const rows=T.seats.map(s=>{
+    const mine=log.filter(e=>e.seat===s.i);
+    const ov=mine.filter(e=>e.override).length;
+    return `<div class="tc-row"><span class="tc-seat" style="--seat:${s.col}">SEAT ${s.i+1}</span>
+      <span class="tc-name">${esc(s.code)} <span class="tc-long">${esc(s.name)}</span></span>
+      <span class="tc-num">${mine.length} call${mine.length===1?"":"s"}${ov?` &#183; ${ov} override${ov===1?"":"s"}`:""}</span></div>`;
+  }).join("");
+  const clean=total>0&&overrides===0;
+  const verdict=total===0?"no decisions recorded"
+    :clean?"clean hand-offs — every call was made by its owner"
+    :`${overrides} of ${total} calls overrode the owning seat`;
+  return `<div class="team-card">
+    <div class="tc-head">TEAM EXECUTION <span class="code">TEAM-01</span></div>
+    <p class="hint" style="font-size:11.5px">${T.size} seats, hot-seat. The score above is unchanged — this card records how the team flew it.</p>
+    ${rows}
+    <div class="tc-foot">COLLABORATION <b style="color:${clean?"var(--phosphor)":total?"var(--amber)":"var(--dim)"}">${esc(verdict)}</b>${clean?` <span class="badge">CLEAN TEAM CREDIT</span>`:""}</div>
+  </div>`;
+}
 function scrReport(){
   const R=S.result, D=derive(S), L=byId(LEVELS,S.levelId), O=S.ops, rm=REAL[L.id];
   replayIdx=-1;
@@ -4411,6 +4506,7 @@ function scrReport(){
       <div class="gradebox"><div class="g" style="color:${gcol}">${R.grade}</div>
         <div class="hint" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;margin-top:5px">MISSION GRADE</div></div>
       ${R.badges.length?`<div class="badges">${R.badges.map(b=>`<span class="badge">${b}</span>`).join("")}</div>`:""}
+      ${teamCardHtml()}
       <div class="share"><span>SHARE</span><input id="shareUrl" readonly value="${shareUrl()}"
         style="flex:1;min-width:180px;background:#04060B;border:1px solid var(--hairline);color:var(--dim);font-family:var(--mono);font-size:10.5px;padding:5px 7px">
         <button class="btn ghost" data-act="copy" style="padding:5px 11px">COPY</button></div>
@@ -4853,7 +4949,7 @@ function finishRun(){
       spec:shareState(),
       rails:railValues(D),
       result:S.result,
-      team:S.team?{size:(S.team.members||[]).length,log:(S.team.log||[]).slice(-100)}:null };
+      team:(S.team&&S.team.size>1)?{size:S.team.size,log:(S.team.log||[]).slice(-120)}:null };
   }catch(e){ return false; }
   let list=pruneRuns([rec].concat(loadRuns()));
   let ok=saveRuns(list);
@@ -5012,6 +5108,230 @@ function historyModal(){
 }
 
 /* ══════════════════════════════════════════════════════════════
+   TEAM MODE (Phase 2 · G1/G2 · D-02…D-06, D-13)
+   ──────────────────────────────────────────────────────────────
+   Hot-seat only: one device, one tab, one authoritative `S` (D-02).
+   No BroadcastChannel, no server, no clock — so `file://` and the
+   offline-first contract are untouched by construction (R-08).
+
+   `S.team` is a DECISION-AUTHORITY overlay, never simulation state:
+   `derive()` does not read it, the ops loop does not read it, and the
+   score formula is not modified (D-05). Everything below is policy over
+   the existing `data-act` surface.
+
+   D-13: the seat→role mapping is DERIVED from `size` and never stored,
+   so a settings edit cannot desynchronise the two. Team size 1 keeps
+   today's behaviour byte-identical: the gate is a no-op and no team UI
+   is rendered at all. ══════════════════════════════════════════ */
+const TEAM_KEY="margin.team";
+const TEAM_MAX=4;
+const TEAM_OVERRIDE_MS=3000;
+const TEAM_ROLES=["planner","engineer","science","director"];
+const TEAM_ROLE_LABEL={planner:"Mission Planner",engineer:"Spacecraft Engineer",science:"Science Lead",director:"Flight Director"};
+const TEAM_ROLE_CODE={planner:"PLN",engineer:"ENG",science:"SCI",director:"FD"};
+const TEAM_SEAT_COL=["#5ef6a0","#7fb2ff","#ffb020","#c9a0ff"];
+
+/* Which seat(s) own each decision action. Anything absent is never gated.
+   The map follows the accepted seat map in the register §2.2, which is
+   authoritative where Appendix A of the brief disagrees (see QA §2). */
+const TEAM_GATE={
+  obj:["science"], instr:["science"],
+  site:["planner"], dsn:["planner"], pmode:["planner"], assist:["planner"], lv:["planner"],
+  power:["engineer"], comms:["engineer"], prop:["engineer"], shield:["engineer"],
+  rover:["engineer"], sord:["engineer"], spce:["engineer"],
+  arrch:["science"],
+  aeroch:["planner"], landch:["planner"],
+  proxch:["director"], evch:["director"], extrev:["director"], fly:["director"]
+};
+/* Documented fallback (D-03): unknown actions are ALLOWED, so a future
+   control cannot lock the player out. These are listed for the audit. */
+const TEAM_NEVER=["closeModal","sources","how","about","spd","cam-mode","toggle-minimap","toggle-hud",
+  "rep","copy","copyc","history","cmprun","home","gohome","start","resume","level","sysview","resetview",
+  "devjump","devm","devgo","tobuild","tolaunch","tobrief","rebuild","next","evack","filter-useful",
+  "toggle-acc","handoff","seat","goseat","teamsize",
+  /* Build step navigation is presentation, not a design decision: the
+     hand-off between seats lands ON a step, so the step switch must be free
+     or the next seat could never reach its own panel. The decisions inside
+     each step stay gated. (Deviation from Appendix A, documented in QA §2.) */
+  "bstep","bstep-payload","bstep-systems","bstep-review"];
+
+function teamRoleMap(size){
+  const n=Math.max(1,Math.min(TEAM_MAX,size|0));
+  if(n<=1) return [TEAM_ROLES.slice()];
+  if(n===2) return [["planner","science"],["engineer","director"]];
+  if(n===3) return [["planner","science"],["engineer"],["director"]];
+  return [["planner"],["engineer"],["science"],["director"]];
+}
+function teamCfgSize(){
+  try{
+    const v=JSON.parse(localStorage.getItem(TEAM_KEY)||"null");
+    if(isFinite(v)&&v>=1&&v<=TEAM_MAX) return v|0;
+  }catch(e){}
+  return 1;
+}
+function setTeamSize(n){
+  n=Math.max(1,Math.min(TEAM_MAX,n|0));
+  try{ localStorage.setItem(TEAM_KEY,JSON.stringify(n)); }catch(e){}
+  return n;
+}
+function makeTeam(size){
+  const n=Math.max(1,Math.min(TEAM_MAX,size|0));
+  const map=teamRoleMap(n);
+  return {
+    size:n, seat:0, votes:{}, goAll:null, pending:null, log:[],
+    seats:map.map((roles,i)=>({
+      i, roles:roles.slice(),
+      name:roles.map(r=>TEAM_ROLE_LABEL[r]).join(" + "),
+      code:roles.map(r=>TEAM_ROLE_CODE[r]).join("/"),
+      col:TEAM_SEAT_COL[i]
+    }))
+  };
+}
+function teamActive(){ return !!(S.team&&S.team.size>1); }
+function seatRoles(){ return (teamActive()&&S.team.seats[S.team.seat])?S.team.seats[S.team.seat].roles:[]; }
+function seatHas(role){ return seatRoles().indexOf(role)>=0; }
+function teamSeatFor(role){
+  if(!S.team) return 0;
+  const i=S.team.seats.findIndex(s=>s.roles.indexOf(role)>=0);
+  return i<0?0:i;
+}
+/* One append-only decision log per attempt. `resetRunState()` replaces the
+   whole team object at every attempt boundary (A-11 / R-13), so this can
+   never be attributed to the next mission. */
+function teamLog(a,id,extra){
+  if(!teamActive()) return;
+  const T=S.team, seat=T.seats[T.seat];
+  T.log.push({a, id:(id===undefined||id===null)?null:String(id),
+    seat:T.seat, roles:seat.roles.slice(), role:(extra&&extra.role)||null,
+    joint:!!(extra&&extra.joint), offRole:!!(extra&&extra.offRole),
+    override:!!(extra&&extra.override), detail:(extra&&extra.detail)||null,
+    screen:S.screen, day:(S.ops&&S.ops.day)||0, t:Date.now()});
+  if(T.log.length>240) T.log.splice(0,T.log.length-240);
+}
+let hintTimer=null;
+function teamHint(msg){
+  const h=el("teamhint"); if(!h) return;
+  clearTimeout(hintTimer); hintTimer=null;
+  if(!msg){ h.hidden=true; h.textContent=""; return; }
+  h.textContent=msg; h.hidden=false;
+  /* Transient by design: the prompt is advisory, not a modal (R-04). */
+  hintTimer=setTimeout(()=>{ h.hidden=true; h.textContent=""; },4500);
+}
+/* The single gate (D-03). Returns true when the action may run. A seat that
+   does not own the action gets a 3 s override window instead of a modal, so
+   every dialog can still be dismissed (R-04). */
+function teamGate(a,id){
+  if(!teamActive()) return true;
+  /* D-04 / R2 §7: one GO/NO-GO roll-call, and `goAll` is a one-shot token
+     consumed by `fly`. A launch without a unanimous call is not a decision
+     the Flight Director is allowed to take. */
+  if(a==="fly"&&!S.team.goAll){
+    const done=S.team.seats.filter(s=>S.team.votes[s.i]).length;
+    teamHint(`FLIGHT DIRECTOR: roll call is ${done}/${S.team.size}. Every seat must call GO before commit.`);
+    return false;
+  }
+  const owners=TEAM_GATE[a];
+  if(!owners) return true;
+  const now=Date.now();
+  const owned=owners.filter(r=>seatHas(r));
+  if(owned.length){
+    S.team.pending=null; teamHint("");
+    teamLog(a,id,{role:owned[0]});
+    return true;
+  }
+  const p=S.team.pending;
+  if(p&&p.a===a&&String(p.id)===String(id===undefined||id===null?"":id)&&now<p.until){
+    S.team.pending=null; teamHint("");
+    teamLog(a,id,{role:owners[0],offRole:true,override:true});
+    return true;
+  }
+  S.team.pending={a,id:(id===undefined||id===null)?"":String(id),seat:S.team.seat,at:now,until:now+TEAM_OVERRIDE_MS};
+  teamHint(`SEAT ${S.team.seat+1} · ${S.team.seats[S.team.seat].code} does not own this — ${owners.map(r=>TEAM_ROLE_LABEL[r]).join(" / ")} does. Click again within 3 s to override (logged).`);
+  return false;
+}
+
+/* Seat badge in the top bar. Only rendered for a real team, so a solo run
+   shows exactly the chrome it showed before Phase 2. */
+function renderTeamBadge(){
+  const host=el("teambadge"); if(!host) return;
+  /* In-mission chrome only: the select screen keeps exactly the toolbar it
+     had before Phase 2 (a badge there would advertise a team for a mission
+     that has not started). */
+  if(!teamActive()||!S.levelId||S.screen==="title"||S.screen==="select"){
+    host.hidden=true; host.innerHTML=""; return;
+  }
+  host.hidden=false;
+  const T=S.team, seat=T.seats[T.seat];
+  host.innerHTML=`<span class="tbb-label">TEAM ${T.size}</span>`+
+    T.seats.map(s=>`<button class="tbb-seat ${s.i===T.seat?"on":""}" data-act="seat" data-id="${s.i}"
+      style="--seat:${s.col}" title="Seat ${s.i+1} — ${esc(s.name)}">${s.i+1}</button>`).join("")+
+    `<span class="tbb-role">${esc(seat.code)}</span>`;
+}
+
+/* ── hand-off overlay (P2-9) ─────────────────────────────────────
+   Shown once per phase/bstep entry. It is a DOM card, so `?no3d`,
+   `file://` and the Canvas2D path are unaffected (I-04, I-05, R-07).
+   While it is open the ops clock is paused; it resumes on dismiss. */
+let handoffShown=null;
+function teamHandoffKey(){
+  if(!teamActive()) return null;
+  if(S.screen==="build") return "build:"+S.bstep;
+  if(["brief","launch","ops","report"].indexOf(S.screen)>=0) return S.screen;
+  return null;
+}
+function teamHandoffRole(key){
+  if(key==="brief") return "science";
+  if(key&&key.indexOf("build:")===0) return key==="build:payload"?"science":"engineer";
+  if(key==="launch") return "planner";   /* LV + window first; commit hands to the director */
+  if(key==="ops") return "director";
+  return null;
+}
+function maybeTeamHandoff(){
+  const box=el("teamhand"); if(!box) return;
+  /* Escaping team mode or leaving every hand-off screen (title, select)
+     dismisses the card. Without this the overlay outlived its mission and
+     covered the select screen — a real defect found in the P2-10 playtest. */
+  if(!teamActive()||GOLDEN_ACTIVE||!S.levelId){ teamHandoffHide(); return; }
+  const key=teamHandoffKey();
+  if(!key){ teamHandoffHide(); return; }
+  if(key===handoffShown) return;
+  handoffShown=key;
+  const role=teamHandoffRole(key);
+  if(!role){ teamHandoffHide(); return; }
+  const idx=teamSeatFor(role), seat=S.team.seats[idx];
+  /* Same seat keeps the controls: the badge already says so, and a card that
+     asks the same person to hand off to themselves is pure friction (R-09).
+     The key is still consumed so the card cannot pop later for this phase. */
+  if(idx===S.team.seat){ renderTeamBadge(); return; }
+  const paused=!!(S.ops&&S.ops.running);
+  if(paused) S.ops.running=false;
+  box.dataset.paused=paused?"1":"0";
+  box.querySelector("#thtitle").textContent=`SEAT ${idx+1} · ${seat.code}`;
+  box.querySelector("#thbody").innerHTML=`<b>${esc(seat.name)}</b> takes the controls.`+
+    ` <span class="th-why">${teamHandoffWhy(key)}</span>`;
+  box.querySelector("#thseats").innerHTML=S.team.seats.map(s=>
+    `<span class="th-chip ${s.i===idx?"on":""}" style="--seat:${s.col}">${s.i+1} ${esc(s.code)}</span>`).join("");
+  S.team.seat=idx;
+  box.hidden=false;
+  renderTeamBadge();
+}
+/* One dismiss path for the card, so a paused ops clock cannot be left behind. */
+function teamHandoffHide(){
+  const box=el("teamhand"); if(!box) return;
+  if(!box.hidden&&box.dataset.paused==="1"&&S.ops) S.ops.running=true;
+  box.dataset.paused="0"; box.hidden=true;
+}
+function teamHandoffWhy(key){
+  if(key==="brief") return "Choose the objectives and the landing site. Only this seat can change them without an override.";
+  if(key==="build:payload") return "Pick the instruments that cover the objectives. The Science Lead owns what the spacecraft measures.";
+  if(key==="build:systems") return "Size the bus: power, comms, propulsion, shielding. The Science Lead still owns the instruments.";
+  if(key==="build:review") return "Certify the build against the margins before the launch planner takes over.";
+  if(key==="launch") return "Pick the launch vehicle and the launch window. When every seat has called GO, the Flight Director takes the commit.";
+  if(key==="ops") return "Fly the mission: anomalies, proximity ops, landing and the extension review.";
+  return "";
+}
+
+/* ══════════════════════════════════════════════════════════════
    LEVEL SETUP + EVENT HANDLING
    ══════════════════════════════════════════════════════════════ */
 /* A-11 / D-18: one helper, four call points. Everything here is scoped to a
@@ -5022,7 +5342,13 @@ function historyModal(){
 function resetRunState(){
   S.runRecorded=false;              /* A-04: exactly-once run record */
   S.lastRunId=null;                 /* id of the run this attempt recorded */
-  S.team=null;                      /* Phase 2 populates; R-13 */
+  /* A-11 / R-13: the team is REPLACED, never merely left in place — a fresh
+     object means a fresh decision log, so one mission's calls can never be
+     attributed to the next. Building it here (rather than at the four call
+     sites) is deliberate: a new call site cannot forget it. */
+  S.team=makeTeam(teamCfgSize());
+  handoffShown=null;
+  pickSig=null; lastPickSig=""; lastPickAt=0;
   S.landing=null;                   /* Phase-4 touchdown record */
   S.surface=null;                   /* Phase-6 surface ops state */
   /* `seed` and `challenge` are deliberately NOT cleared here: they are
@@ -5053,10 +5379,60 @@ document.addEventListener("click",e=>{
   const a=t.dataset.act, id=t.dataset.id;
   const prev = ["build","launch"].includes(S.screen)?railValues(derive(S)):null;
 
+  /* Phase 2 / D-03: ONE gate for the whole decision surface. A blocked action
+     returns before the switch runs, so a consequence is never half-applied.
+     Unknown actions fall through as allowed (documented fallback). */
+  if(!teamGate(a,id)) return;
+
   switch(a){
     case "start": go("select"); Audio_.click(); break;
     case "resume": if(!loadDraft()){ render(); } Audio_.click(); break;
     case "about": aboutModal(); Audio_.click(); break;
+    case "how": howModal(); break;
+    case "seat": {
+      /* Never gated: hot-seat means anyone may take any seat. */
+      if(!teamActive()) break;
+      const si=+id;
+      if(!(si>=0&&si<S.team.size)) break;
+      S.team.seat=si; S.team.pending=null; teamHint("");
+      Audio_.click(); renderTeamBadge(); render();
+      break;
+    }
+    case "handoff": {
+      teamHandoffHide();
+      Audio_.click(); break;
+    }
+    case "goseat": {
+      if(!teamActive()) break;
+      const gi=+id;
+      if(!(gi>=0&&gi<S.team.size)) break;
+      if(!S.team.votes) S.team.votes={};
+      S.team.votes[gi]=!S.team.votes[gi];
+      S.team.goAll=S.team.seats.every(s=>!!S.team.votes[s.i])?{at:Date.now()}:null;
+      /* D-04: a unanimous roll call HANDS THE COMMIT to the Flight Director.
+         The planner owns the vehicle, the window and the GO/NO-GO — but the
+         commit itself is the director's call, so the seat moves instead of
+         forcing every director to override. This only happens on the launch
+         screen: the same button never moves the seat anywhere else. */
+      if(S.team.goAll&&S.screen==="launch"&&!seatHas("director")){
+        S.team.seat=teamSeatFor("director");
+        S.team.pending=null;
+        const d=S.team.seats[S.team.seat];
+        teamHint(`Roll call unanimous — commit passed to SEAT ${S.team.seat+1} · ${d.code} (${d.name}).`);
+        renderTeamBadge();
+      }
+      Audio_.click(); renderGo(); renderDock();
+      break;
+    }
+    case "teamsize": {
+      /* P2-2: a visible one-click control. Free only where difficulty is
+         free — team size is part of the attempt's identity, like the mode. */
+      if(!MODE_FREE.includes(S.screen)) break;
+      const cur=teamCfgSize();
+      setTeamSize(cur>=TEAM_MAX?1:cur+1);
+      Audio_.click(); render();
+      break;
+    }
     case "how": howModal(); break;
     case "home": try{ finishLanding(); }catch(e){} S.ops=null; go("select"); break;
     case "gohome": try{ finishLanding(); }catch(e){} S.ops=null; go("title"); Audio_.click(); break;
@@ -5171,7 +5547,7 @@ document.addEventListener("click",e=>{
       cascade(prev);
       break;
     }
-    case "fly": liftoff(); break;
+    case "fly": if(teamActive()) S.team.goAll=null; liftoff(); break;
     case "spd": {
       /* Phase 4: the descent beat owns the pause state until touchdown resolves. */
       if(S.ops&&S.ops.descentActive) break;
@@ -5853,6 +6229,18 @@ function applySceneShortcut(){
   const m=(q.get("m")&&byId(LEVELS,q.get("m")))?q.get("m"):"l1";
   return jumpToScene(s,m,q.get("lv")||null);
 }
+/* P2-8: `?team=4` beside the scene shortcuts. Configures the next mission —
+   it never edits a run that is already in progress. */
+function applyTeamShortcut(){
+  let q=null;
+  try{ q=new URLSearchParams(location.search); }catch(e){ return false; }
+  const raw=q.get("team");
+  if(raw===null) return false;
+  const n=Math.max(1,Math.min(TEAM_MAX,parseInt(raw,10)||1));
+  setTeamSize(n);
+  if(!S.levelId) S.team=makeTeam(n);
+  return true;
+}
 
 /* ══════════════════════════════════════════════════════════════
    GOLDEN DETERMINISM GATE  (P0-1 · D-21 · D-12 · D-19 · I-13)
@@ -6037,6 +6425,7 @@ function goldenGate(){
 
 /* ── boot ── */
 goldenGate();
+applyTeamShortcut();
 loadProgress();
 el("telemRun").innerHTML=telemText();
 if(!loadShare()) S.screen="title";

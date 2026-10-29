@@ -17,6 +17,7 @@
   <header id="topbar">
     <div class="mark">MARG<i>I</i>N</div>
     <nav id="steps" aria-label="Mission phase"></nav>
+    <div id="teambadge" class="team-badge" hidden></div>
     <button class="tb-btn" id="btnSound" aria-pressed="false" title="Toggle sound">SOUND</button>
     <button class="tb-btn" id="btnMode" title="Toggle difficulty">CADET</button>
     <button class="tb-btn" id="btnHome" title="Mission select">MISSIONS</button>
@@ -33,6 +34,16 @@
 <div id="tip" role="tooltip"></div>
 <div id="cascade" aria-hidden="true"></div>
 <div id="modal" role="dialog" aria-modal="true"><div class="mbox" id="mbox"></div></div>
+<div id="teamhint" role="status" aria-live="polite" hidden></div>
+<div id="teamhand" role="dialog" aria-modal="true" aria-labelledby="thtitle" hidden>
+  <div class="th-card">
+    <div class="th-kicker">TEAM HAND-OFF</div>
+    <h3 id="thtitle"></h3>
+    <p id="thbody"></p>
+    <div id="thseats" class="th-seats"></div>
+    <button class="btn primary" data-act="handoff" style="width:100%">CONTINUE</button>
+  </div>
+</div>
 <div class="sr" id="live" role="status" aria-live="polite"></div>
 <script src="js/constants.js"></script>
 <script src="js/time-service.js"></script>
