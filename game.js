@@ -4609,7 +4609,9 @@ const REAL={
  l3:{n:"Mars Reconnaissance Orbiter",mass:2180,cost:716,yrs:5},
  l4:{n:"OSIRIS-REx",mass:2110,cost:1160,yrs:7},
  l5:{n:"Europa Clipper",mass:6065,cost:5200,yrs:12},
- sbx:{n:"Mars Reconnaissance Orbiter",mass:2180,cost:716,yrs:5}
+ sbx:{n:"Mars Reconnaissance Orbiter",mass:2180,cost:716,yrs:5},
+ sbx_moon:{n:"Lunar Reconnaissance Orbiter",mass:1846,cost:583,yrs:2},
+ sbx_earth:{n:"PACE",mass:1700,cost:964,yrs:3}
 };
 /* P2-7 / D-05: derived data only. The score formula is untouched, so this
    card can never inflate a grade; it reports who made each call and whether
@@ -4637,7 +4639,8 @@ function teamCardHtml(){
   </div>`;
 }
 function scrReport(){
-  const R=S.result, D=derive(S), L=byId(LEVELS,S.levelId), O=S.ops, rm=REAL[L.id];
+  const R=S.result, D=derive(S), L=byId(LEVELS,S.levelId), O=S.ops;
+  const rm=REAL[L.id]||(L.body==="moon"?REAL.l2:L.body==="earth"?REAL.l1:REAL.sbx)||{n:"Reference Mission",mass:2000,cost:750,yrs:5};
   replayIdx=-1;
   /* The crossfade in go() re-reads S.screen ~190 ms after navigation, so a
      stale report paint can land after RESULT/REBUILD has already cleared
