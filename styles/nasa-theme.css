@@ -1676,6 +1676,12 @@ body.select-active.sysview .planet-info-content{
   position:absolute;left:0;right:0;bottom:0;z-index:6;
   display:flex;flex-direction:column;gap:8px;pointer-events:none;
 }
+/* The floating bars are pointer-events:none so drags and scrolls reach the
+   orrery behind them; every real control inside them must opt back in
+   (same pattern as .sel-top .tape / .strip-wrap). Without this, HISTORY
+   (.sel-tools) and RESUME LAST DESIGN (.sel-bottom) render but never take a
+   click — the hit test falls through to the viewer behind the bar. */
+.sel-top .btn,.sel-bottom .btn{pointer-events:auto}
 /* destination dossier: tucked under the header (never mid-screen),
    free height on tall viewports, capped only to protect the strip below */
 .selcap-chip{
