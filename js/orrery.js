@@ -90,7 +90,7 @@ export function ensureModeFromURL(){ try{ const A=AZ(); if(!A||typeof A.setMode!
 export function getUnitsPerKm(){ return UNITS_PER_KM; }
 export function radiusWorld(k,opts){ opts=opts||{}; const phys=!!opts.physical||isPhysicalMode(); const u=opts.unitsPerKm!==undefined?opts.unitsPerKm:UNITS_PER_KM; if(phys) return radiusKmTrue(k)*u; return radiusOf(k); }
 
-export const LEVEL_BODY={ l1:'earth', l2:'moon', l3:'mars', l4:'bennu', l5:'europa', sbx:'mars' };
+export const LEVEL_BODY={ l1:'earth', l2:'moon', l3:'mars', l4:'bennu', l5:'europa', sbx:'mars', sbx_moon:'moon', sbx_earth:'earth' };
 export const DAYS_PER_SEC=0.04; // PRESENTATION (time-lapse rate, not physics)
 // Moon/satellite periods below are transitional APPROXIMATION compatibility values
 // owned by js/constants.js MOON_PERIODS_D; the satellite-ephemeris phase must

@@ -53,6 +53,7 @@ const PROV_ABSTRACTIONS=[
  "Instruments observe ~12% of the time (build-screen assumption).",
  "LV reliability figures and launch-outcome splits are gameplay numbers, not LSP data.",
  "The anomaly deck, DSN tiers (60/150%), extension ×1.2, aerobrake and proximity figures are balanced abstractions, not flight-certified models.",
+ "C&DH and ADCS options are balanced subsystem abstractions anchored to NASA mission classes (RAD750, SpaceCube, reaction wheel clusters, CMGs), with zero-delta baselines against standard bus structure.",
  "Porkchop solutions ignore inclination (understates C3 ~1–3 km²/s²) and render on a 90×70 grid."
 ];
 function sourcesModal(){
@@ -167,6 +168,32 @@ const SHIELD = [
  {id:"sh2",n:"Titanium-aluminium vault (Clipper class)", m:150,c:42, f:0.012,p:SRC.nssdc}
 ];
 
+/* ── Command & Data Handling (C&DH / Onboard Computers) ──
+   D-19 / I-13: cdh_std is a ZERO-DELTA baseline against the bus structure
+   and power formulas already inside derive(). Default builds and legacy links
+   derive byte-identically. */
+const CDH = [
+ {id:"cdh_std",  n:"RAD750 Single Computer",             g:"C&DH", dm:0,  dw:0,  dc:0,  trl:9, her:"BAE RAD750 133 MHz SBC (MRO/LRO baseline)", p:SRC.techport,
+  d:"Flight-proven single rad-hard SBC, MIL-STD-1553 bus. Standard baseline absorbed into bus dry mass and load."},
+ {id:"cdh_dual", n:"Dual-Lockstep Fault-Tolerant C&DH", g:"C&DH", dm:18, dw:25, dc:20, trl:9, her:"Cross-strapped RAD750 pairs (Europa Clipper class)", p:SRC.techport,
+  d:"Dual lockstep processors with cross-strapped voting logic. High radiation and single-event latchup tolerance."},
+ {id:"cdh_edge", n:"SpaceCube / HPSC Edge Processor",   g:"C&DH", dm:12, dw:40, dc:32, trl:8, her:"NASA GSFC SpaceCube v2.0 / HPSC", p:SRC.techport,
+  d:"Multi-core radiation-tolerant DSP/FPGA edge architecture for onboard autonomous data processing."}
+];
+
+/* ── Attitude Determination & Control System (ADCS) ──
+   D-19 / I-13: adcs_std is a ZERO-DELTA baseline against the bus structure
+   and power formulas already inside derive(). Default builds and legacy links
+   derive byte-identically. */
+const ADCS = [
+ {id:"adcs_std",   n:"3-Axis Reaction Wheels (Pyramid)", g:"ADCS", dm:0,  dw:0,  dc:0,  trl:9, her:"4 skewed reaction wheels + dual star trackers (Landsat/LRO baseline)", p:SRC.techport,
+  d:"Standard 4-wheel skewed reaction cluster with dual star trackers. Baseline 0.05° pointing absorbed into bus structure."},
+ {id:"adcs_prec",  n:"Fine-Pointing CMG & Optical Guide",g:"ADCS", dm:28, dw:35, dc:26, trl:9, her:"Control Moment Gyroscopes + FGS (Hubble/Roman class)", p:SRC.techport,
+  d:"High-torque CMG package and fine guidance optical sensors for sub-arcsecond payload pointing stability."},
+ {id:"adcs_micro", n:"Cold-Gas Micro-Thruster Slew Pack", g:"ADCS", dm:36, dw:12, dc:22, trl:8, her:"Pulsed cold-gas GN2 attitude package (OSIRIS-REx class)", p:SRC.techport,
+  d:"Independent cold-gas attitude thruster cluster for rapid high-rate slew maneuvers and safe-hold authority."}
+];
+
 /* ── Targets ──
    a,e,M0,peri : heliocentric Keplerian elements (J2000 epoch, coplanar approx)
    mu, rp      : capture body gravitational parameter & periapsis radius
@@ -213,7 +240,7 @@ const MOON_SITES=[
   slope:12,hazard:0.60,sun:0.75,earth:0.4,sci:1.30,travKm:14,hazardDv:0.12,
   fx:"+0.12 km/s divert reserve · solar ×0.90 · +$5.6M traverse reserve · science ×1.30"}
 ];
-function moonSite(S){ if(!S||S.levelId!=="l2"||!S.site) return null; return byId(MOON_SITES,S.site)||null; }
+function moonSite(S){ if(!S||(S.levelId!=="l2"&&S.levelId!=="sbx_moon")||!S.site) return null; return byId(MOON_SITES,S.site)||null; }
 
 /* ── Mars landing-site candidates (MOLA bake v1, same contract as §MOON_SITES) ──
    Coordinates: real landing record (Jezero JPL Mars 2020 press kit; Gale
@@ -288,7 +315,7 @@ const ROVER_PAY=[
  {id:"ry3",n:"Drill + sample cache (MSL class)",m:110,draw:120,sci:1.70,c:210,
   d:"Subsurface access and caching. The heavy science option.",her:"MSL/ExoMars class",p:SRC.techport}
 ];
-function roverKit(S){ if(!S||(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx")||!S.rover) return null;
+function roverKit(S){ if(!S||(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx"&&S.levelId!=="sbx_moon")||!S.rover) return null;
   const r=S.rover, rm=byId(ROVER_MOB,r.mob), rp=byId(ROVER_PWR,r.pwr),
         rc=byId(ROVER_COM,r.com), ry=byId(ROVER_PAY,r.pay);
   return (rm&&rp&&rc&&ry)?{rm,rp,rc,ry}:null; }
@@ -373,17 +400,39 @@ const LEVELS = [
   depart:[2030.0,2031.5], tofRange:[700,2400],
   par:{mass:6000,power:2700,cost:4200}},
 
- {id:"sbx", num:6, name:"Free Design", sub:"Sandbox — every part, every target",
+ {id:"sbx", num:6, name:"Free Design (Mars)", sub:"Sandbox — Mars transfer, unconstrained",
   real:"No template. Grade rewards science returned under the cost cap with healthy margins.",
   brief:"The whole catalogue, the full launch fleet, and a Mars transfer window. Build whatever you can defend. Grade rewards science returned under the cost cap with healthy margins, so an elegant small mission can beat an expensive one.",
   newMech:"No constraints but physics and money.",
-  body:"mars", mode:"pork", capM:3000, years:5, dataScale:9, storeMb:160000,
+  body:"mars", mode:"pork", capM:3000, uncapped:true, years:5, dataScale:9, storeMb:160000,
   objs:["o_mmap","o_ice","o_geo","o_relay","o_atm","o_int","o_org","o_rad","o_dust","o_fld"], req:1,
   parts:INSTR.map(i=>i.id),
   power:POWER.map(p=>p.id), comms:COMMS.map(c=>c.id), prop:["mono","bi","dual","sep"],
   lvs:LV.map(v=>v.id), dsnHrs:6, dose:2.0,
   depart:[2028.7,2029.4], tofRange:[150,420],
-  par:{mass:3000,power:1400,cost:2600}}
+  par:{mass:3000,power:1400,cost:2600}},
+
+ {id:"sbx_moon", num:7, name:"Free Design (Moon)", sub:"Sandbox — Lunar orbit & surface delivery, unconstrained",
+  real:"No template. Uncapped lunar mission design.",
+  brief:"The whole catalogue, full launch fleet, and direct lunar transfer with optional surface delivery. Build an unconstrained orbiter or lander with no budget cap.",
+  newMech:"Uncapped lunar mission design.",
+  body:"moon", mode:"fixedC3", c3:-1.9, tof:5, capM:2000, uncapped:true, years:3, linkAu:0.02, dataScale:1, storeMb:160000,
+  objs:["o_mmap","o_ice","o_int","o_rad","o_geo","o_dust","o_fld"], req:1,
+  parts:INSTR.map(i=>i.id),
+  power:POWER.map(p=>p.id), comms:COMMS.map(c=>c.id), prop:["mono","bi","dual","sep"],
+  lvs:LV.map(v=>v.id), dsnHrs:8, dose:0.5,
+  par:{mass:2500,power:800,cost:800}},
+
+ {id:"sbx_earth", num:8, name:"Free Design (Earth)", sub:"Sandbox — Low Earth orbit observatory, unconstrained",
+  real:"No template. Uncapped Earth orbital observatory design.",
+  brief:"The whole catalogue and full launch fleet in low Earth orbit. Build an unconstrained space telescope, Earth observer, or technology testbed with no budget cap.",
+  newMech:"Uncapped Earth orbit design.",
+  body:"earth", mode:"leo", altKm:690, linkAu:0.02, capM:1500, uncapped:true, years:3, dataScale:1, storeMb:160000,
+  objs:["o_ocean","o_land","o_aer","o_atm","o_rad","o_wx","o_dust"], req:1,
+  parts:INSTR.map(i=>i.id),
+  power:POWER.map(p=>p.id), comms:COMMS.map(c=>c.id), prop:["none","mono","bi","dual","sep"],
+  lvs:LV.map(v=>v.id), dsnHrs:14, dose:0.3,
+  par:{mass:2200,power:600,cost:500}}
 ];
 
 /* which instrument tag satisfies which capability */
@@ -392,6 +441,8 @@ const RELAY_PART = {id:"relay",n:"UHF Relay Payload",g:"Comms payload",m:15,w:35
 INSTR.push(RELAY_PART);
 LEVELS.find(l=>l.id==="l3").parts.push("relay");
 LEVELS.find(l=>l.id==="sbx").parts.push("relay");
+LEVELS.find(l=>l.id==="sbx_moon").parts.push("relay");
+LEVELS.find(l=>l.id==="sbx_earth").parts.push("relay");
 
 /* cached DSN snapshot — the live feed refreshes every ~5 s */
 const DSN_SNAP = [
@@ -583,7 +634,9 @@ function derive(S){
   const iData=instr.reduce((s,x)=>s+x.d,0);          // Mbit/s if all on
   const iCost=instr.reduce((s,x)=>s+x.c,0);
 
-  const payloadMass0 = iMass + (pw?pw.m:0) + (cm?cm.m:0) + (pr?pr.m:0) + sh.m;
+  const cdh = byId(CDH, S.cdh) || CDH[0];
+  const adcs = byId(ADCS, S.adcs) || ADCS[0];
+  const payloadMass0 = iMass + (pw?pw.m:0) + (cm?cm.m:0) + (pr?pr.m:0) + sh.m + cdh.dm + adcs.dm;
   /* Phase-2 rover kit: mass/draw/cost flow through the standard books below.
      Null/invalid rover (old saves, other missions) = zero effect. */
   const rv = roverKit(S);
@@ -630,8 +683,8 @@ function derive(S){
   }
   const busLoad = 95 + 0.06*dryMass;
   const sepLoad = (pr&&pr.id==="sep")?pr.w*0.30:0;    // electric propulsion must be fed by the array
-  const loadPeak = busLoad + iPower + (cm?cm.w:0) + sepLoad + rvDraw;
-  const loadAvg  = busLoad + iPower*0.55 + (cm?cm.w:0)*0.30 + rvDraw*0.6;
+  const loadPeak = busLoad + iPower + (cm?cm.w:0) + sepLoad + rvDraw + cdh.dw + adcs.dw;
+  const loadAvg  = busLoad + iPower*0.55 + (cm?cm.w:0)*0.30 + rvDraw*0.6 + cdh.dw*0.8 + adcs.dw*0.7;
   /* Phase-1 rover-forward site effects (balanced abstractions, cf. MOON_SITES):
      solar illumination duty derates array output (RTGs unaffected); the prime
      target's distance accrues a surface-traverse ops reserve for later phases.
@@ -665,7 +718,7 @@ function derive(S){
   const genMbPerDay  = iData*DATA_DUTY*DAY;           // Mbit per day at observing duty cycle
 
   // cost
-  const partsCost = iCost + (pw?pw.c:0) + (cm?cm.c:0) + (pr?pr.c:0) + sh.c + rvCost;
+  const partsCost = iCost + (pw?pw.c:0) + (cm?cm.c:0) + (pr?pr.c:0) + sh.c + rvCost + cdh.dc + adcs.dc;
   const busCost = 60 + 0.30*dryMass;
   const lowTrl = instr.filter(x=>x.trl<8).length;
   const months = 34 + 1.6*instr.length + (pw?pw.sch:0) + lowTrl*4 + (rv?3:0);
@@ -700,7 +753,7 @@ function derive(S){
     sched: 72-months
   };
 
-  return {L,b,instr,pw,cm,pr,sh,iMass,iPower,iData,iCost,payloadMass,busDry,dryMass,
+  return {L,b,instr,pw,cm,pr,sh,cdh,adcs,iMass,iPower,iData,iCost,payloadMass,busDry,dryMass,
           dv,dvTotal,propMass,wetMass,genBOL,genEOL,busLoad,loadPeak,loadAvg,
           rate,passH,downMbPerDay,genMbPerDay,partsCost,busCost,months,integCost,
           lvCost,opsCost,cost,cap,capability,c3,margins:m,years,auDist,linkAu,dsnClass,
@@ -756,7 +809,8 @@ function capText(L, mode){
    ══════════════════════════════════════════════════════════════ */
 const S = {
   screen:"title", mode:"cadet", levelId:null, seed:DEFAULT_SEED,
-  instruments:[], power:null, comms:null, prop:null, shield:"sh0", objectives:[],
+  instruments:[], power:null, comms:null, prop:null, shield:"sh0", cdh:"cdh_std", adcs:"adcs_std",
+  missionName:"", targetSci:100, objectives:[],
   launch:null, ops:null, result:null, sound:false, sel:null, bstep:"payload", site:null, rover:null, landing:null,
   progress:{}, aerobrake:false, dsn:"standard",
   /* Phase 1 lifecycle integration: authoritative once-only phase ledger. */
@@ -1325,6 +1379,51 @@ function scrSelect(){
 }
 
 /* ── BRIEFING ── */
+
+function orbitExplainerHtml(L){
+  if(L.mode==="leo"){
+    return `<div class="orbit-card" style="font-size:12px;line-height:1.6">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--phosphor);font-weight:600;margin-bottom:4px">SUN-SYNCHRONOUS CIRCULAR ORBIT (SSO)</div>
+      <p style="color:var(--bone);margin-bottom:6px">Altitude: <b>690 km</b> · Period: <b>98.5 min</b> · Inclination: <b>98.2°</b> · 14.6 revs/day</p>
+      <p class="hint" style="font-size:11.5px">Nodal precession (~0.9856°/day) matches Earth's mean orbital motion around the Sun, keeping a constant local solar time and lighting geometry for ocean color and land imaging. Ground station contacts occur 14 times daily.</p>
+    </div>`;
+  }
+  const spec = arrivalSpec();
+  if(spec && spec.kind==="rendezvous"){
+    const ch = arrivalChoices("rendezvous");
+    return `<div class="orbit-card" style="font-size:12px;line-height:1.6">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--phosphor);font-weight:600;margin-bottom:4px">ASTEROID PROXIMITY &amp; RENDEZVOUS STRATEGY</div>
+      <p style="color:var(--bone);margin-bottom:6px">Arrival burn matches the target asteroid's heliocentric velocity exactly (full V-infinity cancelled). Proximity operations trade cruise duration against survey detail.</p>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">
+        ${ch.map(c=>`<div style="background:rgba(255,255,255,0.03);padding:5px 8px;border-radius:3px">
+          <b style="color:var(--bone)">${esc(c.t)}:</b> <span class="hint" style="font-size:11px">${esc(c.d)}</span>
+        </div>`).join("")}
+      </div>
+    </div>`;
+  }
+  if(L.body==="jupiter"){
+    const ch = proxChoices("tour");
+    return `<div class="orbit-card" style="font-size:12px;line-height:1.6">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--phosphor);font-weight:600;margin-bottom:4px">JOVIAN TOUR &amp; EUROPA FLYBY TRAJECTORY</div>
+      <p style="color:var(--bone);margin-bottom:6px">Jupiter orbit insertion followed by 50 resonant flybys of Europa. Tight periapsis yields rich radar/spectral data but multiplies radiation dose rate.</p>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">
+        ${ch.map(c=>`<div style="background:rgba(255,255,255,0.03);padding:5px 8px;border-radius:3px">
+          <b style="color:var(--bone)">${esc(c.t)}:</b> <span class="hint" style="font-size:11px">${esc(c.d)}</span>
+        </div>`).join("")}
+      </div>
+    </div>`;
+  }
+  const ch = arrivalChoices("capture");
+  return `<div class="orbit-card" style="font-size:12px;line-height:1.6">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--phosphor);font-weight:600;margin-bottom:4px">${L.body==="moon"?"LUNAR POLAR ORBIT CAPTURE":"PLANETARY CAPTURE ORBIT"}</div>
+    <p style="color:var(--bone);margin-bottom:6px">${L.body==="moon"?"Translunar injection puts the craft on a polar encounter. Capture burn establishes circular mapping orbit before surface descent.":"Arrival burn sets the science orbit for the entire mission lifetime. Lower orbits increase surface resolution but require higher insertion Δv."}</p>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">
+      ${ch.map(c=>`<div style="background:rgba(255,255,255,0.03);padding:5px 8px;border-radius:3px">
+        <b style="color:var(--bone)">${esc(c.t)}:</b> <span class="hint" style="font-size:11px">${esc(c.d)}</span>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
 function scrBrief(){
   const L=byId(LEVELS,S.levelId);
   const sel=S.objectives;
@@ -1373,6 +1472,40 @@ function scrBrief(){
         <dt class="hint">Radiation environment ${infoTag(SRC.nssdc,"Radiation dose")}</dt><dd class="num">${L.dose} krad/yr</dd>
       </dl>
     </div>
+  </div>
+  <div class="panel glass mt"><span class="bracket tl"></span><span class="bracket br"></span>
+    <h3>ORBIT &amp; ARRIVAL STRATEGY <span class="code">ORB-01</span></h3>
+    <div class="pad">
+      ${orbitExplainerHtml(L)}
+    </div>
+  </div>
+  <div class="panel glass mt"><span class="bracket tl"></span><span class="bracket br"></span>
+    <h3>MISSION IDENTITY &amp; TARGETS <span class="code">ID-01</span></h3>
+    <div class="pad" style="display:flex;flex-direction:column;gap:10px">
+      <div>
+        <label style="font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.12em;display:block;margin-bottom:4px">CUSTOM MISSION NAME</label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="inMissionName" maxlength="32" placeholder="${esc(L.name)}" value="${esc(S.missionName||'')}"
+            style="background:rgba(15,23,42,0.8);border:1px solid var(--hairline);color:var(--bone);font-family:var(--sans);font-size:13px;padding:5px 8px;border-radius:4px;flex:1"
+            oninput="const h=document.getElementById('briefMissionH1');if(h)h.textContent=this.value.trim()||'${esc(L.name)}';"
+            aria-label="Custom mission name">
+          <button class="btn ghost" data-act="setname" style="padding:4px 10px;font-size:10.5px">SET</button>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <label style="font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.12em">SCIENCE RETURN TARGET</label>
+          <span style="font-family:var(--mono);font-size:11.5px;color:var(--phosphor);font-weight:600" id="targetSciVal">${S.targetSci||100}%</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="range" id="inTargetSci" min="40" max="150" step="5" value="${S.targetSci||100}" style="flex:1"
+            oninput="document.getElementById('targetSciVal').textContent=this.value+'%';"
+            aria-label="Science return target percentage">
+          <button class="btn ghost" data-act="settarget" style="padding:4px 10px;font-size:10.5px">SET</button>
+        </div>
+        <p class="hint" style="font-size:11px;margin-top:4px;line-height:1.4">Target science threshold is evaluated in the final mission report against total returned data.</p>
+      </div>
+    </div>
   </div>`;
 
   const objsPanel = `<div class="panel glass"><span class="bracket tl"></span><span class="bracket br"></span>
@@ -1402,7 +1535,7 @@ function scrBrief(){
   ${challengeBanner()}
   <div class="briefdossier">
     <span class="kicker">MISSION ${L.num} &#183; DESTINATION ${esc(BODY[L.body].n.toUpperCase())}</span>
-    <h1>${L.name}</h1>
+    <h1 id="briefMissionH1">${esc(S.missionName || L.name)}</h1>
     <span class="bsub">${esc(L.sub)}</span>
     <div class="bstats"><span>${auStr}</span><span>${ltStr} ONE-WAY LIGHT</span><span>${L.years} YR</span><span>${capText(L).toUpperCase()} ${L.uncapped?"":"CAP"}</span></div>
   </div>
@@ -1523,11 +1656,13 @@ function scrBuild(){
         ${list.map(x=>{
           const on=S[key]===x.id;
           const detail = key==="shield"
-            ? `${x.f<1?"dose \u00D7 "+x.f.toFixed(3):"full environment"} &#183; ${x.m} kg &#183; $${x.c}M`
+            ? `${x.f<1?"dose \u00D7 "+x.f.toFixed(3):"full environment"} &#183; ${x.m} kg &#183; ${x.c}M`
             : key==="power"
-            ? `${x.solar?fmt(solarPower(x.bol,D.auDist,0,x.deg))+" W at target":x.bol+" W BOL"} &#183; ${x.m} kg &#183; $${x.c}M${x.sch?" &#183; +"+x.sch+" mo":""}`
-            : key==="comms" ? `${x.gain} dBi &#183; ${x.w} W &#183; ${x.m} kg &#183; $${x.c}M`
-            : `${x.isp?"Isp "+x.isp+" s":"no propulsion"} &#183; ${x.m} kg &#183; $${x.c}M`;
+            ? `${x.solar?fmt(solarPower(x.bol,D.auDist,0,x.deg))+" W at target":x.bol+" W BOL"} &#183; ${x.m} kg &#183; ${x.c}M${x.sch?" &#183; +"+x.sch+" mo":""}`
+            : key==="comms" ? `${x.gain} dBi &#183; ${x.w} W &#183; ${x.m} kg &#183; ${x.c}M`
+            : key==="cdh" ? `${x.dm>0?"+"+x.dm+" kg":"std bus mass"} &#183; ${x.dw>0?"+"+x.dw+" W":"std bus load"} &#183; ${x.dc>0?"+$"+x.dc+"M":"baseline"}`
+            : key==="adcs" ? `${x.dm>0?"+"+x.dm+" kg":"std bus mass"} &#183; ${x.dw>0?"+"+x.dw+" W":"std bus load"} &#183; ${x.dc>0?"+$"+x.dc+"M":"baseline"}`
+            : `${x.isp?"Isp "+x.isp+" s":"no propulsion"} &#183; ${x.m} kg &#183; ${x.c}M`;
           return `<button class="part ${on?'on':''}" data-act="${key}" data-id="${x.id}" style="${on?'border-color:var(--phosphor);background:rgba(101,242,165,0.08);':''}">
             <span class="pn">
               <span>${esc(x.n)}</span>
@@ -1607,6 +1742,7 @@ function scrBuild(){
           ${pick("POWER SOURCE",tierList(L.power.map(id=>byId(POWER,id)),S.power),"power","PWR-02")}
           ${pick("PROPULSION",L.prop.map(id=>byId(PROP,id)),"prop","PRP-03")}
           ${L.dose>=2?pick("RADIATION SHIELDING",SHIELD,"shield","RAD-05"):""}
+          ${pick("ONBOARD COMPUTER (C&DH)",CDH,"cdh","CDH-06")}
         </div>
         ${D.dv.length?`
         <div class="panel mt"><h3>DELTA-V BUDGET &amp; MARGIN ${infoTag(SRC.nssdc,"Delta-v line items")} <span class="code">GNC-07</span></h3>
@@ -1649,6 +1785,7 @@ function scrBuild(){
       <div class="bay-col">
         <div class="accordion-group">
           ${pick("COMMUNICATIONS",tierList(L.comms.map(id=>byId(COMMS,id)),S.comms),"comms","TLM-11",commsBottleneck?`${D.cm?D.cm.n:""} (BOTTLENECK: ${(retFrac*100).toFixed(0)}% RETURN ⚠)`:null)}
+          ${pick("ATTITUDE CONTROL (ADCS)",ADCS,"adcs","ADC-08")}
           <div class="accordion-item open" id="acc-dsn">
             <div class="accordion-header" data-act="toggle-acc" data-target="acc-dsn">
               <div class="accordion-title-wrap">
@@ -1686,7 +1823,7 @@ function scrBuild(){
     ["Within cost cap",D.cost<=D.cap,`$${fmt(D.cost)}M vs ${capText(D.L)}`,"systems"],
     ["Launch readiness within 72 months",D.months<=72,`${fmt(D.months)} months`,"systems"]
   ];
-  if((S.levelId==="l2"||S.levelId==="l3"||S.levelId==="sbx")&&S.rover&&landSite(S)){
+  if((S.levelId==="l2"||S.levelId==="l3"||S.levelId==="sbx"||S.levelId==="sbx_moon")&&S.rover&&landSite(S)){
     ready.push(["Rover clears site slopes",D.rvSlopeOk,`chassis ${D.rv.rm.slope}° vs ground ${landSite(S).slope}°`,"systems"]);
     ready.push(["Rover night + link compatible",D.rvNightOk&&D.rvComOk,
       `${D.rvNightOk?"heat OK":"no night heat"} · ${D.rvComOk?"link OK":"no link"}`,"systems"]);
@@ -2431,7 +2568,7 @@ function resolveProx(i){
    profile is committed when the orbiter is actually over the site. Outcome is
    computed deterministically here; the overlay only reveals it. */
 function landSpec(){
-  if(!S||(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx")) return null;
+  if(!S||(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx"&&S.levelId!=="sbx_moon")) return null;
   const st=landSite(S), rv=roverKit(S);
   if(!st||!rv) return null;
   return {site:st,rv};
@@ -4484,9 +4621,9 @@ function scrReport(){
         <span style="font-family:var(--disp);font-weight:700;letter-spacing:.2em;font-size:12px">MARGIN</span>
       </div>
       <div style="padding:14px 16px;border-bottom:1px solid var(--hairline)">
-        <h2>${esc(L.name)}</h2><p class="hint">${esc(L.sub)} &#183; ${esc(reason)}</p>
+        <h2>${esc(S.missionName || L.name)}</h2><p class="hint">${esc(L.sub)} &#183; ${esc(reason)}</p>
       </div>
-      <div class="rrow"><span class="k">SCIENCE RETURN</span><span class="v" style="color:${gcol}">${(R.ret*100).toFixed(0)}%</span></div>
+      <div class="rrow"><span class="k">SCIENCE RETURN</span><span class="v" style="color:${gcol}">${(R.ret*100).toFixed(0)}% <span style="font-size:11px;color:${(R.ret*100)>=(S.targetSci||100)?'var(--phosphor)':'var(--amber)'}">/ TARGET ${S.targetSci||100}% (${(R.ret*100)>=(S.targetSci||100)?'MET ✓':'BELOW'})</span></span></div>
       <div class="rrow"><span class="k">TOTAL COST</span><span class="v">$${fmt(R.cost)}M <span style="color:var(--dim);font-size:11px">/ ${capText(L)}${L.uncapped?"":" cap"}</span></span></div>
       <div class="rrow"><span class="k">MISSION DURATION</span><span class="v">${dayLabel(R.days)} &nbsp;<span style="color:var(--dim);font-size:11px">${(R.days/365.25).toFixed(1)} yr</span></span></div>
       ${S.assist&&L.assist?`<div class="rrow"><span class="k">TRAJECTORY</span><span class="v" style="font-size:12px">${esc(L.assist.label)}</span></div>`:""}
@@ -4612,7 +4749,7 @@ function liRow(t){ return `<p style="margin-bottom:8px">• ${t}</p>`; }
 function decisionLines(D,R){
   const O=S.ops, out=[];
   out.push(`Designed for ${S.objectives.length} objective(s): ${S.objectives.map(o=>esc(OBJ[o].t)).join("; ")||"—"}.`);
-  out.push(`Built ${D.instr.length} instruments on ${esc(D.pw?D.pw.n:"—")} / ${esc(D.cm?D.cm.n:"—")} / ${esc(D.pr&&D.pr.isp?D.pr.n:"no propulsion")}.`);
+  out.push(`Built ${D.instr.length} instruments on ${esc(D.pw?D.pw.n:"—")} / ${esc(D.cm?D.cm.n:"—")} / ${esc(D.pr&&D.pr.isp?D.pr.n:"no propulsion")} with ${esc(D.cdh?D.cdh.n:"standard C&DH")} and ${esc(D.adcs?D.adcs.n:"standard ADCS")}.`);
   if(S.launch&&S.launch.lv){ const lv=byId(LV,S.launch.lv); out.push(`Launched on ${esc(lv?lv.n:S.launch.lv)}${S.launch.set?` at C3 ${(S.launch.c3||0).toFixed(1)}, ${(S.launch.tof||0).toFixed(0)}-day cruise`:""}.`); }
   const LO=(S.launch&&S.launch.outcome);
   if(LO&&LO.type!=="nominal") out.push(`Launch outcome forced a response: ${esc(launchOutcomeLabel())}.`);
@@ -4732,8 +4869,11 @@ function verdict(D,R,O){
    SHARE / SAVE
    ══════════════════════════════════════════════════════════════ */
 function shareState(){
-  return {l:S.levelId,o:S.objectives,i:S.instruments,p:S.power,c:S.comms,r:S.prop,s:S.shield,a:S.assist,q:S.dsn,t:S.site||null,v:S.rover||null,
-          m:S.mode,sd:S.seed,w:S.launch?{v:S.launch.lv,i:S.launch.i,j:S.launch.j}:null};
+  const d = {l:S.levelId,o:S.objectives,i:S.instruments,p:S.power,c:S.comms,r:S.prop,s:S.shield,a:S.assist,q:S.dsn,t:S.site||null,v:S.rover||null,
+             cdh:S.cdh||"cdh_std",adcs:S.adcs||"adcs_std",m:S.mode,sd:S.seed,w:S.launch?{v:S.launch.lv,i:S.launch.i,j:S.launch.j}:null};
+  if(S.missionName && S.missionName.trim()) d.nm = S.missionName.trim().slice(0, 32);
+  if(S.targetSci != null && S.targetSci !== 100) d.tg = Math.round(S.targetSci);
+  return d;
 }
 function shareUrl(){
   try{
@@ -4769,9 +4909,11 @@ function defaultBuild(L){
     power:L.power[Math.min(1,L.power.length-1)],
     comms:L.comms[Math.min(1,L.comms.length-1)],
     prop:L.prop[0], shield:"sh0", dsn:"standard", site:null, assist:false,
+    cdh:"cdh_std", adcs:"adcs_std",
+    missionName:"", targetSci:100,
     /* Landing missions preselect the baseline rover kit; the player upgrades
        from there. Every other mission carries no rover. */
-    rover:(L.id==="l2"||L.id==="l3"||L.id==="sbx")?{mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}:null
+    rover:(L.id==="l2"||L.id==="l3"||L.id==="sbx"||L.id==="sbx_moon")?{mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}:null
   };
 }
 /* Catalogue membership test used by every loader (A-13). byId() is array-only,
@@ -4793,6 +4935,10 @@ function applyShareObject(d){
   S.comms =(okId(COMMS,d.c)&&L.comms.includes(d.c))?d.c:def.comms;
   S.prop  =(okId(PROP,d.r)&&L.prop.includes(d.r))?d.r:def.prop;
   S.shield=okId(SHIELD,d.s)?d.s  :def.shield;
+  S.cdh   =okId(CDH,d.cdh)  ?d.cdh:def.cdh;
+  S.adcs  =okId(ADCS,d.adcs)?d.adcs:def.adcs;
+  S.missionName = (d.nm && typeof d.nm === "string") ? d.nm.trim().slice(0, 32) : "";
+  S.targetSci   = (d.tg != null && isFinite(d.tg)) ? Math.max(10, Math.min(200, Math.round(Number(d.tg)))) : 100;
   S.dsn   =okId(DSN,d.q)    ?d.q  :def.dsn;
   S.assist=!!d.a;
   S.mode=(d.m==="fd")?"fd":"cadet";
@@ -4810,7 +4956,7 @@ function applyShareObject(d){
     S.rover=def.rover;
   }else{
     const v=d.v, q=v?{mob:v.mob,pwr:v.pwr,com:v.com,pay:v.pay}:null;
-    S.rover=(q&&["l2","l3","sbx"].includes(L.id)
+    S.rover=(q&&["l2","l3","sbx","sbx_moon"].includes(L.id)
              &&okId(ROVER_MOB,q.mob)&&okId(ROVER_PWR,q.pwr)
              &&okId(ROVER_COM,q.com)&&okId(ROVER_PAY,q.pay))?q:null;
   }
@@ -4944,6 +5090,8 @@ function finishRun(){
     rec={ v:RULES_V, id:"r"+ts.toString(36)+"-"+(++RUN_SEQ), ts,
       level:L.id, mode:S.mode, seed:(S.seed|0),
       sandbox:isSandbox(L),
+      name:S.missionName||L.name,
+      targetSci:S.targetSci||100,
       cap:isFinite(D.cap)?D.cap:0,
       launch:S.launch?{tDep:S.launch.tDep,c3:S.launch.c3,vinf:S.launch.vinf,tof:S.launch.tof}:null,
       spec:shareState(),
@@ -5001,7 +5149,7 @@ function specView(rec){
     objectives:(s.o||[]).map(id=>(OBJ[id]?OBJ[id].t:id)).join(", ")||"—",
     instruments:(s.i||[]).map(id=>nm(INSTR,id)).join(", ")||"none",
     power:nm(POWER,s.p), comms:nm(COMMS,s.c), prop:nm(PROP,s.r),
-    shield:nm(SHIELD,s.s||"sh0"), dsn:nm(DSN,s.q||"standard"),
+    shield:nm(SHIELD,s.s||"sh0"), cdh:nm(CDH,s.cdh||"cdh_std"), adcs:nm(ADCS,s.adcs||"adcs_std"), dsn:nm(DSN,s.q||"standard"),
     site:site?site.n:"—",
     rover:r?[nm(ROVER_MOB,r.mob),nm(ROVER_PWR,r.pwr),nm(ROVER_COM,r.com),nm(ROVER_PAY,r.pay)].join(" · "):"—",
     trajectory:s.a?"gravity assist":"direct",
@@ -5011,6 +5159,7 @@ function specView(rec){
 const CMP_ROWS=[
   ["objectives","OBJECTIVES"],["instruments","INSTRUMENTS"],["power","POWER SOURCE"],
   ["comms","COMMUNICATIONS"],["prop","PROPULSION"],["shield","SHIELDING"],
+  ["cdh","ONBOARD COMPUTER (C&DH)"],["adcs","ATTITUDE CONTROL (ADCS)"],
   ["dsn","DSN ALLOCATION"],["site","LANDING SITE"],["rover","ROVER KIT"],
   ["trajectory","TRAJECTORY"],["launch","LAUNCH DATE"]
 ];
@@ -5138,7 +5287,8 @@ const TEAM_GATE={
   obj:["science"], instr:["science"],
   site:["planner"], dsn:["planner"], pmode:["planner"], assist:["planner"], lv:["planner"],
   power:["engineer"], comms:["engineer"], prop:["engineer"], shield:["engineer"],
-  rover:["engineer"], sord:["engineer"], spce:["engineer"],
+  cdh:["engineer"], adcs:["engineer"], rover:["engineer"], sord:["engineer"], spce:["engineer"],
+  setname:["planner"], settarget:["science"],
   arrch:["science"],
   aeroch:["planner"], landch:["planner"],
   proxch:["director"], evch:["director"], extrev:["director"], fly:["director"]
@@ -5368,6 +5518,7 @@ function startLevel(id){
   S.launch=null; S.ops=null; S.result=null; S.pmode="c3"; S.bstep="payload";
   S.commit=null; S.phases={levelId:id,plan:phasePlanFor(id),done:{build:true}};
   S.power=def.power; S.comms=def.comms; S.prop=def.prop; S.shield=def.shield;
+  S.cdh=def.cdh; S.adcs=def.adcs; S.missionName=def.missionName; S.targetSci=def.targetSci;
   S.rover=def.rover; S.site=def.site; S.dsn=def.dsn; S.assist=def.assist;
   S.aerobrake=false;
   go("brief");
@@ -5517,8 +5668,20 @@ document.addEventListener("click",e=>{
     case "dsn": S.dsn=id; Audio_.click(); refreshBuild(prev); break;
     case "prop":  S.prop=id;  Audio_.click(); refreshBuild(prev); break;
     case "shield":S.shield=id;Audio_.click(); refreshBuild(prev); break;
+    case "cdh": S.cdh=id; Audio_.click(); refreshBuild(prev); break;
+    case "adcs": S.adcs=id; Audio_.click(); refreshBuild(prev); break;
+    case "setname": {
+      const inp = document.getElementById("inMissionName");
+      if(inp) S.missionName = inp.value.trim().slice(0, 32);
+      Audio_.click(); render(); break;
+    }
+    case "settarget": {
+      const inp = document.getElementById("inTargetSci");
+      if(inp && isFinite(inp.value)) S.targetSci = Math.max(10, Math.min(200, Math.round(Number(inp.value))));
+      Audio_.click(); render(); break;
+    }
     case "rover": {
-      if(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx") break;
+      if(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx"&&S.levelId!=="sbx_moon") break;
       const k=t.dataset.k;
       if(!["mob","pwr","com","pay"].includes(k)) break;
       const cat=k==="mob"?ROVER_MOB:k==="pwr"?ROVER_PWR:k==="com"?ROVER_COM:ROVER_PAY;
@@ -6210,7 +6373,7 @@ function jumpToScene(s,m,lv){
 }
 function showDevJump(){
   const m=S._devM||"l1";
-  const missions=["l1","l2","l3","l4","l5","sbx"].map(id=>
+  const missions=["l1","l2","l3","l4","l5","sbx","sbx_moon","sbx_earth"].map(id=>
     `<button class="btn ${id===m?"primary":"ghost"}" data-act="devm" data-id="${id}" style="flex:1">${id.toUpperCase()}</button>`).join("");
   const dests=[["select","SELECT"],["brief","BRIEF"],["build","BUILD"],["launch","LAUNCH"],["ascent","ASCENT"],["ops","OPS"]].map(d=>
     `<button class="btn ghost" data-act="devgo" data-to="${d[0]}" style="flex:1">${d[1]}</button>`).join("");
@@ -6263,10 +6426,9 @@ function applyTeamShortcut(){
    (stop, fix it) or it was intended (re-emit and document the baseline diff). Never widen a tolerance to make it pass.
    ══════════════════════════════════════════════════════════════ */
 let GOLDEN_ACTIVE=false;
-const GOLDEN_V=2;
-/* Baseline v2 (2026-10-29 via ?golden=emit): deterministic snapshot baseline covering default builds, seeded event decks, and share links. */
+const GOLDEN_V=3;
+/* Baseline v3 (2026-10-29 via ?golden=emit): deterministic snapshot baseline covering default builds, seeded event decks, and share links. */
 const GOLDEN={derive:{
-
     "l1/cadet": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.514435,38.000000]",
     "l1/fd": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.441600,38.000000]",
     "l2/cadet": "wet=1066.555527 dry=684.600000 pay=234.000000 prop=381.955527 cost=642.380000 cap=3992.253889 peak=251.076000 genEOL=672.280000 gen=0.000000 down=1834.925943 mo=37.000000 m=[0.732844,0.626531,1.000000,0.301761,35.000000]",
@@ -6277,8 +6439,12 @@ const GOLDEN={derive:{
     "l4/fd": "wet=5283.116003 dry=561.100000 pay=169.000000 prop=4722.016003 cost=733.330000 cap=6464.898793 peak=178.666000 genEOL=1080.045218 gen=0.000000 down=31061.595524 mo=35.000000 m=[0.182800,0.834575,1.000000,0.511113,37.000000]",
     "l5/cadet": "wet=1489.884317 dry=559.200000 pay=168.000000 prop=930.684317 cost=1029.760000 cap=1955.410554 peak=228.552000 genEOL=90.642916 gen=0.000000 down=9343.163364 mo=43.000000 m=[0.238071,-1.521455,1.000000,0.801013,29.000000]",
     "l5/fd": "wet=1489.884317 dry=559.200000 pay=168.000000 prop=930.684317 cost=1029.760000 cap=1955.410554 peak=228.552000 genEOL=90.642916 gen=0.000000 down=9343.163364 mo=43.000000 m=[0.238071,-1.521455,1.000000,0.771164,29.000000]",
-    "sbx/cadet": "wet=1190.098444 dry=684.600000 pay=234.000000 prop=505.498444 cost=714.380000 cap=2865.986131 peak=251.076000 genEOL=273.867970 gen=0.000000 down=11.913041 mo=37.000000 m=[0.584751,0.083222,1.000000,0.792933,35.000000]",
+    "sbx/cadet": "wet=1190.098444 dry=684.600000 pay=234.000000 prop=505.498444 cost=714.380000 cap=2865.986131 peak=251.076000 genEOL=273.867970 gen=0.000000 down=11.913041 mo=37.000000 m=[0.584751,0.083222,1.000000,0.761873,35.000000]",
     "sbx/fd": "wet=1190.098444 dry=684.600000 pay=234.000000 prop=505.498444 cost=714.380000 cap=2865.986131 peak=251.076000 genEOL=273.867970 gen=0.000000 down=11.913041 mo=37.000000 m=[0.584751,0.083222,1.000000,0.761873,35.000000]",
+    "sbx_moon/cadet": "wet=1066.555527 dry=684.600000 pay=234.000000 prop=381.955527 cost=666.380000 cap=3992.253889 peak=251.076000 genEOL=658.834400 gen=0.000000 down=1834.925943 mo=37.000000 m=[0.732844,0.618909,1.000000,0.666810,35.000000]",
+    "sbx_moon/fd": "wet=1066.555527 dry=684.600000 pay=234.000000 prop=381.955527 cost=666.380000 cap=3992.253889 peak=251.076000 genEOL=658.834400 gen=0.000000 down=1834.925943 mo=37.000000 m=[0.732844,0.618909,1.000000,0.666810,35.000000]",
+    "sbx_earth/cadet": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.720800,38.000000]",
+    "sbx_earth/fd": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.720800,38.000000]",
   },events:{
     "l1/cadet": "total=1096 cruise=0 speed=4 ev=conj@183,dsn@327,rad@828,safe@841",
     "l1/fd": "total=1096 cruise=0 speed=4 ev=conj@183,dsn@327,inst@468,rad@828,safe@841,ext@899",
@@ -6292,6 +6458,10 @@ const GOLDEN={derive:{
     "l5/fd": "total=4383 cruise=993 speed=4 ev=thrust@995,conj@1097,mmod@2358,ext@3594,dsn@3599,safe@3736",
     "sbx/cadet": "total=1826 cruise=299 speed=4 ev=conj@415,rad@999,dsn@1267,ext@1497",
     "sbx/fd": "total=1826 cruise=299 speed=4 ev=thrust@301,conj@415,rad@999,dsn@1267,ext@1497,mmod@1551",
+    "sbx_moon/cadet": "total=1096 cruise=5 speed=4 ev=conj@121,rad@506,dsn@693,ext@899",
+    "sbx_moon/fd": "total=1096 cruise=5 speed=4 ev=thrust@7,conj@121,rad@506,dsn@693,mmod@892,ext@899",
+    "sbx_earth/cadet": "total=1096 cruise=0 speed=4 ev=conj@116,rad@503,dsn@692,ext@899",
+    "sbx_earth/fd": "total=1096 cruise=0 speed=4 ev=thrust@2,conj@116,rad@503,dsn@692,mmod@891,ext@899",
   },links:{
     "L1-cadet-leo": "l1 o_ocean+o_land ocean+vnir+ctx sa1 mga mono sh0 direct standard - - cadet launch=null wet=608.113303 dry=551.600000 pay=164.000000 prop=56.513303 cost=576.880000 cap=0.000000 peak=239.096000 genEOL=282.357600 gen=61171.200000 down=3211.120399 mo=38.800000 m=[0.679940,0.153216,-0.947506,0.331154,33.200000]",
     "L2-fd-moon-rover": "l2 o_mmap+o_ice hires+therm+alt+rad sa2 hga2 bi sh1 direct standard shackleton rm2.rp2.rc2.ry2 fd launch=f9:20:15:unset wet=2219.708999 dry=1389.500000 pay=605.000000 prop=830.208999 cost=1260.650000 cap=3992.253889 peak=540.370000 genEOL=605.052000 gen=66375.936000 down=1220386.194612 mo=43.400000 m=[0.443996,0.106903,0.945611,-0.575812,28.600000]",

@@ -2608,7 +2608,7 @@ function enterSurface(V) {
   try {
     const Ld = (typeof S !== 'undefined') ? S.landing : null;
     siteId = Ld ? Ld.site : null;
-    if (!siteId && typeof S !== 'undefined' && (S.levelId === 'l2' || S.levelId === 'l3' || S.levelId === 'sbx')) siteId = S.site;
+    if (!siteId && typeof S !== 'undefined' && (S.levelId === 'l2' || S.levelId === 'l3' || S.levelId === 'sbx' || S.levelId === 'sbx_moon')) siteId = S.site;
   } catch (e) {}
   if (!siteId) return false;
   if (!V.surf || V.surf.siteId !== siteId) {
