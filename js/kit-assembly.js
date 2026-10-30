@@ -163,8 +163,8 @@ export function normalizeHero(group) {
    preview compose only — never at boot, never headless (?no3d safe: view3d
    only calls this inside the live-renderer compose path). */
 export const ROVER_BY_LEVEL = {
-  l2: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
-  sbx_moon: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  l2: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Surface Exploration Rover' },
+  sbx_moon: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Surface Exploration Rover' },
   l3: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
   sbx: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
 };
@@ -182,10 +182,10 @@ export function roverConfigForLevel(levelId, isMars) {
   return ROVER_BY_LEVEL.l2;
 }
 
-export const ROVER_GLB_URL = 'models/nasa/rassor.glb';
-export const ROVER_TRUE_SPAN_M = 1.66;
-export const ROVER_RAW_MAX_UNITS = 1.66;
-export const ROVER_CAL_FACTOR = 1.0;
+export const ROVER_GLB_URL = 'models/nasa/perseverance.glb';
+export const ROVER_TRUE_SPAN_M = 3.0;
+export const ROVER_RAW_MAX_UNITS = 175.63;
+export const ROVER_CAL_FACTOR = 3.0 / 175.63;
 
 export function loadRoverGltf(levelId, isMars) {
   const cfg = roverConfigForLevel(levelId, isMars);

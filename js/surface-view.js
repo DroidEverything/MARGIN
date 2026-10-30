@@ -10,7 +10,7 @@
    ops-view <-> surface-view cycle is safe: neither module touches the other
    at load time. */
 import * as THREE from 'three';
-import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030d';
+import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030e';
 import { bodyWorld, UNITS_PER_KM, tex } from './orrery.js';
 import { SOLAR_CONSTANT_W_M2 } from './solar-system-accuracy.js';
 import { createBodyTextSprite, buildCraftMarker, loadLanderGltf } from './ops-view.js';
@@ -1296,7 +1296,7 @@ function buildSurface(siteId) {
       // without ANY repeating tile seams or grid lines across the 3 km terrain.
       // Moon diffuse albedo is driven by verified LOLA topography, slope shading, and Lommel-Seeliger
       // photometric scattering (mat.map remains 1x1 placeholder to avoid repeating photographic tile seams).
-      new THREE.TextureLoader().load('assets/textures/lunar_regolith_apollo11_normal.png', (t) => {
+      new THREE.TextureLoader().load('assets/textures/lroc_nac_tile.png', (t) => {
         try {
           if (!F.scene || !mat) return;
           detailCommon(t);
@@ -2165,32 +2165,6 @@ function surfPlaceRover(V) {
         dot.visible = true;
         F.scene.add(dot);
         F.marker = dot;
-        // Spawn persistent landed descent craft at touchdown site for visual continuity
-        try {
-          if (!F.lander && typeof loadLanderGltf === 'function' && !F.isMars) {
-            loadLanderGltf().then((lgltf) => {
-              try {
-                if (!V.surfActive || !V.surf || V.surf !== F || !lgltf) return;
-                const lsc = (lgltf.scene || lgltf).clone(true);
-                const lbox = new THREE.Box3().setFromObject(lsc);
-                const lwrap = new THREE.Group();
-                lwrap.name = 'surface_lander';
-                lsc.position.y = -lbox.min.y;
-                lwrap.add(lsc);
-                // Place lander at touchdown coordinates
-                const Ld = (typeof S !== 'undefined') ? S.landing : null;
-                const landKm = (Ld && isFinite(Ld.travKm)) ? Ld.travKm : 0;
-                const lx = landKm * 1000 * F.dscale;
-                const lz = 0;
-                const ly = surfHeightAt(F.patch, lx, lz);
-                lwrap.position.set(lx, ly, lz);
-                lwrap.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-                F.scene.add(lwrap);
-                F.lander = lwrap;
-              } catch (_) {}
-            }).catch(() => {});
-          }
-        } catch (_) {}
         // Wheel-track ribbon + dust pool (capped, scene-owned → auto-disposed).
         F.track = makeTrackRibbon(F.scene, F);
         F.dust = makeDustPool(F.scene);

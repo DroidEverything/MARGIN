@@ -167,7 +167,7 @@ export const BODY_TEX = {
   earthNight:      'assets/textures/earth_night_sss.jpg',
   earthClouds:     'assets/textures/earth_clouds_sss.png',
   earthRough:      'assets/textures/earth_roughness_sss.jpg',
-  moon:            'assets/textures/lroc_color_4k.jpg',
+  moon:            'assets/textures/moon_8k.jpg',
   mars:            'models/8K_textures/8k_mars.jpg',
   mercury:         'models/8K_textures/8k_mercury.jpg',
   venus:           'models/8K_textures/venus/8k_venus_surface.jpg',
@@ -695,105 +695,6 @@ export function createEarthMaterial(sunPosVec){
   return mat;
 }
 
-/* Moon: Multi-scale PBR material with Hermite sub-texel sharpening and
-   infinite-resolution procedural micro-cratering and regolith synthesis.
-   Eliminates bilinear magnification blur when zooming in close from orbit
-   or in the celestial viewer, preserving sharp crater edges and tactile
-   lunar ground detail at any zoom level without loading bloated textures. */
-export function createMoonMaterial(sunPosVec){
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.92,
-    metalness: 0.0,
-    map: tex('moon'),
-    side: THREE.DoubleSide
-  });
-  mat.userData.sunPos = { value: sunPosVec ? sunPosVec.clone() : new THREE.Vector3(0, 0, 0) };
-  const sunPosU = mat.userData.sunPos;
-
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.sunPos = sunPosU;
-    shader.vertexShader = 'varying vec3 vWNormal;\nvarying vec3 vWPos;\n' + shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      '#include <begin_vertex>\nvWNormal = normalize(mat3(modelMatrix) * normal);\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;'
-    );
-    shader.fragmentShader = ('uniform vec3 sunPos;\nvarying vec3 vWNormal;\nvarying vec3 vWPos;\n' + shader.fragmentShader)
-      .replace('#include <map_fragment>', `
-  #ifdef USE_MAP
-    // Hermite smoothstep texel-boundary reconstruction:
-    // Standard linear filtering interpolates linearly between discrete texels,
-    // producing a muddy, blurry appearance under close-up magnification.
-    // By remapping the sub-texel coordinates with a cubic Hermite curve, crater edges,
-    // ridge crests, and ejecta rays remain sharp and crisp without blocky aliasing.
-    vec2 texRes = vec2(4096.0, 2048.0);
-    vec2 uvIn = vMapUv * texRes - 0.5;
-    vec2 iuv = floor(uvIn);
-    vec2 fuv = fract(uvIn);
-    vec2 s = fuv * fuv * (3.0 - 2.0 * fuv);
-    vec2 sharpUv = (iuv + s + 0.5) / texRes;
-    vec4 sampledDiffuseColor = texture2D(map, sharpUv);
-
-    // Screen-space magnification detection via UV derivatives:
-    #if defined( GL_OES_standard_derivatives ) || __VERSION__ >= 300
-      vec2 duv = fwidth(vMapUv * texRes);
-      float maxTexelSpan = max(duv.x, duv.y);
-    #else
-      float maxTexelSpan = clamp(length(vViewPosition) * 0.15, 0.05, 2.0);
-    #endif
-    float zoomLevel = clamp(1.0 - maxTexelSpan * 0.85, 0.0, 1.0);
-    float closeUp = smoothstep(0.10, 0.90, zoomLevel);
-
-    // 1. Dynamic Unsharp Contrast Enhancement on macro features:
-    vec4 broadMap = texture2D(map, vMapUv, 2.0);
-    vec3 highPass = sampledDiffuseColor.rgb - broadMap.rgb;
-    sampledDiffuseColor.rgb = clamp(sampledDiffuseColor.rgb + highPass * (0.65 * closeUp), 0.0, 1.0);
-
-    // 2. Multi-scale procedural lunar regolith & impact micro-cratering (Infinite Resolution):
-    if (closeUp > 0.01) {
-      vec2 microUv1 = vMapUv * 720.0;
-      vec2 microUv2 = vMapUv * 2880.0;
-      vec2 cell = fract(microUv1) - 0.5;
-      float r = length(cell);
-      float craterRim = smoothstep(0.42, 0.30, r) * smoothstep(0.18, 0.30, r);
-      float craterHollow = smoothstep(0.32, 0.0, r) * 0.35;
-      float microCrater = craterRim - craterHollow;
-      float microGrain = fract(sin(dot(floor(microUv2), vec2(12.9898, 78.233))) * 43758.5453);
-
-      float microDetail = (microCrater * 0.28 + (microGrain - 0.5) * 0.16) * closeUp;
-      sampledDiffuseColor.rgb = clamp(sampledDiffuseColor.rgb * (1.0 + microDetail), 0.0, 1.0);
-    }
-
-    #ifdef DECODE_VIDEO_TEXTURE
-      sampledDiffuseColor = vec4( mix( pow( sampledDiffuseColor.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), sampledDiffuseColor.rgb * 0.0773993808, vec3( lessThanEqual( sampledDiffuseColor.rgb, vec3( 0.04045 ) ) ) ), sampledDiffuseColor.w );
-    #endif
-    diffuseColor *= sampledDiffuseColor;
-  #endif
-      `)
-      .replace('#include <normal_fragment_maps>', `
-  #include <normal_fragment_maps>
-  #ifdef USE_MAP
-    #if defined( GL_OES_standard_derivatives ) || __VERSION__ >= 300
-      vec2 duv_n = fwidth(vMapUv * vec2(4096.0, 2048.0));
-      float maxSpan_n = max(duv_n.x, duv_n.y);
-    #else
-      float maxSpan_n = clamp(length(vViewPosition) * 0.15, 0.05, 2.0);
-    #endif
-    float closeUp_n = smoothstep(0.10, 0.90, clamp(1.0 - maxSpan_n * 0.85, 0.0, 1.0));
-    if (closeUp_n > 0.02) {
-      vec2 mUv = vMapUv * 720.0;
-      vec2 nP = vec2(
-        cos(mUv.x * 6.28318) * sin(mUv.y * 6.28318),
-        sin(mUv.x * 6.28318) * cos(mUv.y * 6.28318)
-      );
-      normal = normalize(normal + vec3(nP * (0.15 * closeUp_n), 0.0));
-    }
-  #endif
-      `);
-  };
-  mat.customProgramCacheKey = () => 'marginMoonMultiScaleProcedural';
-  return mat;
-}
-
 export function sphereMesh(key,opts){
   opts=opts||{};
   const def=BODY_STYLE[key]||{tint:0xffffff,spin:0.1};
@@ -820,8 +721,6 @@ export function sphereMesh(key,opts){
     });
   } else if (key==='earth'&&opts.sunPos){
     mat = createEarthMaterial(opts.sunPos);
-  } else if (key==='moon'){
-    mat = createMoonMaterial(opts.sunPos);
   } else if(def.tex){
     mat = new THREE.MeshStandardMaterial({
       color: def.tint,
