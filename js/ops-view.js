@@ -13,7 +13,7 @@ import {
   loadRoverGltf, calibrateRover,
   bodyTierOf, wingTierOf, radioTierOf, wingScaleOf, radioScaleOf,
   engineSpecOf, groupOfInstr, mountEngineRow, mountGlyphRow
-} from './kit-assembly.js';
+} from './kit-assembly.js?v=20261030b';
 import { AU_KM, SOLAR_CONSTANT_W_M2 } from './solar-system-accuracy.js';
 import {
   DPR_CAP, WORLD_PER_AU, UNITS_PER_KM,

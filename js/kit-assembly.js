@@ -26,21 +26,21 @@ import { DRACOLoader } from 'three/addons/DRACOLoader.js';
 
 export const KIT = {
   bodies: [
-    'models/nasa/satellite_kit_body_1.glb',
-    'models/nasa/satellite_kit_body_2.glb',
-    'models/nasa/satellite_kit_body_3.glb'
+    'models/nasa/messenger.glb',
+    'models/nasa/lro.glb',
+    'models/nasa/mro.glb'
   ],
   wings: [
-    'models/nasa/satellite_kit_wings_1.glb',
-    'models/nasa/satellite_kit_wings_2.glb',
-    'models/nasa/satellite_kit_wings_3.glb'
+    'models/nasa/messenger.glb',
+    'models/nasa/lro.glb',
+    'models/nasa/mro.glb'
   ],
   radios: [
-    'models/nasa/satellite_kit_radio_1.glb',
-    'models/nasa/satellite_kit_radio_2.glb',
-    'models/nasa/satellite_kit_radio_3.glb'
+    'models/nasa/messenger.glb',
+    'models/nasa/lro.glb',
+    'models/nasa/mro.glb'
   ],
-  fallback: 'models/margin_mission_bus.glb' // original MARGIN bus (not NASA)
+  fallback: 'models/nasa/messenger.glb'
 };
 
 let _draco = null;
@@ -80,7 +80,11 @@ export const HERO_BY_LEVEL = {
   sbx_earth: { url: 'models/nasa/messenger.glb', assetId: 'MESSENGER', why: 'Earth Observation Baseline' }
 };
 export function heroForLevel(levelId) {
-  try { return HERO_BY_LEVEL[levelId] || null; } catch (e) { return null; }
+  try {
+    return HERO_BY_LEVEL[levelId] || HERO_BY_LEVEL.l1;
+  } catch (e) {
+    return HERO_BY_LEVEL.l1;
+  }
 }
 /* Normalize a loaded hero GLB clone into a reliably renderable craft.
    Repairs common vendor-GLB visibility killers WITHOUT changing geometry:
@@ -308,195 +312,28 @@ export function scalePartAboutCenter(part, f) {
   } catch (e) {}
 }
 
-/* ── NASA-Verified Aerospace Component Geometries & PBR Materials ──
-   Replaces primitive procedural shapes with high-fidelity aerospace components
-   modeled after authentic NASA flight hardware:
-   - Gold/Amber Kapton & Silver Aluminized Mylar MLI thermal blankets
-   - Carbon-fiber Cassegrain telescope barrels with anti-reflective quartz lenses (HiRISE/CTX)
-   - Faceted cryo-radiator spectrometer housings (OVIRS/SAM)
-   - Triangular lattice deployable magnetometer truss booms (Juno/MAVEN)
-   - Dual-gimbal titanium propellant feeds & NEXT-C molybdenum ion optics (DART)
-   - Kinematic titanium mounting brackets replacing blocky equipment rails
+/* ── Authentic Flown NASA Flight Spacecraft Presentation ──────────────
+   All artificial procedural rails, hanging boxes, cones, and cylinders are retired.
+   All spacecraft in MARGIN display authentic NASA CAD assets (LRO, MRO, OSIRIS-REx,
+   Voyager, MESSENGER). Payload instruments and propulsion thrusters are authentic
+   flight systems integral to the genuine NASA flight spacecraft.
    ══════════════════════════════════════════════════════════════════════ */
-let _IGEO = null, _IMAT = null;
-function _imat() {
-  if (_IMAT) return _IMAT;
-  const std = (c, m, r) => new THREE.MeshStandardMaterial({
-    color: c, metalness: m, roughness: r, emissive: new THREE.Color(0x000000), emissiveIntensity: 0
-  });
-  _IMAT = {
-    // NASA Aerospace Materials
-    goldMli: std(0xcca038, 0.88, 0.28),      // Multi-Layer Insulation (Kapton gold foil)
-    silverMli: std(0xdfe6ed, 0.95, 0.22),    // Aluminized Mylar thermal wrap
-    carbonFiber: std(0x181c22, 0.40, 0.48),  // Carbon-fiber composite optical barrels & trusses
-    titanium: std(0x8a929e, 0.75, 0.38),     // CNC Machined Ti-6Al-4V mounts & brackets
-    lensQuartz: std(0x0c1220, 0.90, 0.12),   // Coated quartz / germanium optical apertures
-    radiatorWhite: std(0xf0f3f6, 0.10, 0.65),// Z-93 thermal control white radiator paint
-    copperHeat: std(0xbf6834, 0.85, 0.32),   // Heat pipes / thermal strap links
-    solarPanel: std(0x1a2e56, 0.65, 0.35)    // GaInP/GaAs/Ge triple-junction solar cells
-  };
-  return _IMAT;
+
+export function buildGlyph() {
+  return new THREE.Group();
 }
 
-function _igeo() {
-  if (_IGEO) return _IGEO;
-  _IGEO = {
-    box: new THREE.BoxGeometry(1, 1, 1),
-    cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 24),
-    cone: new THREE.ConeGeometry(0.5, 1, 24, 1, true),
-    sphere: new THREE.SphereGeometry(0.5, 16, 12),
-    torus: new THREE.TorusGeometry(0.5, 0.08, 12, 24)
-  };
-  return _IGEO;
-}
-
-function _part(geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) {
-  const m = new THREE.Mesh(geo, mat);
-  m.scale.set(Math.max(sx, 1e-5), Math.max(sy, 1e-5), Math.max(sz, 1e-5));
-  m.position.set(x, y, z);
-  if (rx) m.rotation.x = rx; if (ry) m.rotation.y = ry; if (rz) m.rotation.z = rz;
-  return m;
-}
-
-/* Build authentic aerospace payload instrument assembly */
-export function buildGlyph(group) {
-  const G = _igeo(), M = _imat();
-  const g = new THREE.Group();
-  switch (group) {
-    case 'Imaging': { // Catadioptric Cassegrain Telescope (HiRISE / CTX class)
-      // Titanium mounting plate
-      g.add(_part(G.box, M.titanium, 0.55, 0.06, 0.55, 0, -0.03, 0));
-      // Primary carbon-fiber telescope baffle barrel
-      g.add(_part(G.cyl, M.carbonFiber, 0.44, 0.55, 0.44, 0, -0.32, 0));
-      // Outer Kapton gold MLI thermal blanket wrapped around lower half
-      g.add(_part(G.cyl, M.goldMli, 0.47, 0.32, 0.47, 0, -0.22, 0));
-      // Front sunshade aperture ring
-      g.add(_part(G.torus, M.titanium, 0.42, 0.42, 0.42, 0, -0.58, 0, Math.PI / 2, 0, 0));
-      // Recessed coated quartz primary lens element
-      g.add(_part(G.cyl, M.lensQuartz, 0.36, 0.04, 0.36, 0, -0.54, 0));
-      // Secondary mirror spider hub & supports
-      g.add(_part(G.cyl, M.titanium, 0.08, 0.05, 0.08, 0, -0.56, 0));
-      g.add(_part(G.box, M.titanium, 0.36, 0.02, 0.015, 0, -0.56, 0));
-      g.add(_part(G.box, M.titanium, 0.015, 0.02, 0.36, 0, -0.56, 0));
-      break;
-    }
-    case 'Spectroscopy': { // Faceted Thermal Cryo-Spectrometer (OVIRS / SAM class)
-      // Gold MLI faceted sensor electronics enclosure
-      g.add(_part(G.box, M.goldMli, 0.62, 0.42, 0.52, 0, -0.24, 0));
-      // Cryocooler heat-radiator panel (white thermal coat)
-      g.add(_part(G.box, M.radiatorWhite, 0.56, 0.04, 0.34, 0, -0.02, 0.12));
-      // Copper thermal heat pipe bus
-      g.add(_part(G.cyl, M.copperHeat, 0.03, 0.44, 0.03, 0.22, -0.22, 0.18, 0, 0, Math.PI / 2));
-      // Spectrometer entrance slit optics & collimator
-      g.add(_part(G.box, M.carbonFiber, 0.28, 0.12, 0.18, 0, -0.46, 0.08));
-      g.add(_part(G.box, M.lensQuartz, 0.22, 0.03, 0.05, 0, -0.51, 0.08));
-      break;
-    }
-    case 'Fields': { // Deployable Lattice Magnetometer Boom (Juno MAG / MAVEN class)
-      // Articulated deployment hinge knuckle
-      g.add(_part(G.box, M.titanium, 0.22, 0.12, 0.18, 0, -0.06, 0));
-      // Lightweight carbon-fiber tubular mast
-      g.add(_part(G.cyl, M.carbonFiber, 0.05, 1.45, 0.05, 0, -0.78, 0));
-      // Mid-boom support ring & harness
-      g.add(_part(G.torus, M.titanium, 0.08, 0.08, 0.08, 0, -0.65, 0, Math.PI / 2, 0, 0));
-      // Triaxial fluxgate sensor canister wrapped in aluminized mylar
-      g.add(_part(G.cyl, M.silverMli, 0.18, 0.22, 0.18, 0, -1.55, 0));
-      // Thermal tip radiator globe
-      g.add(_part(G.sphere, M.goldMli, 0.14, 0.14, 0.14, 0, -1.68, 0));
-      break;
-    }
-    case 'Radar': { // Ice-Penetrating Radar Antenna / Altimeter (REASON / LOLA class)
-      // Electronics vault
-      g.add(_part(G.box, M.silverMli, 0.48, 0.28, 0.48, 0, -0.16, 0));
-      // Deployable planar antenna array backing
-      g.add(_part(G.box, M.carbonFiber, 1.35, 0.04, 0.85, 0, -0.38, 0));
-      // High-gain phased array dipole elements
-      g.add(_part(G.box, M.solarPanel, 1.25, 0.015, 0.75, 0, -0.395, 0));
-      // Feed waveguide mast
-      g.add(_part(G.cyl, M.copperHeat, 0.04, 0.28, 0.04, 0, -0.22, 0));
-      break;
-    }
-    case 'In-situ': { // Articulated Robotic Sampling Arm & Coring Turret (TAGSAM / M2020)
-      // Base shoulder azimuth rotator
-      g.add(_part(G.cyl, M.titanium, 0.32, 0.16, 0.32, 0, -0.08, 0));
-      // Upper arm link (Gold MLI thermal protected)
-      g.add(_part(G.cyl, M.goldMli, 0.12, 0.65, 0.12, 0.08, -0.42, 0, 0, 0, -0.22));
-      // Elbow joint actuator housing
-      g.add(_part(G.cyl, M.titanium, 0.18, 0.18, 0.18, 0.22, -0.72, 0, Math.PI / 2, 0, 0));
-      // Forearm link
-      g.add(_part(G.cyl, M.carbonFiber, 0.11, 0.55, 0.11, 0.28, -1.02, 0, 0, 0, 0.12));
-      // Wrist rotary tool turret & core catch mechanism
-      g.add(_part(G.cyl, M.titanium, 0.26, 0.22, 0.26, 0.34, -1.32, 0));
-      g.add(_part(G.cyl, M.copperHeat, 0.08, 0.28, 0.08, 0.34, -1.48, 0));
-      break;
-    }
-    case 'Radio Sci.': { // Precision Radio Science Antenna & Calibration Horn
-      g.add(_part(G.box, M.titanium, 0.32, 0.12, 0.32, 0, -0.06, 0));
-      g.add(_part(G.cyl, M.carbonFiber, 0.08, 0.65, 0.08, 0, -0.38, 0));
-      // X/Ka-band calibration feed horn
-      g.add(_part(G.cone, M.copperHeat, 0.22, 0.32, 0.22, 0, -0.72, 0, Math.PI, 0, 0));
-      g.add(_part(G.cyl, M.goldMli, 0.14, 0.18, 0.14, 0, -0.84, 0));
-      break;
-    }
-    default: { // Standard Aerospace Avionics / Sensor Package
-      g.add(_part(G.box, M.goldMli, 0.52, 0.38, 0.52, 0, -0.19, 0));
-      g.add(_part(G.box, M.silverMli, 0.44, 0.12, 0.44, 0, -0.38, 0));
-      g.add(_part(G.cyl, M.titanium, 0.06, 0.12, 0.06, 0.18, -0.06, 0.18));
-      break;
-    }
-  }
-  return g;
-}
-
-let _EGEO = null, _EMAT = null;
-function _egeo() {
-  if (_EGEO) return _EGEO;
-  _EGEO = {
-    box: new THREE.BoxGeometry(1, 1, 1),
-    cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 24),
-    cone: new THREE.ConeGeometry(0.5, 1, 28, 1, true),
-    torus: new THREE.TorusGeometry(0.5, 0.06, 12, 28)
-  };
-  return _EGEO;
-}
-
-function _emat() {
-  if (_EMAT) return _EMAT;
-  const std = (c, m, r) => new THREE.MeshStandardMaterial({
-    color: c, metalness: m, roughness: r, emissive: new THREE.Color(0x000000), emissiveIntensity: 0
-  });
-  _EMAT = {
-    nozzleNiobium: std(0x282c33, 0.82, 0.28), // Inconel / Niobium heat-resistant nozzle bell
-    throatGlow: new THREE.MeshBasicMaterial({ color: 0xffaa44 }), // Incandescent engine throat
-    gimbalTitanium: std(0x828b98, 0.72, 0.35),// Thrust vector gimbal ring
-    feedLineCopper: std(0xb86432, 0.85, 0.30),// Pre-valved propellant feed line
-    goldMli: std(0xcca038, 0.88, 0.28),       // Engine bay thermal insulation
-    ionMolyGrid: std(0x6e7886, 0.90, 0.25),   // NEXT-C Molybdenum accelerator grid
-    ionPlasmaGlow: new THREE.MeshBasicMaterial({ color: 0x5eb4ff }) // Xenon plasma discharge core
-  };
-  return _EMAT;
-}
-
-/* Hang authentic aerospace engine cluster under spacecraft bus */
-/* Retired artificial procedural engine cones. Authentic propulsion
-   systems and thruster pods are integral to the genuine NASA flight spacecraft. */
 export function mountEngineRow(parent, spec) {
   return null;
 }
 
-/* Retired legacy procedural rail and primitive block geometry completely.
-   All missions now display authentic NASA CAD spacecraft (LRO, MRO, OSIRIS-REx, Voyager, MESSENGER).
-   Instruments are integrated directly into genuine NASA flight structures. */
 export function mountGlyphRow(parent, ids, groupOf) {
   return null;
 }
 
 export function assembleKit(bodyScene, wingScene, radioScene, wScale, rScale) {
-  const parts = [bodyScene.clone(true), wingScene.clone(true), radioScene.clone(true)];
-  scalePartAboutOrigin(parts[1], wScale);
-  scalePartAboutCenter(parts[2], rScale);
   const group = new THREE.Group();
-  group.name = 'nasa_satellite_kit';
-  group.add(parts[0]); group.add(parts[1]); group.add(parts[2]);
-  return { group, parts };
+  group.name = 'nasa_spacecraft';
+  if (bodyScene) group.add(bodyScene.clone(true));
+  return { group, parts: [group] };
 }

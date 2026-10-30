@@ -29,7 +29,7 @@ import {
   loadRoverGltf, calibrateRover, ROVER_TRUE_SPAN_M,
   bodyTierOf, wingTierOf, radioTierOf, wingScaleOf, radioScaleOf,
   engineSpecOf, keyOf, groupOfInstr, mountEngineRow, mountGlyphRow
-} from './kit-assembly.js';
+} from './kit-assembly.js?v=20261030b';
 
 const DPR_CAP = 1.5;
 
@@ -62,32 +62,8 @@ function groupOf(id) {
 }
 /* View-bay wrappers: old-row removal + highlight-group bookkeeping around the
    shared mounters (flags userData.engine / userData.generic). */
-function refreshEngineRow() {
-  try {
-    if (!M3D.craft || !M3D.craft.getObjectByName) return;
-    const old = M3D.craft.getObjectByName('engine_block');
-    if (old) M3D.craft.remove(old);
-    if (M3D.groups && M3D.groups.prop && old)
-      M3D.groups.prop = M3D.groups.prop.filter(m => !m.userData.engine);
-    const row = mountEngineRow(M3D.craft, pickEngine());
-    if (!row) return;
-    tagMeshes(row, 'prop');
-    // the engine owns the prop highlight group now (drop the borrowed slice)
-    M3D.groups.prop = M3D.groups.prop.filter(m => m.userData.engine);
-  } catch (e) {}
-}
-function refreshGlyphRow() {
-  try {
-    if (!M3D.craft || !M3D.craft.getObjectByName) return;
-    const old = M3D.craft.getObjectByName('generic_instruments');
-    if (old) M3D.craft.remove(old);
-    if (M3D.groups && M3D.groups.payload && old)
-      M3D.groups.payload = M3D.groups.payload.filter(m => !m.userData.generic);
-    const row = mountGlyphRow(M3D.craft, selOfS().instr, groupOf);
-    if (!row) return;
-    tagMeshes(row, 'payload'); // pulse with the payload highlight
-  } catch (e) {}
-}
+function refreshEngineRow() {}
+function refreshGlyphRow() {}
 
 const M3D = {
   ok: false, ready: false,
@@ -346,8 +322,7 @@ function compose(skipHero) {
     M3D.craft = craft;
     M3D.scene.add(craft);
     M3D.key = key;
-    refreshEngineRow(); // procedural engine from prop choice (owns prop group)
-    refreshGlyphRow();
+    // procedural rows retired
     frameCraft();
     M3D.ready = true;
     M3D.ok = true;
@@ -483,7 +458,7 @@ function sync() {
         else if (sel.c !== p.c) setHighlight('comms');
         else if (sel.r !== p.r) setHighlight('prop');
         else setHighlight('bus');
-      } else if (sel.i !== p.i) { refreshGlyphRow(); setHighlight('payload'); }
+      } else if (sel.i !== p.i) { setHighlight('payload'); }
       else if (sel.p !== p.p) setHighlight('power');
       else if (sel.c !== p.c) setHighlight('comms');
       else if (sel.r !== p.r) setHighlight('prop');
