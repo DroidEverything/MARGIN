@@ -10,7 +10,7 @@
    ops-view <-> surface-view cycle is safe: neither module touches the other
    at load time. */
 import * as THREE from 'three';
-import { loadRoverGltf, calibrateRover } from './kit-assembly.js';
+import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030d';
 import { bodyWorld, UNITS_PER_KM, tex } from './orrery.js';
 import { SOLAR_CONSTANT_W_M2 } from './solar-system-accuracy.js';
 import { createBodyTextSprite, buildCraftMarker, loadLanderGltf } from './ops-view.js';
@@ -1292,18 +1292,20 @@ function buildSurface(siteId) {
     // Mars keeps the baked meso-normal/horizon maps (real MOLA) + grain-free
     // physical material until a Mars-analogue detail bake exists.
     if (!isMars) {
+      // Seamless Apollo 11 regolith normal map: provides physical micro-porosity and rock pitting
+      // without ANY repeating tile seams or grid lines across the 3 km terrain.
+      // Moon diffuse albedo is driven by verified LOLA topography, slope shading, and Lommel-Seeliger
+      // photometric scattering (mat.map remains 1x1 placeholder to avoid repeating photographic tile seams).
       new THREE.TextureLoader().load('assets/textures/lunar_regolith_apollo11_normal.png', (t) => {
         try {
           if (!F.scene || !mat) return;
           detailCommon(t);
           const old = mat.normalMap;
           mat.normalMap = t;
-          mat.normalScale = new THREE.Vector2(1.1, 1.1); // Part-7: 0.3 buried grit
+          mat.normalScale = new THREE.Vector2(1.1, 1.1);
           mat.needsUpdate = true;
           F.detailTex = t;
           try { if (old && old !== t && old.dispose) old.dispose(); } catch (e2) {}
-          // Part-9 (Play-Doh): share the regolith micro-texture with the breccia — spherical
-          // rock UVs pick up pitted texture at 0.9 scale.
           try {
             if (F.rocks && F.rocks.material && !F.rocks.material.normalMap) {
               F.rocks.material.normalMap = t;
@@ -1313,19 +1315,6 @@ function buildSurface(siteId) {
           } catch (e3) { /* smooth fallback stands */ }
         } catch (e) { /* regolith stands down */ }
       }, undefined, () => { /* regolith stands down */ });
-
-      new THREE.TextureLoader().load('assets/textures/lunar_regolith_apollo11.jpg', (t) => {
-        try {
-          if (!F.scene || !mat) return;
-          detailCommon(t);
-          if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
-          mat.map = t;
-          // Compensate base diffuse so inner patch mean matches outer context (0x78787a)
-          mat.color.setHex(0xb6b6ba);
-          mat.needsUpdate = true;
-          F.regolithAlbedo = t;
-        } catch (e) {}
-      }, undefined, () => {});
     }
   } catch (e) { /* velvet stands down */ }
   /* Jezero measured micro-detail arrival (progressive enhancement):
@@ -2144,11 +2133,12 @@ function surfPlaceRover(V) {
   const F = V.surf;
   if (!F || F.rover) return;
   try {
-    const levelId = (typeof S !== 'undefined' ? S.levelId : '');
-    loadRoverGltf(levelId).then((gltf) => {
+    const isMars = !!(F && F.isMars);
+    const levelId = (typeof S !== 'undefined' && S && S.levelId ? S.levelId : (isMars ? 'l3' : 'l2'));
+    loadRoverGltf(levelId, isMars).then((gltf) => {
       try {
         if (!V.surfActive || !V.surf || V.surf !== F || !gltf || !gltf.scene) return;
-        const cal = calibrateRover(gltf.scene.clone(true), levelId);
+        const cal = calibrateRover(gltf.scene.clone(true), levelId, isMars);
         cal.updateMatrixWorld(true);
         // Lift comes from the calibration (wheel-referenced); measure the full
         // bbox only as a fallback for models with no named wheel assembly.

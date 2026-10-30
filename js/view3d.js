@@ -222,12 +222,13 @@ function attachRoverPreview(craft, key) {
     try { lvl = (typeof S !== 'undefined') ? S.levelId : null; } catch (e) {}
     try { rv = (typeof S !== 'undefined') ? S.rover : null; } catch (e) {}
     if ((lvl !== 'l2' && lvl !== 'l3' && lvl !== 'sbx' && lvl !== 'sbx_moon') || !rv) return;
-    loadRoverGltf(lvl).then((gltf) => {
+    const isMars = (lvl === 'l3' || (lvl === 'sbx' && typeof S !== 'undefined' && S && S.body === 'mars'));
+    loadRoverGltf(lvl, isMars).then((gltf) => {
       try {
         if (M3D.key !== key || M3D.craft !== craft) return; // stale compose
         if (!gltf || !gltf.scene) return;
         if (craft.getObjectByName('rover_preview')) return;
-        const cal = calibrateRover(gltf.scene.clone(true), lvl);
+        const cal = calibrateRover(gltf.scene.clone(true), lvl, isMars);
         const disp = new THREE.Group();
         disp.name = 'rover_preview';
         const span = cal.userData && cal.userData.trueSpanM ? cal.userData.trueSpanM : ROVER_TRUE_SPAN_M;

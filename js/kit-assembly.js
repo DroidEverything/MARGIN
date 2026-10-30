@@ -168,8 +168,17 @@ export const ROVER_BY_LEVEL = {
   l3: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
   sbx: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
 };
-export function roverConfigForLevel(levelId) {
-  if (levelId === 'l3' || levelId === 'sbx') return ROVER_BY_LEVEL.l3;
+export function roverConfigForLevel(levelId, isMars) {
+  if (isMars === false) return ROVER_BY_LEVEL.l2; // Ground truth: Moon ALWAYS gets RASSOR
+  if (isMars === true) return ROVER_BY_LEVEL.l3;  // Ground truth: Mars ALWAYS gets Perseverance
+  if (levelId === 'l2' || levelId === 'sbx_moon') return ROVER_BY_LEVEL.l2;
+  if (levelId === 'l3') return ROVER_BY_LEVEL.l3;
+  if (levelId === 'sbx') {
+    if (typeof S !== 'undefined' && S && (S.site === 'shackleton' || S.site === 'malapert' || S.site === 'tranq')) {
+      return ROVER_BY_LEVEL.l2;
+    }
+    return ROVER_BY_LEVEL.l3;
+  }
   return ROVER_BY_LEVEL.l2;
 }
 
@@ -178,12 +187,12 @@ export const ROVER_TRUE_SPAN_M = 1.66;
 export const ROVER_RAW_MAX_UNITS = 1.66;
 export const ROVER_CAL_FACTOR = 1.0;
 
-export function loadRoverGltf(levelId) {
-  const cfg = roverConfigForLevel(levelId);
+export function loadRoverGltf(levelId, isMars) {
+  const cfg = roverConfigForLevel(levelId, isMars);
   return loadKitGltf(cfg.url);
 }
-export function calibrateRover(rawGroup, levelId) {
-  const cfg = roverConfigForLevel(levelId);
+export function calibrateRover(rawGroup, levelId, isMars) {
+  const cfg = roverConfigForLevel(levelId, isMars);
   const trueSpanM = cfg.spanM;
   const fixed = normalizeHero(rawGroup);
   const root = new THREE.Group();
