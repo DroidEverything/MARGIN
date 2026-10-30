@@ -26,7 +26,7 @@ import {
   updateSurfaceCamera, updateSurfSky, updateSurfRover, disposeSurface,
   enterSurface as surfEnterSurface, exitSurface as surfExitSurface,
   surfDebugExposure, decodeSite, surfHeightAt
-} from './surface-view.js?v=20261030h';
+} from './surface-view.js?v=20261030i';
 import { STAR_VEC } from './stars-data.js';
 
 const V = {
@@ -868,6 +868,34 @@ function updateBodyLabels() {
     sp.material.opacity = maxOp;
     sp.visible = true;
   }
+
+  // De-conflict celestial labels when a moon orbits close to its parent planet
+  // (e.g. Phobos right on Mars projection causing text overlap into "PMAROS").
+  const MOON_PARENTS = {
+    phobos: 'mars', deimos: 'mars', moon: 'earth',
+    io: 'jupiter', europa: 'jupiter', ganymede: 'jupiter', callisto: 'jupiter'
+  };
+  const viewW = Math.max(300, V.W || (V.canvas && V.canvas.clientWidth) || window.innerWidth || 1280);
+  const viewH = Math.max(300, V.H || (V.canvas && V.canvas.clientHeight) || window.innerHeight || 720);
+  for (const [moonKey, parentKey] of Object.entries(MOON_PARENTS)) {
+    const mItem = V.bodyLabels[moonKey];
+    const pItem = V.bodyLabels[parentKey];
+    if (!mItem || !mItem.sprite || !mItem.sprite.visible) continue;
+    if (!pItem || !pItem.sprite || !pItem.sprite.visible) continue;
+    _v1.copy(mItem.sprite.position).project(V.camera);
+    _v2.copy(pItem.sprite.position).project(V.camera);
+    if (_v1.z >= -1 && _v1.z <= 1 && _v2.z >= -1 && _v2.z <= 1) {
+      const dxPx = (_v1.x - _v2.x) * 0.5 * viewW;
+      const dyPx = (_v1.y - _v2.y) * 0.5 * viewH;
+      if (Math.hypot(dxPx, dyPx) < 48) {
+        if (mItem.isTarget) {
+          pItem.sprite.visible = false;
+        } else {
+          mItem.sprite.visible = false;
+        }
+      }
+    }
+  }
 }
 
 /* ── Resize Viewport ── */
@@ -1551,6 +1579,7 @@ function animate(now) {
     if (PERF && V._gpuT) { try { V._gpuT.end(); } catch (e) {} }
     if (PERF) perfSample(performance.now() - _pf0);
   } else if (V.surfActive && V.surf && V.surf.scene) {
+    try { if (V.craftGroup) V.craftGroup.visible = false; } catch (e) {}
     try {
       const auLen = (V.targetWorldPos && V.targetWorldPos.length() > 1e-9)
         ? V.targetWorldPos.length() : WORLD_PER_AU;

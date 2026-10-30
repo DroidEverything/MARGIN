@@ -163,10 +163,10 @@ export function normalizeHero(group) {
    preview compose only — never at boot, never headless (?no3d safe: view3d
    only calls this inside the live-renderer compose path). */
 export const ROVER_BY_LEVEL = {
-  l2: { url: 'models/nasa/rassor_articulated.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
-  sbx_moon: { url: 'models/nasa/rassor_articulated.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
-  l3: { url: 'models/nasa/perseverance_articulated.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
-  sbx: { url: 'models/nasa/perseverance_articulated.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
+  l2: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  sbx_moon: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  l3: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
+  sbx: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
 };
 export function roverConfigForLevel(levelId, isMars) {
   if (isMars === false) return ROVER_BY_LEVEL.l2; // Ground truth: Moon ALWAYS gets RASSOR
@@ -204,14 +204,14 @@ export function calibrateRover(rawGroup, levelId, isMars) {
       // make co-planar ground contact on the lunar surface (height difference < 5 mm).
       fixed.rotation.x = 0.218;
 
-      // Authentic NASA KSC Swamp Works finish: dark titanium/graphite composite with machined metallic drums.
-      // Replaces the untextured, blown-out white default with realistic aerospace metalness and specular contrast.
+      // Authentic NASA KSC Swamp Works finish: light satin aerospace aluminum with machined metallic drums.
+      // High diffuse reflectivity so details and drums remain crisp, clear, and visible under direct sunlight and lunar shadow.
       fixed.traverse((o) => {
         if (o.isMesh) {
           o.material = new THREE.MeshStandardMaterial({
-            color: 0x3d444d,
-            metalness: 0.65,
-            roughness: 0.38,
+            color: 0xb4bcc8,
+            metalness: 0.22,
+            roughness: 0.42,
             side: THREE.DoubleSide
           });
         }

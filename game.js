@@ -6590,6 +6590,7 @@ function jumpToScene(s,m,lv){
     startLevel(m);
     if(!seedDemoLaunch(lv)) return false;
     ensurePhases().done.launch=true;
+    if(!S.rover && (m==="l2"||m==="l3"||m==="sbx"||m==="sbx_moon")) { S.rover = {mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}; }
     go("ops");
     try {
       const isMars = (m === 'l3' || (m === 'sbx' && S && S.body === 'mars'));
@@ -6853,6 +6854,6 @@ addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="
     import("./js/title-earth.js").catch(function(){});
     import("./js/select-viewer.js").catch(function(){});
     import("./js/brief-view.js").catch(function(){});
-    import("./js/ops-view.js?v=20261030h").catch(function(err){ console.error("[ops-view] import failed:", err); });
+    import("./js/ops-view.js?v=20261030i").catch(function(err){ console.error("[ops-view] import failed:", err); });
   }catch(e){}
 })();
