@@ -57,6 +57,49 @@ const PROV_ABSTRACTIONS=[
  "Battery storage and eclipse survival model dark-pass energy demand (loadAvg × tDark) for solar array missions in LEO, lunar, and planetary orbits, with zero-delta baseline bat_std.",
  "Porkchop solutions ignore inclination (understates C3 ~1–3 km²/s²) and render on a 90×70 grid."
 ];
+
+function nasaHardwareModal(cat, id){
+  if(typeof NASA_HARDWARE_DATA==='undefined') return;
+  const h = getNasaHardwareData(cat, id);
+  if(!h) return;
+  let specRows = '';
+  if(h.flightSpecs){
+    specRows = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;background:rgba(255,255,255,0.03);padding:10px;border-radius:3px;margin:12px 0">'
+      + '<div><span style="font-size:10px;color:var(--dim);display:block;font-family:var(--mono)">FLIGHT MASS</span><b style="font-size:14px;color:var(--phosphor)">' + h.flightSpecs.massKg + ' kg</b></div>'
+      + '<div><span style="font-size:10px;color:var(--dim);display:block;font-family:var(--mono)">POWER DRAW</span><b style="font-size:14px;color:var(--phosphor)">' + h.flightSpecs.powerW + ' W</b></div>'
+      + '<div><span style="font-size:10px;color:var(--dim);display:block;font-family:var(--mono)">DATA RATE</span><b style="font-size:14px;color:var(--phosphor)">' + h.flightSpecs.dataRateMbps + ' Mb/s</b></div>'
+      + '</div>';
+  } else if(h.efficiency || h.specs || h.storage || h.pointing){
+    const val = h.efficiency || h.specs || h.storage || h.pointing;
+    specRows = '<div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:3px;margin:12px 0">'
+      + '<span style="font-size:10px;color:var(--dim);display:block;font-family:var(--mono)">TECHNICAL PERFORMANCE</span>'
+      + '<span style="font-size:12.5px;color:var(--phosphor);font-family:var(--mono)">' + esc(val) + '</span>'
+      + '</div>';
+  }
+
+  el('mbox').innerHTML = '<div style="border-bottom:1px solid var(--hairline);padding-bottom:8px;margin-bottom:12px">'
+    + '<div class="spread">'
+    + '<span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--dim)">NASA FLIGHT PROVENANCE DOSSIER</span>'
+    + '<span class="tag" style="border-color:var(--nasa-blue);color:var(--blue-lift)">NASA VERIFIED</span>'
+    + '</div>'
+    + '<h2 style="margin:6px 0 2px;font-size:18px">' + esc(h.name) + '</h2>'
+    + '<div class="hint" style="font-size:11.5px;color:var(--phosphor)">' + esc(h.mission || h.flightOrigin || '') + '</div>'
+    + '</div>'
+    + '<div class="mb" style="font-size:12.5px;line-height:1.6;max-height:60vh;overflow:auto">'
+    + (h.sponsor ? '<p style="margin:4px 0"><b style="color:var(--dim)">Principal Sponsor / Facility:</b> ' + esc(h.sponsor) + '</p>' : '')
+    + (h.nssdcId ? '<p style="margin:4px 0"><b style="color:var(--dim)">NASA NSSDCA Master ID:</b> <span style="font-family:var(--mono);color:var(--bone)">' + esc(h.nssdcId) + '</span></p>' : '')
+    + (h.heritageClass ? '<p style="margin:4px 0"><b style="color:var(--dim)">Hardware Class:</b> ' + esc(h.heritageClass) + '</p>' : '')
+    + specRows
+    + '<p style="margin-top:10px;color:var(--bone)">' + esc(h.description) + '</p>'
+    + (h.pdsUrl ? '<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--hairline);font-size:11px">'
+      + '<span style="color:var(--dim)">Archival PDS / Flight Records: </span>'
+      + '<a href="' + esc(h.pdsUrl) + '" target="_blank" rel="noopener" style="color:var(--blue-lift);word-break:break-all">' + esc(h.pdsUrl) + '</a>'
+      + '</div>' : '')
+    + '<button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE DOSSIER</button>'
+    + '</div>';
+  el('modal').classList.add('on');
+}
+
 function sourcesModal(){
   const keys=Object.keys(SRC);
   const grp=c=>keys.filter(k=>provClassOf(k)===c).map(k=>{
@@ -897,8 +940,11 @@ function fitCanvas(cv,defW,defH){
 }
 
 /* ── provenance tooltip ── */
-function infoTag(p,label,extra){
-  const d=JSON.stringify({t:label||p.source,s:p.source,u:p.url,r:p.retrieved,m:extra||p.simp});
+function infoTag(p,label,extra,cat,id){
+  const d=JSON.stringify({t:label||(p&&p.source)||"",s:(p&&p.source)||"",u:(p&&p.url)||"",r:(p&&p.retrieved)||"",m:extra||(p&&p.simp)||""});
+  if(cat && id){
+    return `<span class="info" tabindex="0" data-act="nasainfo" data-cat="${esc(cat)}" data-id="${esc(id)}" data-tip='${esc(d)}' role="button" title="View NASA Flight Provenance Dossier" aria-label="Where this number comes from">i</span>`;
+  }
   return `<span class="info" tabindex="0" data-tip='${esc(d)}' role="button" aria-label="Where this number comes from">i</span>`;
 }
 (function tooltipInit(){
@@ -1662,7 +1708,7 @@ function scrBuild(){
       const useful=x.tags.some(t=>need.has(t));
       return `<button class="part ${on?'on':''}" data-act="instr" data-id="${x.id}">
         <span class="pn">
-          <span>${esc(x.n)}</span>
+          <span style="display:inline-flex;align-items:center;gap:6px">${esc(x.n)} ${infoTag(x.p,x.n,null,'instruments',x.id)}</span>
           <span style="display:inline-flex;gap:6px;align-items:center">
             ${useful?'<span class="tag" style="border-color:var(--nasa-blue);color:var(--blue-lift)">USEFUL</span>':''}
             <span class="part-add-btn ${on?'mounted':''}" style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px;border:1px solid ${on?'var(--phosphor)':'rgba(255,255,255,0.2)'};background:${on?'rgba(101,242,165,0.15)':'transparent'};color:${on?'var(--phosphor)':'var(--bone)'}">${on?'✓ MOUNTED':'＋ ADD'}</span>
@@ -1706,7 +1752,7 @@ function scrBuild(){
             <span class="pn">
               <span>${esc(x.n)}</span>
               <span style="display:inline-flex;align-items:center;gap:6px">
-                ${infoTag(x.p,x.n)}
+                ${infoTag(x.p,x.n,null,key==='power'?'power':key==='prop'?'propulsion':key==='comms'?'comms':key==='cdh'?'cdh':key==='adcs'?'adcs':key==='bat'?'battery':null,x.id)}
                 ${on?'<span style="color:var(--phosphor);font-family:var(--mono);font-size:11px">✓ SELECTED</span>':''}
               </span>
             </span>
@@ -5787,6 +5833,7 @@ document.addEventListener("click",e=>{
     case "bstep-systems": S.bstep="systems"; Audio_.click(); render(); break;
     case "bstep-review": S.bstep="review"; Audio_.click(); render(); break;
     case "bstep-payload": S.bstep="payload"; Audio_.click(); render(); break;
+    case "nasainfo": { const cat = t.dataset.cat, pid = t.dataset.id; if(cat && pid) nasaHardwareModal(cat, pid); Audio_.click(); break; }
     case "filter-useful": S.filterUseful=!S.filterUseful; Audio_.click(); render(); break;
     case "toggle-acc": {
       const targetId = t.dataset.target;
