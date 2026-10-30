@@ -6829,7 +6829,7 @@ addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="
     if(/[?&]no3d/.test(location.search)) return;
     const t=document.createElement("canvas");
     if(!(t.getContext("webgl2")||t.getContext("webgl"))) return;
-    import("./js/view3d.js").catch(function(){});
+    import("./js/view3d.js?v=" + Date.now()).catch(function(){});
     import("./js/title-earth.js").catch(function(){});
     import("./js/select-viewer.js").catch(function(){});
     import("./js/brief-view.js").catch(function(){});
