@@ -106,6 +106,12 @@ export function normalizeHero(group) {
     let meshes = 0;
     out.traverse(o => {
       if (!o.isMesh) return;
+      // Hide jettisoned flight launch covers (e.g. MRO launch protective aero shroud)
+      const matsCheck = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+      if (matsCheck.some(m => m && (m.name === 'cover' || /cover/i.test(m.name)))) {
+        o.visible = false;
+        return;
+      }
       meshes++;
       try { o.frustumCulled = false; } catch (e) {}
       try { o.castShadow = false; o.receiveShadow = false; } catch (e) {}
@@ -125,6 +131,11 @@ export function normalizeHero(group) {
           if (m.alphaTest > 0.9) m.alphaTest = 0;
           if (m.side === THREE.FrontSide) m.side = THREE.DoubleSide;
           if (m.color && !m.map && m.color.r < 0.02 && m.color.g < 0.02 && m.color.b < 0.02) m.color.setHex(0x232830);
+          // MRO High-Gain Antenna dish polish: soften the harsh 2005 baked specular swirl into realistic satin carbon composite
+          if (m.name === 'default #2') {
+            m.roughness = 0.65;
+            m.metalness = 0.15;
+          }
           if (m.needsUpdate !== undefined) m.needsUpdate = true;
           /* MRO-class heroes carry WebP base-color textures: three r160's
              bundled WebP path can leave the map blank on some drivers, which

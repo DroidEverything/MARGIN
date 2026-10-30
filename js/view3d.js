@@ -172,7 +172,7 @@ function fail() {
 
 function tagMeshes(root, group) {
   root.traverse((o) => {
-    if (!o.isMesh) return;
+    if (!o.isMesh || o.visible === false) return;
     try {
       o.material = o.material.clone();
       if (!o.material.emissive) o.material.emissive = new THREE.Color(0x000000);
