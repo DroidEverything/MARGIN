@@ -129,7 +129,7 @@ export const ORRERY_SETTINGS = {
 
 export const BODY_STYLE = {
   earth:   { tex:'earth',   tint:0xa8b8cc, spin:0.10,   tilt:0.4084, dist:1.35 },
-  moon:    { tex:'moon',    tint:0xc9d2dc, spin:0.05,   dist:0.50 },
+  moon:    { tex:'moon',    tint:0xffffff, spin:0.05,   dist:0.50 },
   mars:    { tex:'mars',    tint:0xb8a89c, spin:0.0972, tilt:0.4398, dist:0.80 },
   bennu:   { spin:0.25,     dist:0.40 },
   jupiter: { tex:'jupiter', tint:0xcbb894, spin:0.2411, tilt:0.0541, dist:0 },
