@@ -26,7 +26,7 @@ import {
   updateSurfaceCamera, updateSurfSky, updateSurfRover, disposeSurface,
   enterSurface as surfEnterSurface, exitSurface as surfExitSurface,
   surfDebugExposure, decodeSite, surfHeightAt
-} from './surface-view.js?v=20261030g';
+} from './surface-view.js?v=20261030h';
 import { STAR_VEC } from './stars-data.js';
 
 const V = {

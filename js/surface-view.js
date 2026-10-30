@@ -10,7 +10,7 @@
    ops-view <-> surface-view cycle is safe: neither module touches the other
    at load time. */
 import * as THREE from 'three';
-import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030g';
+import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030h';
 import { bodyWorld, UNITS_PER_KM, tex } from './orrery.js';
 import { SOLAR_CONSTANT_W_M2 } from './solar-system-accuracy.js';
 import { createBodyTextSprite, buildCraftMarker, loadLanderGltf } from './ops-view.js';
@@ -429,7 +429,9 @@ function surfDisplayXZ() {
           const lead = Math.min(0.1, Math.max(0, (nowMs - F._dTick) / 1000));
           const extra = lead * rate;
           if (extra > 1e-9) {
-            const r = surfEvalAt(F._dSC + extra);
+            const evalSC = Math.max(F._monoSC || 0, F._dSC + extra);
+            F._monoSC = evalSC;
+            const r = surfEvalAt(evalSC);
             if (r && isFinite(r.e) && isFinite(r.n))
               return { x: r.e * 1000 * F.dscale, z: -r.n * 1000 * F.dscale };
           }
@@ -2374,7 +2376,19 @@ function updateSurfRover(V, dt) {
           step = Math.min(gap, v * dtC);
         }
       } catch (e) { step = Math.min(gap, chaseCap * dtC); }
-      if (step > 0) { F._visX += gx / gap * step; F._visZ += gz / gap * step; }
+      if (step > 0) {
+        const dg = surfDisplayDelta();
+        if (dg && (dg.dx * dg.dx + dg.dz * dg.dz >= 1e-8)) {
+          const dot = (gx * dg.dx + gz * dg.dz);
+          if (dot >= 0) {
+            F._visX += gx / gap * step;
+            F._visZ += gz / gap * step;
+          }
+        } else {
+          F._visX += gx / gap * step;
+          F._visZ += gz / gap * step;
+        }
+      }
     }
   }
   const shown = { x: F._visX, z: F._visZ };
@@ -2408,16 +2422,23 @@ function updateSurfRover(V, dt) {
       F.rover.quaternion.copy(F.roverQuat);
     }
     F.roverPos.set(shown.x, gy + (F.roverLift || 1.1), shown.z);
-    /* T8 brake-dip (rotation only — position untouched, decays to zero):
-       latch on VISUAL motion (not the sim segment) so battery stall sols
-       don't each fire a nod — one nod per real visual halt. Timer advances
-       only while running (pause-exact). Scene-owned F; sim never reads it. */
+    /* T8 brake-dip (debounced to avoid micro-stutter nodding while driving) */
     try {
       const segMoving = moving;
       if (V.running === false) { /* frozen mid-dip */ }
-      else if (segMoving) { F._dipArmed = true; F._dipT = 99; }
-      else if (F._dipArmed) { F._dipArmed = false; F._dipT = 0; }
-      else F._dipT = Math.min(99, (F._dipT === undefined ? 99 : F._dipT) + dtC);
+      else if (segMoving) {
+        F._dipArmed = true;
+        F._dipT = 99;
+        F._stopDuration = 0;
+      } else {
+        F._stopDuration = (F._stopDuration || 0) + dtC;
+        if (F._dipArmed && F._stopDuration >= 0.20) {
+          F._dipArmed = false;
+          F._dipT = 0;
+        } else if (F._dipT !== undefined && F._dipT < 99) {
+          F._dipT += dtC;
+        }
+      }
       const dipT = (F._dipT === undefined) ? 99 : F._dipT;
       if (dipT < 0.6 && F.roverQuat) {
         F.rover.quaternion.copy(F.roverQuat);
@@ -2425,6 +2446,26 @@ function updateSurfRover(V, dt) {
         F.rover.quaternion.multiply(_q2);
       }
     } catch (e) { /* nod never breaks the drive */ }
+
+    // Wheel spin animation: spin all wheels/drums synchronously with terrain traverse
+    try {
+      if (moving && F.rover && F.rover.userData && F.rover.userData.wheels && F.rover.userData.wheels.length) {
+        const dX = shown.x - (F._lastSpinX !== undefined ? F._lastSpinX : shown.x);
+        const dZ = shown.z - (F._lastSpinZ !== undefined ? F._lastSpinZ : shown.z);
+        const dDist = Math.hypot(dX, dZ);
+        if (dDist > 1e-5 && dDist < 50) {
+          const rW = F.rover.userData.wheelRadius || 0.25;
+          const dTheta = dDist / rW;
+          const wheels = F.rover.userData.wheels;
+          for (let wi = 0; wi < wheels.length; wi++) {
+            wheels[wi].rotation.x += dTheta;
+          }
+        }
+        F._lastSpinX = shown.x;
+        F._lastSpinZ = shown.z;
+      }
+    } catch (e) {}
+
     if (V.running !== false && moving) trackPush(F, shown.x, shown.z);
     dustUpdate(V, F, Math.min(0.1, Math.max(0, dt)), moving, shown.x, shown.z);
     if (F.marker) {
@@ -2615,6 +2656,7 @@ function enterSurface(V) {
       /* Steady-spin anchor resets with entry (re-anchors to truth below). */
       try { V.surf._spinLon = NaN; V.surf._spinDay = NaN; } catch (e) {}
       V.surf._visX = NaN; V.surf._visZ = NaN;
+      if (typeof S !== 'undefined' && S && S.surface) S.surface._monoSC = 0;
     }
   } catch (e) {}
   V.camMode = 'mast';

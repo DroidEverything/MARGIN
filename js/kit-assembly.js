@@ -163,10 +163,10 @@ export function normalizeHero(group) {
    preview compose only — never at boot, never headless (?no3d safe: view3d
    only calls this inside the live-renderer compose path). */
 export const ROVER_BY_LEVEL = {
-  l2: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
-  sbx_moon: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
-  l3: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
-  sbx: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
+  l2: { url: 'models/nasa/rassor_articulated.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  sbx_moon: { url: 'models/nasa/rassor_articulated.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  l3: { url: 'models/nasa/perseverance_articulated.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
+  sbx: { url: 'models/nasa/perseverance_articulated.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
 };
 export function roverConfigForLevel(levelId, isMars) {
   if (isMars === false) return ROVER_BY_LEVEL.l2; // Ground truth: Moon ALWAYS gets RASSOR
@@ -270,6 +270,14 @@ export function calibrateRover(rawGroup, levelId, isMars) {
       lift = 0.28;
     }
     root.userData.groundLift = lift;
+    const wheels = [];
+    root.traverse((o) => {
+      if (o.name && /wheel_|drum_/i.test(o.name)) {
+        wheels.push(o);
+      }
+    });
+    root.userData.wheels = wheels;
+    root.userData.wheelRadius = cfg.url.includes('rassor') ? 0.20 : 0.26;
   } catch (e) {
     try { root.add(fixed); } catch (e2) {}
     root.userData.calFactor = 1;
