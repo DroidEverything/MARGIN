@@ -6853,6 +6853,6 @@ addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="
     import("./js/title-earth.js").catch(function(){});
     import("./js/select-viewer.js").catch(function(){});
     import("./js/brief-view.js").catch(function(){});
-    import("./js/ops-view.js?v=20261030f").catch(function(err){ console.error("[ops-view] import failed:", err); });
+    import("./js/ops-view.js?v=20261030g").catch(function(err){ console.error("[ops-view] import failed:", err); });
   }catch(e){}
 })();

@@ -10,7 +10,7 @@
    ops-view <-> surface-view cycle is safe: neither module touches the other
    at load time. */
 import * as THREE from 'three';
-import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030f';
+import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030g';
 import { bodyWorld, UNITS_PER_KM, tex } from './orrery.js';
 import { SOLAR_CONSTANT_W_M2 } from './solar-system-accuracy.js';
 import { createBodyTextSprite, buildCraftMarker, loadLanderGltf } from './ops-view.js';

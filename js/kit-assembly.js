@@ -203,6 +203,19 @@ export function calibrateRover(rawGroup, levelId, isMars) {
       // Pitching the model down (+0.218 rad) levels the chassis so both front and rear excavation drums
       // make co-planar ground contact on the lunar surface (height difference < 5 mm).
       fixed.rotation.x = 0.218;
+
+      // Authentic NASA KSC Swamp Works finish: dark titanium/graphite composite with machined metallic drums.
+      // Replaces the untextured, blown-out white default with realistic aerospace metalness and specular contrast.
+      fixed.traverse((o) => {
+        if (o.isMesh) {
+          o.material = new THREE.MeshStandardMaterial({
+            color: 0x3d444d,
+            metalness: 0.65,
+            roughness: 0.38,
+            side: THREE.DoubleSide
+          });
+        }
+      });
     }
     fixed.updateMatrixWorld(true);
     const b = new THREE.Box3().setFromObject(fixed);
@@ -251,6 +264,10 @@ export function calibrateRover(rawGroup, levelId, isMars) {
     if (lift === null || !isFinite(lift)) {
       const fb = new THREE.Box3().setFromObject(root);
       lift = fb.isEmpty() ? 1.1 : -fb.min.y;
+    }
+    if (cfg.url.includes('rassor')) {
+      // Plant RASSOR drums firmly into the regolith (avoid floating above surface)
+      lift = 0.28;
     }
     root.userData.groundLift = lift;
   } catch (e) {
