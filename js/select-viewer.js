@@ -237,9 +237,15 @@ function getOriginForFocus(focusKey, simDays) {
    selection anchor) so flights can never stack, fight, or go stale. */
 function updateFocusClamp(key){
   if (!V.controls) return;
+  const k = key || V.toKey || 'earth';
   if (V.isPhys) {
-    try { V.controls.minDistance = approachMinDist(key || V.toKey || 'earth', UNITS_PER_KM); } catch(e){}
-  } else V.controls.minDistance = 0.04;
+    try { V.controls.minDistance = approachMinDist(k, UNITS_PER_KM); } catch(e){}
+  } else {
+    try {
+      const r = radiusOf(k);
+      V.controls.minDistance = Math.max(r * 1.15, 0.04);
+    } catch(e) { V.controls.minDistance = 0.04; }
+  }
 }
 
 function commitFly(toKey) {
