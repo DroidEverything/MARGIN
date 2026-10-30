@@ -163,8 +163,8 @@ export function normalizeHero(group) {
    preview compose only — never at boot, never headless (?no3d safe: view3d
    only calls this inside the live-renderer compose path). */
 export const ROVER_BY_LEVEL = {
-  l2: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Surface Exploration Rover' },
-  sbx_moon: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Surface Exploration Rover' },
+  l2: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  sbx_moon: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
   l3: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
   sbx: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
 };
@@ -198,6 +198,12 @@ export function calibrateRover(rawGroup, levelId, isMars) {
   const root = new THREE.Group();
   root.name = 'rover_calibrated';
   try {
+    if (cfg.url.includes('rassor')) {
+      // Level RASSOR: NASA's CAD export has the front excavator arms modeled in an upward digging tilt (~12.5 deg).
+      // Pitching the model down (+0.218 rad) levels the chassis so both front and rear excavation drums
+      // make co-planar ground contact on the lunar surface (height difference < 5 mm).
+      fixed.rotation.x = 0.218;
+    }
     fixed.updateMatrixWorld(true);
     const b = new THREE.Box3().setFromObject(fixed);
     if (b.isEmpty()) throw new Error('rover glb empty');

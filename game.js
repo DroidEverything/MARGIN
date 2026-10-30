@@ -6585,18 +6585,38 @@ function jumpToScene(s,m,lv){
   if(s==="launch"){ S.ops=null; startLevel(m); if(!seedDemoLaunch(lv))return false; go("launch"); return true; }
   if(s==="ascent"){ S.ops=null; startLevel(m); if(!seedDemoLaunch(lv))return false; go("launch"); liftoff(); return true; }
   if(s==="ops"){ S.ops=null; startLevel(m); if(!seedDemoLaunch(lv))return false; ensurePhases().done.launch=true; go("ops"); return true; }
+  if(s==="surface"){
+    S.ops=null;
+    startLevel(m);
+    if(!seedDemoLaunch(lv)) return false;
+    ensurePhases().done.launch=true;
+    go("ops");
+    try {
+      const isMars = (m === 'l3' || (m === 'sbx' && S && S.body === 'mars'));
+      S.site = S.site || (isMars ? 'jezero' : 'shackleton');
+      S.landing = { site: S.site, profile: 'balanced', slope: 2.8, off: 0.1, travKm: 0, done: true };
+      initSurface();
+      const enter = () => {
+        if(window.OpsView && OpsView.enterSurface) OpsView.enterSurface();
+      };
+      enter();
+      setTimeout(enter, 100);
+      setTimeout(enter, 500);
+    } catch(e) {}
+    return true;
+  }
   return false;
 }
 function showDevJump(){
   const m=S._devM||"l1";
   const missions=["l1","l2","l3","l4","l5","sbx","sbx_moon","sbx_earth"].map(id=>
     `<button class="btn ${id===m?"primary":"ghost"}" data-act="devm" data-id="${id}" style="flex:1">${id.toUpperCase()}</button>`).join("");
-  const dests=[["select","SELECT"],["brief","BRIEF"],["build","BUILD"],["launch","LAUNCH"],["ascent","ASCENT"],["ops","OPS"]].map(d=>
+  const dests=[["select","SELECT"],["brief","BRIEF"],["build","BUILD"],["launch","LAUNCH"],["ascent","ASCENT"],["ops","OPS"],["surface","SURFACE"]].map(d=>
     `<button class="btn ghost" data-act="devgo" data-to="${d[0]}" style="flex:1">${d[1]}</button>`).join("");
   el("mbox").innerHTML=`<h3>DEV JUMP <span class="code">TEST ONLY</span></h3><div class="mb" style="font-size:12px;line-height:1.6">
     <p class="hint">Mission</p><div style="display:flex;gap:6px;margin:4px 0 10px">${missions}</div>
     <p class="hint">Jump to <span class="code">${m.toUpperCase()}</span> (demo-seeded, first-listed LV)</p><div style="display:flex;gap:6px;flex-wrap:wrap">${dests}</div>
-    <p class="hint mt-s">Same as URL shortcuts: <span class="code">?s=launch&m=${m}</span> — composes with <span class="code">&lv= &no3d</span>.</p>
+    <p class="hint mt-s">Same as URL shortcuts: <span class="code">?s=surface&m=l2</span> or <span class="code">?s=launch&m=${m}</span> — composes with <span class="code">&lv= &no3d</span>.</p>
     <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
   el("modal").classList.add("on");
 }
@@ -6833,6 +6853,6 @@ addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="
     import("./js/title-earth.js").catch(function(){});
     import("./js/select-viewer.js").catch(function(){});
     import("./js/brief-view.js").catch(function(){});
-    import("./js/ops-view.js?v=20261030e").catch(function(err){ console.error("[ops-view] import failed:", err); });
+    import("./js/ops-view.js?v=20261030f").catch(function(err){ console.error("[ops-view] import failed:", err); });
   }catch(e){}
 })();
