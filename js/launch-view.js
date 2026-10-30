@@ -2586,9 +2586,20 @@ function buildModularStack(lvId, payloadCraft) {
       bCore.position.y = cfg.s1 / 2;
       bGroup.add(bCore);
 
-      const nose = new THREE.Mesh(new THREE.ConeGeometry(cfg.coreD / 2, cfg.coreD * 1.4, 32), coreMat);
-      nose.position.y = cfg.s1 + cfg.coreD * 0.7;
+      // Falcon Heavy aerodynamic titanium booster nosecone
+      const nose = new THREE.Mesh(new THREE.CylinderGeometry(cfg.coreD * 0.04, cfg.coreD / 2, cfg.coreD * 1.5, 32), coreMat);
+      nose.position.y = cfg.s1 + (cfg.coreD * 1.5) / 2;
       bGroup.add(nose);
+      // Forward structural attach collar & pneumatic separation pusher ring
+      const sepCollarMat = new THREE.MeshStandardMaterial({ color: 0x48505b, roughness: 0.4, metalness: 0.6 });
+      const sepCollar = new THREE.Mesh(new THREE.CylinderGeometry(cfg.coreD * 0.508, cfg.coreD * 0.508, 0.55, 32), sepCollarMat);
+      sepCollar.position.y = cfg.s1 - 0.3;
+      bGroup.add(sepCollar);
+      // Forward separation thruster nozzle fitting (points inward towards core)
+      const sepThruster = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.35, 12, 1, true), darkMetal);
+      sepThruster.position.set(sx > 0 ? -cfg.coreD * 0.45 : cfg.coreD * 0.45, cfg.s1 + 0.4, 0);
+      sepThruster.rotation.z = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+      bGroup.add(sepThruster);
 
       // Booster engines
       for (let k = 0; k < 9; k++) {
@@ -2615,13 +2626,32 @@ function buildModularStack(lvId, payloadCraft) {
       const bGroup = new THREE.Group();
       bGroup.name = 'srb_' + i;
 
-      const sBody = new THREE.Mesh(new THREE.CylinderGeometry(srbDia / 2, srbDia / 2, srbLen, 24), srbMat);
+      // Authentic segmented SRB casing (Aerojet / Orbital ATK / SLS heritage)
+      const sBody = new THREE.Mesh(new THREE.CylinderGeometry(srbDia / 2, srbDia / 2, srbLen, 28), srbMat);
       sBody.position.y = srbLen / 2;
       bGroup.add(sBody);
 
-      const sNose = new THREE.Mesh(new THREE.ConeGeometry(srbDia / 2, srbDia * 1.6, 24), srbMat);
-      sNose.position.y = srbLen + srbDia * 0.8;
+      // SRB structural field joints & casing reinforcement rings
+      const nJoints = Math.max(3, Math.floor(srbLen / 12));
+      const jointMat = new THREE.MeshStandardMaterial({ color: 0x5a626d, roughness: 0.35, metalness: 0.65 });
+      for (let j = 1; j <= nJoints; j++) {
+        const jRing = new THREE.Mesh(new THREE.CylinderGeometry(srbDia * 0.508, srbDia * 0.508, 0.28, 28), jointMat);
+        jRing.position.y = (srbLen / (nJoints + 1)) * j;
+        bGroup.add(jRing);
+      }
+
+      // Aerodynamic ogive nosecone with forward separation motor band
+      const sNose = new THREE.Mesh(new THREE.CylinderGeometry(srbDia * 0.05, srbDia / 2, srbDia * 1.7, 28), srbMat);
+      sNose.position.y = srbLen + (srbDia * 1.7) / 2;
       bGroup.add(sNose);
+      // Forward thrust termination / separation nozzle cluster band
+      const sFwdBand = new THREE.Mesh(new THREE.CylinderGeometry(srbDia * 0.51, srbDia * 0.51, 0.45, 28), jointMat);
+      sFwdBand.position.y = srbLen + 0.25;
+      bGroup.add(sFwdBand);
+      // Aft skirt flare at nozzle base
+      const sAftSkirt = new THREE.Mesh(new THREE.CylinderGeometry(srbDia * 0.50, srbDia * 0.54, Math.min(1.5, srbLen * 0.05), 28), jointMat);
+      sAftSkirt.position.y = Math.min(0.75, srbLen * 0.025);
+      bGroup.add(sAftSkirt);
 
       // Canted SRB nozzle bell, apex-up into the motor (unflipped — see above).
       const sNozzle = new THREE.Mesh(new THREE.ConeGeometry(srbDia * 0.42, srbDia * 0.75, 16, 1, true), nozzleMat);
