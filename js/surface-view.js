@@ -1291,27 +1291,42 @@ function buildSurface(siteId) {
     // Lunar NAC velvet is Moon regolith — never draped on Mars (provenance).
     // Mars keeps the baked meso-normal/horizon maps (real MOLA) + grain-free
     // physical material until a Mars-analogue detail bake exists.
-    if (!isMars) new THREE.TextureLoader().load('assets/textures/lroc_nac_tile.png', (t) => {
-      try {
-        if (!F.scene || !mat) return;
-        detailCommon(t);
-        const old = mat.normalMap;
-        mat.normalMap = t;
-        mat.normalScale = new THREE.Vector2(1.1, 1.1); // Part-7: 0.3 buried grit
-        mat.needsUpdate = true;
-        F.detailTex = t;
-        try { if (old && old !== t && old.dispose) old.dispose(); } catch (e2) {}
-        // Part-9 (Play-Doh): share the velvet with the breccia — spherical
-        // rock UVs pick up pitted texture at 0.9 scale (one recompile, once).
+    if (!isMars) {
+      new THREE.TextureLoader().load('assets/textures/lunar_regolith_apollo11_normal.png', (t) => {
         try {
-          if (F.rocks && F.rocks.material && !F.rocks.material.normalMap) {
-            F.rocks.material.normalMap = t;
-            F.rocks.material.normalScale.set(0.9, 0.9);
-            F.rocks.material.needsUpdate = true;
-          }
-        } catch (e3) { /* smooth fallback stands */ }
-      } catch (e) { /* velvet stands down */ }
-    }, undefined, () => { /* velvet stands down */ });
+          if (!F.scene || !mat) return;
+          detailCommon(t);
+          const old = mat.normalMap;
+          mat.normalMap = t;
+          mat.normalScale = new THREE.Vector2(1.1, 1.1); // Part-7: 0.3 buried grit
+          mat.needsUpdate = true;
+          F.detailTex = t;
+          try { if (old && old !== t && old.dispose) old.dispose(); } catch (e2) {}
+          // Part-9 (Play-Doh): share the regolith micro-texture with the breccia — spherical
+          // rock UVs pick up pitted texture at 0.9 scale.
+          try {
+            if (F.rocks && F.rocks.material && !F.rocks.material.normalMap) {
+              F.rocks.material.normalMap = t;
+              F.rocks.material.normalScale.set(0.9, 0.9);
+              F.rocks.material.needsUpdate = true;
+            }
+          } catch (e3) { /* smooth fallback stands */ }
+        } catch (e) { /* regolith stands down */ }
+      }, undefined, () => { /* regolith stands down */ });
+
+      new THREE.TextureLoader().load('assets/textures/lunar_regolith_apollo11.jpg', (t) => {
+        try {
+          if (!F.scene || !mat) return;
+          detailCommon(t);
+          if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+          mat.map = t;
+          // Compensate base diffuse so inner patch mean matches outer context (0x78787a)
+          mat.color.setHex(0xb6b6ba);
+          mat.needsUpdate = true;
+          F.regolithAlbedo = t;
+        } catch (e) {}
+      }, undefined, () => {});
+    }
   } catch (e) { /* velvet stands down */ }
   /* Jezero measured micro-detail arrival (progressive enhancement):
      real 1 m normals replace the runtime meso uniform (horizon gate keeps
@@ -2129,15 +2144,16 @@ function surfPlaceRover(V) {
   const F = V.surf;
   if (!F || F.rover) return;
   try {
-    loadRoverGltf().then((gltf) => {
+    const levelId = (typeof S !== 'undefined' ? S.levelId : '');
+    loadRoverGltf(levelId).then((gltf) => {
       try {
         if (!V.surfActive || !V.surf || V.surf !== F || !gltf || !gltf.scene) return;
-        const cal = calibrateRover(gltf.scene.clone(true)); // true 3.0 m span
+        const cal = calibrateRover(gltf.scene.clone(true), levelId);
         cal.updateMatrixWorld(true);
         // Lift comes from the calibration (wheel-referenced); measure the full
         // bbox only as a fallback for models with no named wheel assembly.
         let lift = (cal.userData && isFinite(cal.userData.groundLift))
-          ? cal.userData.groundLift : 1.1;
+          ? cal.userData.groundLift : (cal.userData && cal.userData.trueSpanM ? cal.userData.trueSpanM * 0.35 : 0.6);
         if (!isFinite(lift)) {
           const bb = new THREE.Box3().setFromObject(cal);
           lift = bb.isEmpty() ? 1.1 : -bb.min.y;

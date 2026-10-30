@@ -162,21 +162,29 @@ export function normalizeHero(group) {
    normalizeHero (shared path, geometry untouched). Lazy: fetched on first L2
    preview compose only — never at boot, never headless (?no3d safe: view3d
    only calls this inside the live-renderer compose path). */
-export const ROVER_GLB_URL = 'models/nasa/perseverance.glb';
-export const ROVER_TRUE_SPAN_M = 3.0; // NASA Mars 2020 fact sheet: ~3 m long, 2.7 m wide, 2.2 m tall
-export const ROVER_RAW_MAX_UNITS = 175.63; // measured bbox max (audit table)
-export const ROVER_CAL_FACTOR = ROVER_TRUE_SPAN_M / ROVER_RAW_MAX_UNITS; // ≈0.01708 m/unit
-let _roverP = null;
-export function loadRoverGltf() {
-  if (!_roverP) _roverP = loadKitGltf(ROVER_GLB_URL);
-  return _roverP;
+export const ROVER_BY_LEVEL = {
+  l2: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  sbx_moon: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
+  l3: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' },
+  sbx: { url: 'models/nasa/perseverance.glb', spanM: 3.0, name: 'NASA Perseverance (Mars 2020 Rover)' }
+};
+export function roverConfigForLevel(levelId) {
+  if (levelId === 'l3' || levelId === 'sbx') return ROVER_BY_LEVEL.l3;
+  return ROVER_BY_LEVEL.l2;
 }
-export function calibrateRover(rawGroup) {
-  /* Wheels define the ground plane: Perseverance wheels are exactly 0.5 m in
-     diameter (published), and the export keeps them assembled at y≈0. A full
-     bbox grounds on whichever stray part hangs lowest (a waveguide block sits
-     ~1.5 m below the wheels in this export) — floating the rover. So: span
-     assert on the whole root, lift from the wheel meshes, full bbox fallback. */
+
+export const ROVER_GLB_URL = 'models/nasa/rassor.glb';
+export const ROVER_TRUE_SPAN_M = 1.66;
+export const ROVER_RAW_MAX_UNITS = 1.66;
+export const ROVER_CAL_FACTOR = 1.0;
+
+export function loadRoverGltf(levelId) {
+  const cfg = roverConfigForLevel(levelId);
+  return loadKitGltf(cfg.url);
+}
+export function calibrateRover(rawGroup, levelId) {
+  const cfg = roverConfigForLevel(levelId);
+  const trueSpanM = cfg.spanM;
   const fixed = normalizeHero(rawGroup);
   const root = new THREE.Group();
   root.name = 'rover_calibrated';
@@ -187,7 +195,7 @@ export function calibrateRover(rawGroup) {
     const c = b.getCenter(new THREE.Vector3());
     const sz = b.getSize(new THREE.Vector3());
     const maxDim = Math.max(sz.x, sz.y, sz.z) || 1;
-    const k = ROVER_TRUE_SPAN_M / maxDim;
+    const k = trueSpanM / maxDim;
     const inner = new THREE.Group();
     // Offset lives INSIDE the scaled frame (cf. ops-view craft_true): a single
     // node with position+scale would apply the offset unscaled.
@@ -196,15 +204,16 @@ export function calibrateRover(rawGroup) {
     inner.add(fixed);
     root.add(inner);
     root.userData.calFactor = k;
-    root.userData.trueSpanM = ROVER_TRUE_SPAN_M;
+    root.userData.trueSpanM = trueSpanM;
+    root.userData.roverName = cfg.name;
     root.updateMatrixWorld(true);
     // Span assert: a unit-rogue export rescales here, never silently.
     const chk = new THREE.Box3().setFromObject(root);
     if (!chk.isEmpty()) {
       const cs = chk.getSize(new THREE.Vector3());
       const span = Math.max(cs.x, cs.y, cs.z) || 1;
-      if (Math.abs(span - ROVER_TRUE_SPAN_M) / ROVER_TRUE_SPAN_M > 0.10) {
-        root.scale.multiplyScalar(ROVER_TRUE_SPAN_M / span);
+      if (Math.abs(span - trueSpanM) / trueSpanM > 0.10) {
+        root.scale.multiplyScalar(trueSpanM / span);
         root.updateMatrixWorld(true);
       }
     }

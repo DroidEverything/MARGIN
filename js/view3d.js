@@ -221,16 +221,17 @@ function attachRoverPreview(craft, key) {
     let lvl = null, rv = null;
     try { lvl = (typeof S !== 'undefined') ? S.levelId : null; } catch (e) {}
     try { rv = (typeof S !== 'undefined') ? S.rover : null; } catch (e) {}
-    if (lvl !== 'l2' || !rv) return;
-    loadRoverGltf().then((gltf) => {
+    if ((lvl !== 'l2' && lvl !== 'l3' && lvl !== 'sbx' && lvl !== 'sbx_moon') || !rv) return;
+    loadRoverGltf(lvl).then((gltf) => {
       try {
         if (M3D.key !== key || M3D.craft !== craft) return; // stale compose
         if (!gltf || !gltf.scene) return;
         if (craft.getObjectByName('rover_preview')) return;
-        const cal = calibrateRover(gltf.scene.clone(true));
+        const cal = calibrateRover(gltf.scene.clone(true), lvl);
         const disp = new THREE.Group();
         disp.name = 'rover_preview';
-        cal.scale.multiplyScalar(1.4 / ROVER_TRUE_SPAN_M);
+        const span = cal.userData && cal.userData.trueSpanM ? cal.userData.trueSpanM : ROVER_TRUE_SPAN_M;
+        cal.scale.multiplyScalar(1.4 / span);
         disp.add(cal);
         disp.position.set(2.1, -0.9, 0.6);
         craft.add(disp);
