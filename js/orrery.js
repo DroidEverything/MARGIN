@@ -151,10 +151,9 @@ export const BODY_STYLE = {
    below); mercury/venus/mars/jupiter/saturn/uranus/neptune load the vendored
    Solar System Scope 8K/2K maps in models/8K_textures (CC BY 4.0,
    solarsystemscope.com/textures — same source as the Earth SSS set, surface
-   appearance only, no ephemeris/lighting/gameplay effect). Moon runs the 8K
-   map (8192×4096, ~170 MB with mips — needs a ≥1 GB GPU; WAC mosaic retained
-   in assets/ as the low-end fallback). Sun stays procedural, rings stay stays procedural, rings stay
-   procedural from real radii, sky stays Hipparcos. See ASSET_SOURCES.md. */
+   appearance only, no ephemeris/lighting/gameplay effect). Moon runs the 8K map (assets/textures/moon_8k.jpg). Sun stays procedural,
+   sky uses Solar System Scope stars_8k.jpg (CC BY 4.0). See ASSET_SOURCES.md. */
+
 /* Earth surface extras. Solar System Scope 2D textures, CC BY 4.0
    (solarsystemscope.com/textures). Non-NASA, unlike the rest of this map set:
    see assets/ASSET_SOURCES.md + SOURCES.md §7 for the full attribution.
@@ -168,7 +167,7 @@ export const BODY_TEX = {
   earthNight:      'assets/textures/earth_night_sss.jpg',
   earthClouds:     'assets/textures/earth_clouds_sss.png',
   earthRough:      'assets/textures/earth_roughness_sss.jpg',
-  moon:            'models/8K_textures/8k_moon.png',
+  moon:            'assets/textures/lroc_color_4k.jpg',
   mars:            'models/8K_textures/8k_mars.jpg',
   mercury:         'models/8K_textures/8k_mercury.jpg',
   venus:           'models/8K_textures/venus/8k_venus_surface.jpg',
