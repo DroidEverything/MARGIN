@@ -70,12 +70,14 @@ export function loadKitGltf(url) {
    player's modular kit build. Sim is untouched — this only selects the mesh.
    Fallback chain everywhere: hero -> kit assembly -> margin bus -> marker. */
 export const HERO_BY_LEVEL = {
-  l2: { url: 'models/nasa/lro.glb', assetId: 'LRO-A', why: 'Lunar orbiter for lunar polar mission' },
-  l3: { url: 'models/nasa/mro.glb', assetId: 'MRO-A', why: 'Mars orbiter for Mars relay mission' },
-  l4: { url: 'models/nasa/osiris_rex.glb', assetId: 'OSIRIS-REX', why: 'Sample-return probe for asteroid TAG mission' },
-  l5: { url: 'models/nasa/voyager.glb', assetId: 'VOYAGER-A', why: 'Outer-system flyby heritage for Europa tour' },
-  l1: null, sbx: null // kit build: your design
-  // spares (viewer-available, unassigned): juno, maven, messenger
+  l1: { url: 'models/nasa/messenger.glb', assetId: 'MESSENGER', why: 'Orbital remote-sensing observatory' },
+  l2: { url: 'models/nasa/lro.glb', assetId: 'LRO-A', why: 'Lunar Reconnaissance Orbiter' },
+  l3: { url: 'models/nasa/mro.glb', assetId: 'MRO-A', why: 'Mars Reconnaissance Orbiter' },
+  l4: { url: 'models/nasa/osiris_rex.glb', assetId: 'OSIRIS-REX', why: 'OSIRIS-REx Sample-Return Probe' },
+  l5: { url: 'models/nasa/voyager.glb', assetId: 'VOYAGER-A', why: 'Outer-Planet Flagship Heritage' },
+  sbx: { url: 'models/nasa/mro.glb', assetId: 'MRO-A', why: 'Mars Exploration Flagship' },
+  sbx_moon: { url: 'models/nasa/lro.glb', assetId: 'LRO-A', why: 'Lunar Exploration Flagship' },
+  sbx_earth: { url: 'models/nasa/messenger.glb', assetId: 'MESSENGER', why: 'Earth Observation Baseline' }
 };
 export function heroForLevel(levelId) {
   try { return HERO_BY_LEVEL[levelId] || null; } catch (e) { return null; }
@@ -476,118 +478,17 @@ function _emat() {
 }
 
 /* Hang authentic aerospace engine cluster under spacecraft bus */
+/* Retired artificial procedural engine cones. Authentic propulsion
+   systems and thruster pods are integral to the genuine NASA flight spacecraft. */
 export function mountEngineRow(parent, spec) {
-  try {
-    if (!parent || !parent.getObjectByName) return null;
-    if (!spec) return null;
-    const box = new THREE.Box3().setFromObject(parent);
-    if (box.isEmpty()) return null;
-    const size = box.getSize(new THREE.Vector3());
-    const c = box.getCenter(new THREE.Vector3());
-    const toLocal = (v) => (parent.worldToLocal ? parent.worldToLocal(v) : v);
-    const cl = toLocal(c.clone());
-    const minLy = toLocal(new THREE.Vector3(c.x, box.min.y, c.z)).y;
-    const G = _egeo(), M = _emat();
-    const row = new THREE.Group();
-    row.name = 'engine_block';
-    const u = Math.max(size.x, size.y, size.z) * 0.16 * (spec.s || 1);
-
-    const P = (geo, mat, sx, sy, sz, x, y, z, rx, ry, rz) => {
-      const m = new THREE.Mesh(geo, mat);
-      m.scale.set(Math.max(sx, 1e-5), Math.max(sy, 1e-5), Math.max(sz, 1e-5));
-      m.position.set(x, y, z);
-      if (rx) m.rotation.x = rx; if (ry) m.rotation.y = ry; if (rz) m.rotation.z = rz;
-      row.add(m); return m;
-    };
-
-    if (spec.kind === 'chem') { // Chemical Engine (MR-106 / R-4D-11 class)
-      // Thrust structure mounting ring
-      P(G.torus, M.gimbalTitanium, u * 0.75, u * 0.75, u * 0.75, cl.x, minLy - u * 0.05, cl.z, Math.PI / 2, 0, 0);
-      // Combustion chamber with gold MLI heat shield
-      P(G.cyl, M.goldMli, u * 0.42, u * 0.32, u * 0.42, cl.x, minLy - u * 0.18, cl.z);
-      // Gimbal actuators (dual orthogonal struts)
-      P(G.cyl, M.gimbalTitanium, u * 0.06, u * 0.35, u * 0.06, cl.x + u * 0.22, minLy - u * 0.16, cl.z, 0, 0, 0.35);
-      P(G.cyl, M.gimbalTitanium, u * 0.06, u * 0.35, u * 0.06, cl.x - u * 0.22, minLy - u * 0.16, cl.z, 0, 0, -0.35);
-      // High-expansion Niobium nozzle bell
-      P(G.cone, M.nozzleNiobium, u * 0.78, u * 0.68, u * 0.78, cl.x, minLy - u * 0.62, cl.z);
-      // Exit plane stiffener lip
-      P(G.torus, M.gimbalTitanium, u * 0.78, u * 0.78, u * 0.78, cl.x, minLy - u * 0.95, cl.z, Math.PI / 2, 0, 0);
-      // Glowing internal throat
-      P(G.cyl, M.throatGlow, u * 0.14, u * 0.04, u * 0.14, cl.x, minLy - u * 0.32, cl.z);
-    } else { // Solar Electric Propulsion (NEXT-C Gridded Ion Thruster Suite)
-      // Thruster module mounting deck
-      P(G.box, M.gimbalTitanium, u * 1.05, u * 0.08, u * 1.05, cl.x, minLy - u * 0.04, cl.z);
-      for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * Math.PI * 2;
-        const ix = cl.x + Math.cos(a) * u * 0.34;
-        const iz = cl.z + Math.sin(a) * u * 0.34;
-        // Discharge cathode body
-        P(G.cyl, M.gimbalTitanium, u * 0.26, u * 0.28, u * 0.26, ix, minLy - u * 0.18, iz);
-        // Ion extraction accelerator grid ring
-        P(G.torus, M.ionMolyGrid, u * 0.28, u * 0.28, u * 0.28, ix, minLy - u * 0.32, iz, Math.PI / 2, 0, 0);
-        // Xenon plasma luminescent emitter disc
-        P(G.cyl, M.ionPlasmaGlow, u * 0.22, u * 0.03, u * 0.22, ix, minLy - u * 0.31, iz);
-      }
-    }
-
-    row.traverse(o => { if (o.isMesh) o.userData.engine = true; });
-    parent.add(row);
-    return row;
-  } catch (e) { return null; }
+  return null;
 }
 
-/* Hang authentic aerospace kinematic mounting rack and components */
+/* Retired legacy procedural rail and primitive block geometry completely.
+   All missions now display authentic NASA CAD spacecraft (LRO, MRO, OSIRIS-REx, Voyager, MESSENGER).
+   Instruments are integrated directly into genuine NASA flight structures. */
 export function mountGlyphRow(parent, ids, groupOf) {
-  try {
-    if (!parent || !parent.getObjectByName) return null;
-    ids = (ids || []).slice(0, 12);
-    if (!ids.length) return null;
-    const box = new THREE.Box3().setFromObject(parent);
-    if (box.isEmpty()) return null;
-    const size = box.getSize(new THREE.Vector3());
-    const c = box.getCenter(new THREE.Vector3());
-    const toLocal = (v) => (parent.worldToLocal ? parent.worldToLocal(v) : v);
-    const craftLocal = toLocal(c.clone());
-    const row = new THREE.Group();
-    row.name = 'generic_instruments';
-    const n = ids.length;
-    const span = Math.max(size.x, 0.02);
-    const cell = span / n;
-    const s = Math.min(cell * 0.45, Math.max(size.y, size.x, size.z) * 0.3);
-    const minLy = toLocal(new THREE.Vector3(c.x, box.min.y, c.z)).y;
-    const rowY = minLy - Math.max(size.y * 0.02, 0.001);
-
-    // Kinematic titanium payload equipment bench
-    const G0 = _igeo(), M0 = _imat();
-    const bench = new THREE.Mesh(G0.box, M0.titanium);
-    bench.scale.set(Math.max(span * 0.98, 1e-4), Math.max(s * 0.08, 1e-5), Math.max(s * 0.24, 1e-5));
-    bench.position.set(craftLocal.x, rowY + s * 0.04, craftLocal.z);
-    bench.traverse(o => { if (o.isMesh) o.userData.generic = true; });
-    row.add(bench);
-
-    // Kinematic titanium bipod struts bolting bench to bus structure
-    for (let j = -1; j <= 1; j += 2) {
-      const strut = new THREE.Mesh(G0.cyl, M0.carbonFiber);
-      strut.scale.set(0.02, Math.max(s * 0.25, 1e-5), 0.02);
-      strut.position.set(craftLocal.x + j * span * 0.42, rowY + s * 0.16, craftLocal.z);
-      strut.traverse(o => { if (o.isMesh) o.userData.generic = true; });
-      row.add(strut);
-    }
-
-    for (let i = 0; i < n; i++) {
-      const glyph = buildGlyph(groupOf ? groupOf(ids[i]) : '');
-      glyph.scale.setScalar(Math.max(s, 1e-4));
-      glyph.position.set(
-        craftLocal.x - span / 2 + cell * (i + 0.5),
-        rowY,
-        craftLocal.z
-      );
-      glyph.traverse(o => { if (o.isMesh) o.userData.generic = true; });
-      row.add(glyph);
-    }
-    parent.add(row);
-    return row;
-  } catch (e) { return null; }
+  return null;
 }
 
 export function assembleKit(bodyScene, wingScene, radioScene, wScale, rScale) {
