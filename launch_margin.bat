@@ -6,11 +6,11 @@ REM ---------------------------------------------------------------
 REM MARGIN local launcher
 REM Browsers block ES modules and binary asset fetches on file://,
 REM so the game must be served over HTTP. This starts a local server
-REM and opens the game. Close this window or press Ctrl+C to stop.
+REM in a minimized window and opens the game in the default browser.
 REM ---------------------------------------------------------------
 
-set "PORT=8000"
-set "URL=http://127.0.0.1:%PORT%/"
+set "PORT=8906"
+set "URL=http://localhost:%PORT%/index.html"
 
 REM Find Python 3 (py launcher first, then python on PATH)
 set "PY="
@@ -25,22 +25,24 @@ if defined PY goto havepython
 echo.
 echo  Python 3 was not found on PATH.
 echo  Install it from https://www.python.org/downloads/
-echo  (tick "Add python.exe to PATH"), then run launch.bat again.
+echo  (tick "Add python.exe to PATH"), then run launch_margin.bat again.
 echo.
 pause
 exit /b 1
 
 :havepython
+echo Starting MARGIN server on port %PORT% ...
+start "MARGIN server" /min %PY% -m http.server %PORT% --bind 127.0.0.1
+timeout /t 2 /nobreak >nul
+
 echo.
-echo  MARGIN - local server
-echo  ---------------------
-echo  Game:  %URL%
-echo  Stop:  Ctrl+C in this window, or close it
+echo  MARGIN: %URL%
+echo  The server runs in the minimized window titled "MARGIN server".
+echo  To stop it, close that window or run:
+echo    taskkill /FI "WINDOWTITLE eq MARGIN server*"
 echo.
-if /i "%MARGIN_NO_BROWSER%"=="1" goto serve
-start "" /b powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Milliseconds 1500; Start-Process '%URL%'"
-:serve
-%PY% -m http.server %PORT% --bind 127.0.0.1
-echo.
-echo  Server stopped.
-pause
+if /i "%MARGIN_NO_BROWSER%"=="1" goto done
+start "" "%URL%"
+
+:done
+endlocal
