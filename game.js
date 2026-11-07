@@ -1006,12 +1006,57 @@ function infoTag(p,label,extra,cat,id){
 })();
 
 /* ── sound (Aerospace Physical Modeling & Mission Control Audio Synthesis) ── */
+const UI_SND = {
+  mechanical: new Set([
+    "start", "commit", "launch", "landch", "tobuild", "tobrief", "tolaunch",
+    "rebuild", "resume", "resumesession", "handoff", "goseat",
+    "apply-match-code", "challenge-match", "cmprun", "extrev", "tour-finish"
+  ]),
+  tick: new Set([
+    "bstep", "tour-step", "devjump", "devm", "next", "rep", "reptab",
+    "history", "filter-useful"
+  ]),
+  scifi: new Set([
+    "closeModal", "how", "about", "sources", "flight-school", "nasainfo",
+    "dsn", "obj", "instr", "tour-toy-inst", "tour-toy-obj", "tour-toy-planet",
+    "tour-toy-pork", "tour-toy-pwr"
+  ]),
+  click2: new Set([
+    "assist", "toggle-acc", "toggle-hud", "toggle-minimap", "cam-mode",
+    "pmode", "spd", "copy", "copyc", "home", "gohome"
+  ])
+};
+
+/* Deterministic UI sound routing: explicit variant wins, otherwise the
+   control's data-act / id / role decides. Same control, same sound. */
+function uiSampleFor(target, variant){
+  if(variant){
+    return variant === "action" ? "mechanical"
+         : variant === "modal" ? "scifi"
+         : variant === "nav" ? "tick"
+         : "click3";
+  }
+  if(target){
+    const act = (target.dataset && target.dataset.act) || "";
+    const id = target.id || "";
+    if(target.classList && target.classList.contains("primary")) return "mechanical";
+    if(UI_SND.mechanical.has(act)) return "mechanical";
+    if(id === "btnSound" || id === "btnMode" || id === "btnHome" || id === "btnTelemToggle") return "click2";
+    if(UI_SND.click2.has(act)) return "click2";
+    if((target.classList && target.classList.contains("tab")) || UI_SND.tick.has(act)) return "tick";
+    if((target.closest && target.closest(".modal")) || UI_SND.scifi.has(act)) return "scifi";
+    return "click3";
+  }
+  return "click3";
+}
+
 const Audio_={
   ctx:null,
   on:true,
   master:null,
   uiSfx:null,
   _uiSfxLoading:false,
+  _noiseCache:{},
 
   init(){
     if(!this.ctx){
@@ -1071,6 +1116,23 @@ const Audio_={
     }catch(e){ return false; }
   },
 
+  // Deterministic fallback transient: seeded once, reused for every click.
+  noiseBuffer(duration, tau){
+    const key = duration + ":" + tau;
+    if(!this._noiseCache[key]){
+      const n = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
+      const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      let seed = 0x9e3779b9;
+      for(let i=0; i<n; i++){
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        d[i] = ((seed / 4294967296) * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * tau));
+      }
+      this._noiseCache[key] = buf;
+    }
+    return this._noiseCache[key];
+  },
+
   // Tactile aerospace console audio profiles with curated acoustic variations:
   // - "nav": sleek, low-friction rotary detent (tab switch, breadcrumbs, step nav)
   // - "select" / "toggle": damped micro-switch contact
@@ -1085,34 +1147,33 @@ const Audio_={
       const c = this.ctx;
       const t0 = c.currentTime;
 
-      // Auto-detect variant if not explicitly supplied
+      // Resolve the control once; the same control always maps to one sound.
+      const uiTarget = (typeof window !== "undefined" && window.event && window.event.target)
+        ? window.event.target.closest("button, [data-act], .choice, .rail")
+        : null;
+
       let v = variant;
-      if (!v && typeof window !== "undefined" && window.event) {
-        const target = window.event.target ? window.event.target.closest("button, [data-act], .choice, .rail") : null;
-        if (target) {
-          const act = target.dataset.act;
-          if (target.classList.contains("primary") || ["start", "commit", "launch", "landch"].includes(act)) v = "action";
-          else if (["tobuild", "tobrief", "tolaunch", "bstep", "tour-step", "devjump", "devm"].includes(act) || target.classList.contains("tab")) v = "nav";
-          else if (["closeModal", "how", "about", "sources", "flight-school"].includes(act) || target.closest(".modal")) v = "modal";
-          else if (["inst", "pw", "pr", "cm", "sh"].includes(act)) v = "mount";
-          else v = "toggle";
-        }
+      if (!v && uiTarget) {
+        const act = uiTarget.dataset.act;
+        if (uiTarget.classList.contains("primary") || ["start", "commit", "launch", "landch"].includes(act)) v = "action";
+        else if (["tobuild", "tobrief", "tolaunch", "bstep", "tour-step", "devjump", "devm"].includes(act) || uiTarget.classList.contains("tab")) v = "nav";
+        else if (["closeModal", "how", "about", "sources", "flight-school"].includes(act) || uiTarget.closest(".modal")) v = "modal";
+        else if (["inst", "pw", "pr", "cm", "sh"].includes(act)) v = "mount";
+        else v = "toggle";
       }
       if (!v) v = "toggle";
 
       if (v === "mount") { this.mount(); return; }
       if (v === "unmount") { this.unmount(); return; }
 
-      // Sampled UI set (CC0). Falls through to the synth below until loaded.
-      const uiName = v === "action" ? "mechanical"
-                   : v === "modal" ? "scifi"
-                   : v === "nav" ? "tick"
-                   : (Math.random() < 0.3 ? "click2" : "click3");
-      const uiGain = v === "action" ? 0.85
-                   : v === "modal" ? 0.65
-                   : v === "nav" ? 0.60
+      // Sampled UI set (CC0). Deterministic: no random pick, no random pitch.
+      const uiName = uiSampleFor(uiTarget, variant);
+      const uiGain = uiName === "mechanical" ? 0.85
+                   : uiName === "scifi" ? 0.65
+                   : uiName === "tick" ? 0.60
+                   : uiName === "click2" ? 0.72
                    : 0.78;
-      if (this.playUiSfx(uiName, uiGain, 0.97 + Math.random() * 0.06)) return;
+      if (this.playUiSfx(uiName, uiGain, 1)) return;
 
       // Shared output stage: soften the top end so the transient reads as a
       // damped console key rather than a bright click.
@@ -1127,11 +1188,8 @@ const Audio_={
 
       if (v === "action") {
         // Weighted aerospace command button: damped snap + deep 135->70 Hz chassis body
-        const snapLen = Math.floor(c.sampleRate * 0.006);
-        const snapBuf = c.createBuffer(1, snapLen, c.sampleRate);
-        const d = snapBuf.getChannelData(0);
-        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0014));
-        const snap = c.createBufferSource(); snap.buffer = snapBuf;
+        const snap = c.createBufferSource();
+        snap.buffer = this.noiseBuffer(0.006, 0.0014);
         const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(1600, t0); sf.Q.setValueAtTime(1.0, t0);
         const sg = c.createGain(); sg.gain.setValueAtTime(0.30, t0);
         snap.connect(sf); sf.connect(sg); sg.connect(out);
@@ -1170,11 +1228,8 @@ const Audio_={
         osc.start(t0); osc.stop(t0 + 0.026);
       } else {
         // Damped micro-switch: softer 1.9 kHz contact + 200->100 Hz body ("toggle" / "select")
-        const snapLen = Math.floor(c.sampleRate * 0.005);
-        const snapBuf = c.createBuffer(1, snapLen, c.sampleRate);
-        const d = snapBuf.getChannelData(0);
-        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0012));
-        const snap = c.createBufferSource(); snap.buffer = snapBuf;
+        const snap = c.createBufferSource();
+        snap.buffer = this.noiseBuffer(0.005, 0.0012);
         const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(1900, t0); sf.Q.setValueAtTime(0.9, t0);
         const sg = c.createGain(); sg.gain.setValueAtTime(0.24, t0);
         snap.connect(sf); sf.connect(sg); sg.connect(out);
