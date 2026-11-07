@@ -1030,7 +1030,7 @@ const Audio_={
 
   // Tactile aerospace console audio profiles with curated acoustic variations:
   // - "nav": sleek, low-friction rotary detent (tab switch, breadcrumbs, step nav)
-  // - "select" / "toggle": crisp Honeywell / Cherry micro-switch snap
+  // - "select" / "toggle": damped micro-switch contact
   // - "action" / "commit": weighted aerospace command console press (deep chassis thud)
   // - "modal": damped acoustic enclosure relay
   // - "mount" / "unmount": 2-stage rack latch mechanism
@@ -1060,70 +1060,81 @@ const Audio_={
       if (v === "mount") { this.mount(); return; }
       if (v === "unmount") { this.unmount(); return; }
 
+      // Shared output stage: soften the top end so the transient reads as a
+      // damped console key rather than a bright click.
+      const out = c.createGain();
+      out.gain.setValueAtTime(1, t0);
+      const tone = c.createBiquadFilter();
+      tone.type = "lowpass";
+      tone.frequency.setValueAtTime(6200, t0);
+      tone.Q.setValueAtTime(0.7, t0);
+      out.connect(tone);
+      tone.connect(this.master || c.destination);
+
       if (v === "action") {
-        // Weighted aerospace command button: tactile snap + deep 160->75 Hz chassis body resonance
-        const snapLen = Math.floor(c.sampleRate * 0.004);
+        // Weighted aerospace command button: damped snap + deep 135->70 Hz chassis body
+        const snapLen = Math.floor(c.sampleRate * 0.006);
         const snapBuf = c.createBuffer(1, snapLen, c.sampleRate);
         const d = snapBuf.getChannelData(0);
-        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0008));
+        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0014));
         const snap = c.createBufferSource(); snap.buffer = snapBuf;
-        const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(2200, t0); sf.Q.setValueAtTime(1.8, t0);
-        const sg = c.createGain(); sg.gain.setValueAtTime(0.45, t0);
-        snap.connect(sf); sf.connect(sg); sg.connect(this.master || c.destination);
+        const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(1600, t0); sf.Q.setValueAtTime(1.0, t0);
+        const sg = c.createGain(); sg.gain.setValueAtTime(0.30, t0);
+        snap.connect(sf); sf.connect(sg); sg.connect(out);
         snap.start(t0);
 
         const thud = c.createOscillator();
         thud.type = "sine";
-        thud.frequency.setValueAtTime(160, t0);
-        thud.frequency.exponentialRampToValueAtTime(75, t0 + 0.026);
+        thud.frequency.setValueAtTime(135, t0);
+        thud.frequency.exponentialRampToValueAtTime(70, t0 + 0.050);
         const tg = c.createGain();
-        tg.gain.setValueAtTime(0.55, t0);
-        tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.026);
-        thud.connect(tg); tg.connect(this.master || c.destination);
-        thud.start(t0); thud.stop(t0 + 0.028);
+        tg.gain.setValueAtTime(0.34, t0);
+        tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.050);
+        thud.connect(tg); tg.connect(out);
+        thud.start(t0); thud.stop(t0 + 0.052);
       } else if (v === "nav") {
-        // Sleek rotary selector detent: 1200 Hz damped micro-snap, low friction
+        // Soft rotary detent: short 820->520 Hz tick, no bright snap
         const osc = c.createOscillator();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(1200, t0);
-        osc.frequency.exponentialRampToValueAtTime(400, t0 + 0.010);
+        osc.frequency.setValueAtTime(820, t0);
+        osc.frequency.exponentialRampToValueAtTime(520, t0 + 0.018);
         const og = c.createGain();
-        og.gain.setValueAtTime(0.25, t0);
-        og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.010);
-        osc.connect(og); og.connect(this.master || c.destination);
-        osc.start(t0); osc.stop(t0 + 0.012);
+        og.gain.setValueAtTime(0.14, t0);
+        og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.018);
+        osc.connect(og); og.connect(out);
+        osc.start(t0); osc.stop(t0 + 0.020);
       } else if (v === "modal") {
         // Enclosure damped acoustic tap
         const osc = c.createOscillator();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(440, t0);
-        osc.frequency.exponentialRampToValueAtTime(180, t0 + 0.014);
+        osc.frequency.setValueAtTime(340, t0);
+        osc.frequency.exponentialRampToValueAtTime(170, t0 + 0.024);
         const og = c.createGain();
-        og.gain.setValueAtTime(0.30, t0);
-        og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.014);
-        osc.connect(og); og.connect(this.master || c.destination);
-        osc.start(t0); osc.stop(t0 + 0.016);
+        og.gain.setValueAtTime(0.18, t0);
+        og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.024);
+        osc.connect(og); og.connect(out);
+        osc.start(t0); osc.stop(t0 + 0.026);
       } else {
-        // Crisp tactile Honeywell micro-switch snap ("toggle" / "select")
-        const snapLen = Math.floor(c.sampleRate * 0.0025);
+        // Damped micro-switch: softer 1.9 kHz contact + 200->100 Hz body ("toggle" / "select")
+        const snapLen = Math.floor(c.sampleRate * 0.005);
         const snapBuf = c.createBuffer(1, snapLen, c.sampleRate);
         const d = snapBuf.getChannelData(0);
-        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0005));
+        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0012));
         const snap = c.createBufferSource(); snap.buffer = snapBuf;
-        const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(3200, t0); sf.Q.setValueAtTime(2.5, t0);
-        const sg = c.createGain(); sg.gain.setValueAtTime(0.38, t0);
-        snap.connect(sf); sf.connect(sg); sg.connect(this.master || c.destination);
+        const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(1900, t0); sf.Q.setValueAtTime(0.9, t0);
+        const sg = c.createGain(); sg.gain.setValueAtTime(0.24, t0);
+        snap.connect(sf); sf.connect(sg); sg.connect(out);
         snap.start(t0);
 
         const thud = c.createOscillator();
         thud.type = "sine";
-        thud.frequency.setValueAtTime(260, t0);
-        thud.frequency.exponentialRampToValueAtTime(120, t0 + 0.014);
+        thud.frequency.setValueAtTime(200, t0);
+        thud.frequency.exponentialRampToValueAtTime(100, t0 + 0.036);
         const tg = c.createGain();
-        tg.gain.setValueAtTime(0.36, t0);
-        tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.014);
-        thud.connect(tg); tg.connect(this.master || c.destination);
-        thud.start(t0); thud.stop(t0 + 0.016);
+        tg.gain.setValueAtTime(0.26, t0);
+        tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.036);
+        thud.connect(tg); tg.connect(out);
+        thud.start(t0); thud.stop(t0 + 0.038);
       }
     }catch(e){}
   },
