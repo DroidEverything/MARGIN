@@ -81,13 +81,13 @@ function nasaHardwareModal(cat, id){
       + '</div>';
   }
 
-  el('mbox').innerHTML = '<div style="border-bottom:1px solid var(--hairline);padding-bottom:8px;margin-bottom:12px">'
+  el('mbox').innerHTML = '<div class="prov-head">'
     + '<div class="spread">'
-    + '<span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--dim)">NASA FLIGHT PROVENANCE DOSSIER</span>'
-    + '<span class="tag" style="border-color:var(--nasa-blue);color:var(--blue-lift)">NASA VERIFIED</span>'
+    + '<span class="prov-kicker">NASA FLIGHT PROVENANCE DOSSIER</span>'
+    + '<span class="tag prov-badge">NASA VERIFIED</span>'
     + '</div>'
-    + '<h2 style="margin:6px 0 2px;font-size:18px">' + esc(h.name) + '</h2>'
-    + '<div class="hint" style="font-size:11.5px;color:var(--phosphor)">' + esc(h.mission || h.flightOrigin || '') + '</div>'
+    + '<h2 class="prov-title">' + esc(h.name) + '</h2>'
+    + '<div class="prov-sub">' + esc(h.mission || h.flightOrigin || '') + '</div>'
     + '</div>'
     + '<div class="mb" style="font-size:12.5px;line-height:1.6;max-height:60vh;overflow:auto">'
     + (h.sponsor ? '<p style="margin:4px 0"><b style="color:var(--dim)">Principal Sponsor / Facility:</b> ' + esc(h.sponsor) + '</p>' : '')
