@@ -1010,6 +1010,8 @@ const Audio_={
   ctx:null,
   on:true,
   master:null,
+  uiSfx:null,
+  _uiSfxLoading:false,
 
   init(){
     if(!this.ctx){
@@ -1026,6 +1028,47 @@ const Audio_={
     if(this.ctx && this.ctx.state === "suspended"){
       try{ this.ctx.resume().catch(()=>{}); }catch(e){}
     }
+    this.loadUiSfx();
+  },
+
+  // Preload the vendored UI samples once; if any fail, the synth fallback remains.
+  loadUiSfx(){
+    if(this._uiSfxLoading || this.uiSfx) return;
+    if(!this.ctx || typeof fetch !== "function") return;
+    this._uiSfxLoading = true;
+    const sources = {
+      click2: "assets/audio/ui/click_002.wav",
+      click3: "assets/audio/ui/click_003.wav",
+      tick: "assets/audio/ui/tick_001.wav",
+      mechanical: "assets/audio/ui/mechanical_select.mp3",
+      scifi: "assets/audio/ui/scifi_select.mp3"
+    };
+    const out = {};
+    let pending = Object.keys(sources).length;
+    Object.entries(sources).forEach(([key, url]) => {
+      fetch(url)
+        .then(r => { if(!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); })
+        .then(buf => this.ctx.decodeAudioData(buf))
+        .then(decoded => { out[key] = decoded; })
+        .catch(() => {})
+        .finally(() => { if(--pending === 0) this.uiSfx = out; });
+    });
+  },
+
+  playUiSfx(name, gain, rate){
+    const buf = this.uiSfx && this.uiSfx[name];
+    if(!buf || !this.ctx) return false;
+    try{
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate || 1;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(gain == null ? 0.8 : gain, this.ctx.currentTime);
+      src.connect(g);
+      g.connect(this.master || this.ctx.destination);
+      src.start();
+      return true;
+    }catch(e){ return false; }
   },
 
   // Tactile aerospace console audio profiles with curated acoustic variations:
@@ -1059,6 +1102,17 @@ const Audio_={
 
       if (v === "mount") { this.mount(); return; }
       if (v === "unmount") { this.unmount(); return; }
+
+      // Sampled UI set (CC0). Falls through to the synth below until loaded.
+      const uiName = v === "action" ? "mechanical"
+                   : v === "modal" ? "scifi"
+                   : v === "nav" ? "tick"
+                   : (Math.random() < 0.3 ? "click2" : "click3");
+      const uiGain = v === "action" ? 0.85
+                   : v === "modal" ? 0.65
+                   : v === "nav" ? 0.60
+                   : 0.78;
+      if (this.playUiSfx(uiName, uiGain, 0.97 + Math.random() * 0.06)) return;
 
       // Shared output stage: soften the top end so the transient reads as a
       // damped console key rather than a bright click.
