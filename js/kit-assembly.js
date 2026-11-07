@@ -70,14 +70,14 @@ export function loadKitGltf(url) {
    player's modular kit build. Sim is untouched — this only selects the mesh.
    Fallback chain everywhere: hero -> kit assembly -> margin bus -> marker. */
 export const HERO_BY_LEVEL = {
-  l1: { url: 'models/nasa/messenger.glb', assetId: 'MESSENGER', why: 'Orbital remote-sensing observatory' },
+  l1: { url: 'models/nasa/aqua.glb', assetId: 'AQUA-EOS', why: 'Aqua Earth Observing System Flagship (NASA EOS)' },
   l2: { url: 'models/nasa/lro.glb', assetId: 'LRO-A', why: 'Lunar Reconnaissance Orbiter' },
   l3: { url: 'models/nasa/mro.glb', assetId: 'MRO-A', why: 'Mars Reconnaissance Orbiter' },
   l4: { url: 'models/nasa/osiris_rex.glb', assetId: 'OSIRIS-REX', why: 'OSIRIS-REx Sample-Return Probe' },
   l5: { url: 'models/nasa/voyager.glb', assetId: 'VOYAGER-A', why: 'Outer-Planet Flagship Heritage' },
   sbx: { url: 'models/nasa/mro.glb', assetId: 'MRO-A', why: 'Mars Exploration Flagship' },
   sbx_moon: { url: 'models/nasa/lro.glb', assetId: 'LRO-A', why: 'Lunar Exploration Flagship' },
-  sbx_earth: { url: 'models/nasa/messenger.glb', assetId: 'MESSENGER', why: 'Earth Observation Baseline' }
+  sbx_earth: { url: 'models/nasa/aqua.glb', assetId: 'AQUA-EOS', why: 'Aqua Earth Observing System Baseline (NASA EOS)' }
 };
 export function heroForLevel(levelId) {
   try {
@@ -127,9 +127,24 @@ export function normalizeHero(group) {
       for (const m of mats) {
         if (!m) continue;
         try {
-          if (m.transparent && (m.opacity === 0 || m.opacity < 0.03)) { m.transparent = false; m.opacity = 1; }
+          // Flight spacecraft and solar arrays are solid physical objects.
+          // Enforce opacity and depth testing/writing so background planets/clouds never bleed through:
+          if (m.transparent && (m.opacity === 0 || m.opacity < 0.05 || m.opacity >= 0.95)) {
+            m.transparent = false;
+            m.opacity = 1.0;
+          }
+          m.depthTest = true;
+          m.depthWrite = true;
           if (m.alphaTest > 0.9) m.alphaTest = 0;
-          if (m.side === THREE.FrontSide) m.side = THREE.DoubleSide;
+          // Only double-side planar sheets (solar arrays, antenna dishes, radiator wings).
+          // Keep 3D volumetric bodies FrontSide to prevent internal backface clipping/hollow hulls:
+          const isPlanar = /panel|wing|array|dish|solar|radiator|foil/i.test(m.name || '') ||
+                           /panel|wing|array|dish|solar|radiator|foil/i.test(o.name || '');
+          if (isPlanar) {
+            m.side = THREE.DoubleSide;
+          } else {
+            m.side = THREE.FrontSide;
+          }
           if (m.color && !m.map && m.color.r < 0.02 && m.color.g < 0.02 && m.color.b < 0.02) m.color.setHex(0x232830);
           // MRO High-Gain Antenna dish polish: soften the harsh 2005 baked specular swirl into realistic satin carbon composite
           if (m.name === 'default #2') {

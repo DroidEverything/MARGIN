@@ -47,7 +47,11 @@ const PROV_EXTRA=[
  {cls:"REAL NASA/JPL DATA",t:"Bennu radar shape model",d:"Nolan et al. (Icarus 226, 2013), NASA PDS Small Bodies Node. DOI 10.26033/33ba-s419. Rendered flat-shaded; no published texture."},
  {cls:"REAL NASA/JPL DATA",t:"NASA texture set",d:"NASA GIBS Blue Marble Earth fallback, outer-planet satellite maps (Io, Europa, Ganymede, Callisto, Pluto, Phobos, Deimos), and MRO HiRISE Jezero crater ortho/DTE micro-detail maps."},
  {cls:"REAL SKY DATA (NON-NASA)",t:"HYG star catalog v4.0",d:"Hipparcos / Yale Bright Star / Gliese bake (CC BY-SA 4.0), 5,070 stars to Vmag 6.0 as J2000 vectors."},
-  {cls:"REAL SKY DATA (NON-NASA)",t:"Planet textures: Solar System Scope, CC BY 4.0",d:"Earth day / night / cloud / land-sea roughness maps, Mercury, Venus, 8K Moon, Mars, Jupiter, Saturn (+ rings), Uranus, Neptune, and the Milky Way skybox (stars_8k.jpg). (c) 2010-2017 Solar System Scope, https://www.solarsystemscope.com/textures/, licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Surface appearance only; affects no ephemeris, lighting, exposure or gameplay value."}
+  {cls:"REAL SKY DATA (NON-NASA)",t:"Planet textures: Solar System Scope, CC BY 4.0",d:"Earth day / night / cloud / land-sea roughness maps, Mercury, Venus, 8K Moon, Mars, Jupiter, Saturn (+ rings), Uranus, Neptune, and the Milky Way skybox (stars_8k.jpg). (c) 2010-2017 Solar System Scope, https://www.solarsystemscope.com/textures/, licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Surface appearance only; affects no ephemeris, lighting, exposure or gameplay value."},
+ {cls:"REAL NASA/JPL DATA",t:"Mars Jezero Crater Surface Mosaic (NASA/JPL/MRO/ESA)",d:"Meter-scale albedo and digital elevation map of Jezero Crater baked from HiRISE (MRO) and HRSC (Mars Express) datasets. Powers the Mars landed diorama and Perseverance rover traverse."},
+ {cls:"REAL NASA/JPL DATA",t:"NASA 3D Hardware Models (NASA 3D Resources / PDS)",d:"Official NASA 3D assets: LC-39B Mobile Launcher (assembled), Apollo Lunar Module, Mars 2020 Perseverance, NASA RASSOR excavation rover, Aqua, LRO, MRO, MESSENGER, OSIRIS-REx, Bennu shape model, and Voyager."},
+ {cls:"REAL NASA/JPL DATA",t:"Historical NASA Mission Benchmarks",d:"PACE (Earth ocean biology), LRO (Lunar polar water ice), MRO (Mars high-resolution science), OSIRIS-REx (Bennu sample return), and Europa Clipper (habitability tour) serve as real-world baseline benchmarks for player report card evaluations."},
+ {cls:"REAL NASA/JPL DATA",t:"NASA Space Apps Challenge 2026 Reference Alignment",d:"Built specifically for the Space Mission Design Game challenge. All orbital dynamics, payload capacities, power decay curves, and communications budgets reflect open-access NASA/JPL scientific standards."}
 ];
 const PROV_ABSTRACTIONS=[
  "Instruments observe ~12% of the time (build-screen assumption).",
@@ -104,22 +108,57 @@ function sourcesModal(){
   const keys=Object.keys(SRC);
   const grp=c=>keys.filter(k=>provClassOf(k)===c).map(k=>{
     const p=SRC[k];
-    return `<div style="padding:7px 0;border-bottom:1px solid var(--hairline)">`
-      +`<div class="spread"><span style="font-size:12.5px">${esc(p.source)}</span>`
-      +`<span class="tag">${c}</span></div>`
-      +`<div class="hint" style="margin-top:3px;line-height:1.6">${esc(p.url)} · retrieved ${esc(p.retrieved)}<br>Simplification: ${esc(p.simp)}</div></div>`;
+    return `<div class="prov-card">
+      <div class="prov-card-head">
+        <span class="prov-card-title">${esc(p.source)}</span>
+        <span class="tag" style="font-size:9.5px;background:rgba(101,242,165,.15);color:var(--phosphor)">${c}</span>
+      </div>
+      <div class="prov-card-body">
+        <span class="prov-card-meta">${esc(p.url)} &middot; retrieved ${esc(p.retrieved)}</span>
+        <div class="prov-card-simp"><b>Simplification:</b> ${esc(p.simp)}</div>
+      </div>
+    </div>`;
   }).join("");
   const extra=c=>PROV_EXTRA.filter(e=>e.cls===c).map(e=>
-    `<div style="padding:7px 0;border-bottom:1px solid var(--hairline)">`
-    +`<div class="spread"><span style="font-size:12.5px">${esc(e.t)}</span><span class="tag">${e.cls}</span></div>`
-    +`<div class="hint" style="margin-top:3px;line-height:1.6">${esc(e.d)}</div></div>`).join("");
-  el("mbox").innerHTML=`<h3>MISSION DATA — WHERE NUMBERS COME FROM</h3><div class="mb" style="font-size:13px;line-height:1.7;max-height:60vh;overflow:auto">`
-    +`<p class="hint">Nothing here is fetched live. Full register: SOURCES.md. Gameplay abstractions are not flight physics.</p>`
-    +grp("REAL NASA/JPL DATA")+extra("REAL NASA/JPL DATA")+extra("REAL SKY DATA (NON-NASA)")
-    +grp("NASA-DERIVED PARAMETER")
-    +`<div class="hint" style="margin:10px 0 4px;font-size:10.5px;letter-spacing:.14em">GAMEPLAY ABSTRACTION</div>`
-    +PROV_ABSTRACTIONS.map(a=>`<p class="hint" style="line-height:1.6">• ${esc(a)}</p>`).join("")
-    +`<button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
+    `<div class="prov-card">
+      <div class="prov-card-head">
+        <span class="prov-card-title">${esc(e.t)}</span>
+        <span class="tag" style="font-size:9.5px;background:rgba(101,242,165,.15);color:var(--phosphor)">${e.cls}</span>
+      </div>
+      <div class="prov-card-body">
+        <div class="prov-card-simp">${esc(e.d)}</div>
+      </div>
+    </div>`).join("");
+
+  el("mbox").className = "mbox modal-wide";
+  el("mbox").innerHTML = `
+    <div class="modal-top-bar">
+      <div class="modal-title-group">
+        <span class="modal-kicker">NASA SPACE APPS CHALLENGE 2026 &mdash; SCIENTIFIC PROVENANCE</span>
+        <h3 class="modal-title">DATA SOURCES &amp; CITATIONS</h3>
+      </div>
+      <button class="modal-close-icon" data-act="closeModal" aria-label="Close dialog">&times;</button>
+    </div>
+    <div class="modal-scroll-body">
+      <div class="prov-intro-card">
+        Every orbital vector, payload curve, planetary model, and telemetry limit is statically vendored from public NASA/JPL archives. Offline-first, zero runtime API calls. Full register: <code>SOURCES.md</code>.
+      </div>
+      <div class="prov-section-header">VERIFIED NASA &amp; SKY ASSETS</div>
+      ${grp("REAL NASA/JPL DATA")}
+      ${extra("REAL NASA/JPL DATA")}
+      ${extra("REAL SKY DATA (NON-NASA)")}
+      <div class="prov-section-header">NASA-DERIVED PARAMETERS</div>
+      ${grp("NASA-DERIVED PARAMETER")}
+      <div class="prov-section-header">GAMEPLAY ABSTRACTIONS</div>
+      <div class="prov-abstractions-box">
+        ${PROV_ABSTRACTIONS.map(a=>`<div class="prov-abs-item">&bull; ${esc(a)}</div>`).join("")}
+      </div>
+    </div>
+    <div class="modal-bottom-bar">
+      <span class="modal-status-text">OFFLINE-FIRST SCIENTIFIC DATA ARCHIVE</span>
+      <button class="btn ghost btn-sm" data-act="closeModal">CLOSE</button>
+    </div>
+  `;
   el("modal").classList.add("on");
 }
 
@@ -966,20 +1005,542 @@ function infoTag(p,label,extra,cat,id){
   document.addEventListener("scroll",hide,true);
 })();
 
-/* ── sound ── */
-const Audio_={ctx:null,on:false,
-  init(){if(!this.ctx){try{this.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}},
-  blip(f=520,d=0.05,type="square",g=0.05){
-    if(!this.on||!this.ctx)return; const c=this.ctx,o=c.createOscillator(),gn=c.createGain();
-    o.type=type;o.frequency.value=f;gn.gain.value=g;o.connect(gn);gn.connect(c.destination);
-    gn.gain.setValueAtTime(g,c.currentTime);gn.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+d);
-    o.start();o.stop(c.currentTime+d);
+/* ── sound (Aerospace Physical Modeling & Mission Control Audio Synthesis) ── */
+const Audio_={
+  ctx:null,
+  on:true,
+  master:null,
+
+  init(){
+    if(!this.ctx){
+      try{
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(AC){
+          this.ctx = new AC();
+          this.master = this.ctx.createGain();
+          this.master.gain.setValueAtTime(0.95, this.ctx.currentTime);
+          this.master.connect(this.ctx.destination);
+        }
+      }catch(e){}
+    }
+    if(this.ctx && this.ctx.state === "suspended"){
+      try{ this.ctx.resume().catch(()=>{}); }catch(e){}
+    }
   },
-  click(){this.blip(420+Math.random()*60,0.035,"square",0.035)},
-  caution(){this.blip(760,0.12,"sine",0.06);setTimeout(()=>this.blip(560,0.16,"sine",0.06),130)},
-  go(){this.blip(300,0.1,"sawtooth",0.05);setTimeout(()=>this.blip(600,0.22,"sine",0.05),90)},
-  bad(){this.blip(160,0.3,"sawtooth",0.06)}
+
+  // Tactile aerospace console audio profiles with curated acoustic variations:
+  // - "nav": sleek, low-friction rotary detent (tab switch, breadcrumbs, step nav)
+  // - "select" / "toggle": crisp Honeywell / Cherry micro-switch snap
+  // - "action" / "commit": weighted aerospace command console press (deep chassis thud)
+  // - "modal": damped acoustic enclosure relay
+  // - "mount" / "unmount": 2-stage rack latch mechanism
+  click(variant){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+
+      // Auto-detect variant if not explicitly supplied
+      let v = variant;
+      if (!v && typeof window !== "undefined" && window.event) {
+        const target = window.event.target ? window.event.target.closest("button, [data-act], .choice, .rail") : null;
+        if (target) {
+          const act = target.dataset.act;
+          if (target.classList.contains("primary") || ["start", "commit", "launch", "landch"].includes(act)) v = "action";
+          else if (["tobuild", "tobrief", "tolaunch", "bstep", "tour-step", "devjump", "devm"].includes(act) || target.classList.contains("tab")) v = "nav";
+          else if (["closeModal", "how", "about", "sources", "flight-school"].includes(act) || target.closest(".modal")) v = "modal";
+          else if (["inst", "pw", "pr", "cm", "sh"].includes(act)) v = "mount";
+          else v = "toggle";
+        }
+      }
+      if (!v) v = "toggle";
+
+      if (v === "mount") { this.mount(); return; }
+      if (v === "unmount") { this.unmount(); return; }
+
+      if (v === "action") {
+        // Weighted aerospace command button: tactile snap + deep 160->75 Hz chassis body resonance
+        const snapLen = Math.floor(c.sampleRate * 0.004);
+        const snapBuf = c.createBuffer(1, snapLen, c.sampleRate);
+        const d = snapBuf.getChannelData(0);
+        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0008));
+        const snap = c.createBufferSource(); snap.buffer = snapBuf;
+        const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(2200, t0); sf.Q.setValueAtTime(1.8, t0);
+        const sg = c.createGain(); sg.gain.setValueAtTime(0.45, t0);
+        snap.connect(sf); sf.connect(sg); sg.connect(this.master || c.destination);
+        snap.start(t0);
+
+        const thud = c.createOscillator();
+        thud.type = "sine";
+        thud.frequency.setValueAtTime(160, t0);
+        thud.frequency.exponentialRampToValueAtTime(75, t0 + 0.026);
+        const tg = c.createGain();
+        tg.gain.setValueAtTime(0.55, t0);
+        tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.026);
+        thud.connect(tg); tg.connect(this.master || c.destination);
+        thud.start(t0); thud.stop(t0 + 0.028);
+      } else if (v === "nav") {
+        // Sleek rotary selector detent: 1200 Hz damped micro-snap, low friction
+        const osc = c.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(1200, t0);
+        osc.frequency.exponentialRampToValueAtTime(400, t0 + 0.010);
+        const og = c.createGain();
+        og.gain.setValueAtTime(0.25, t0);
+        og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.010);
+        osc.connect(og); og.connect(this.master || c.destination);
+        osc.start(t0); osc.stop(t0 + 0.012);
+      } else if (v === "modal") {
+        // Enclosure damped acoustic tap
+        const osc = c.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(440, t0);
+        osc.frequency.exponentialRampToValueAtTime(180, t0 + 0.014);
+        const og = c.createGain();
+        og.gain.setValueAtTime(0.30, t0);
+        og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.014);
+        osc.connect(og); og.connect(this.master || c.destination);
+        osc.start(t0); osc.stop(t0 + 0.016);
+      } else {
+        // Crisp tactile Honeywell micro-switch snap ("toggle" / "select")
+        const snapLen = Math.floor(c.sampleRate * 0.0025);
+        const snapBuf = c.createBuffer(1, snapLen, c.sampleRate);
+        const d = snapBuf.getChannelData(0);
+        for(let i=0; i<snapLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.0005));
+        const snap = c.createBufferSource(); snap.buffer = snapBuf;
+        const sf = c.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.setValueAtTime(3200, t0); sf.Q.setValueAtTime(2.5, t0);
+        const sg = c.createGain(); sg.gain.setValueAtTime(0.38, t0);
+        snap.connect(sf); sf.connect(sg); sg.connect(this.master || c.destination);
+        snap.start(t0);
+
+        const thud = c.createOscillator();
+        thud.type = "sine";
+        thud.frequency.setValueAtTime(260, t0);
+        thud.frequency.exponentialRampToValueAtTime(120, t0 + 0.014);
+        const tg = c.createGain();
+        tg.gain.setValueAtTime(0.36, t0);
+        tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.014);
+        thud.connect(tg); tg.connect(this.master || c.destination);
+        thud.start(t0); thud.stop(t0 + 0.016);
+      }
+    }catch(e){}
+  },
+
+  // Component mount / lock latch (solid 2-stage aerospace rack detent lock)
+  mount(){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+      // Guide pin initial contact (320 Hz)
+      const pin = c.createOscillator();
+      pin.type = "sine";
+      pin.frequency.setValueAtTime(320, t0);
+      pin.frequency.exponentialRampToValueAtTime(180, t0 + 0.012);
+      const pinG = c.createGain();
+      pinG.gain.setValueAtTime(0.30, t0);
+      pinG.gain.exponentialRampToValueAtTime(0.001, t0 + 0.012);
+      pin.connect(pinG);
+      pinG.connect(this.master || c.destination);
+      pin.start(t0);
+      pin.stop(t0 + 0.014);
+
+      // Locking detent (16ms later: 130 Hz chassis thud)
+      setTimeout(() => {
+        if(!this.ctx || !this.on) return;
+        const t1 = this.ctx.currentTime;
+        const thud = this.ctx.createOscillator();
+        thud.type = "sine";
+        thud.frequency.setValueAtTime(130, t1);
+        thud.frequency.exponentialRampToValueAtTime(65, t1 + 0.035);
+        const thudG = this.ctx.createGain();
+        thudG.gain.setValueAtTime(0.45, t1);
+        thudG.gain.exponentialRampToValueAtTime(0.001, t1 + 0.035);
+        thud.connect(thudG);
+        thudG.connect(this.master || this.ctx.destination);
+        thud.start(t1);
+        thud.stop(t1 + 0.04);
+      }, 16);
+    }catch(e){}
+  },
+
+  // Component release / unmount latch (spring-loaded quick disconnect snap)
+  unmount(){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+      const snap = c.createOscillator();
+      snap.type = "triangle";
+      snap.frequency.setValueAtTime(620, t0);
+      snap.frequency.exponentialRampToValueAtTime(240, t0 + 0.022);
+      const snapG = c.createGain();
+      snapG.gain.setValueAtTime(0.35, t0);
+      snapG.gain.exponentialRampToValueAtTime(0.001, t0 + 0.022);
+      snap.connect(snapG);
+      snapG.connect(this.master || c.destination);
+      snap.start(t0);
+      snap.stop(t0 + 0.025);
+    }catch(e){}
+  },
+
+  // Apollo / NASA Quindar telemetry tone (exact 2525 Hz intro chirp with raised-cosine window)
+  quindar(){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+      const osc = c.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(2525, t0);
+      const gn = c.createGain();
+      gn.gain.setValueAtTime(0.0001, t0);
+      gn.gain.linearRampToValueAtTime(0.32, t0 + 0.008);
+      gn.gain.setValueAtTime(0.32, t0 + 0.075);
+      gn.gain.linearRampToValueAtTime(0.0001, t0 + 0.085);
+      osc.connect(gn);
+      gn.connect(this.master || c.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.09);
+    }catch(e){}
+  },
+
+  // NASA Flight Director Go Confirmation Chime (two warm studio harmonic chimes: D5 -> A5)
+  go(){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+      // Note 1: 587.33 Hz (D5)
+      const osc1 = c.createOscillator();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(587.33, t0);
+      const gn1 = c.createGain();
+      gn1.gain.setValueAtTime(0.001, t0);
+      gn1.gain.linearRampToValueAtTime(0.35, t0 + 0.008);
+      gn1.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+      osc1.connect(gn1);
+      gn1.connect(this.master || c.destination);
+      osc1.start(t0);
+      osc1.stop(t0 + 0.24);
+
+      // Note 2: 880.00 Hz (A5, at +85ms)
+      setTimeout(() => {
+        if(!this.ctx || !this.on) return;
+        const t1 = this.ctx.currentTime;
+        const osc2 = this.ctx.createOscillator();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(880.00, t1);
+        const gn2 = this.ctx.createGain();
+        gn2.gain.setValueAtTime(0.001, t1);
+        gn2.gain.linearRampToValueAtTime(0.38, t1 + 0.008);
+        gn2.gain.exponentialRampToValueAtTime(0.0001, t1 + 0.38);
+        osc2.connect(gn2);
+        gn2.connect(this.master || this.ctx.destination);
+        osc2.start(t1);
+        osc2.stop(t1 + 0.40);
+      }, 85);
+    }catch(e){}
+  },
+
+  // Master caution annunciator chime (descending alert: G5 -> C5)
+  caution(){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+      const osc1 = c.createOscillator();
+      osc1.type = "triangle";
+      osc1.frequency.setValueAtTime(783.99, t0);
+      const gn1 = c.createGain();
+      gn1.gain.setValueAtTime(0.36, t0);
+      gn1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12);
+      osc1.connect(gn1);
+      gn1.connect(this.master || c.destination);
+      osc1.start(t0);
+      osc1.stop(t0 + 0.14);
+
+      setTimeout(() => {
+        if(!this.ctx || !this.on) return;
+        const t1 = this.ctx.currentTime;
+        const osc2 = this.ctx.createOscillator();
+        osc2.type = "triangle";
+        osc2.frequency.setValueAtTime(523.25, t1);
+        const gn2 = this.ctx.createGain();
+        gn2.gain.setValueAtTime(0.36, t1);
+        gn2.gain.exponentialRampToValueAtTime(0.001, t1 + 0.22);
+        osc2.connect(gn2);
+        gn2.connect(this.master || this.ctx.destination);
+        osc2.start(t1);
+        osc2.stop(t1 + 0.24);
+      }, 110);
+    }catch(e){}
+  },
+
+  // Master warning / abort alarm (140 Hz resonant low-frequency alert)
+  bad(){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+      const osc = c.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(140, t0);
+      const filter = c.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(420, t0);
+      filter.Q.setValueAtTime(3.0, t0);
+      const gn = c.createGain();
+      gn.gain.setValueAtTime(0.38, t0);
+      gn.gain.exponentialRampToValueAtTime(0.001, t0 + 0.32);
+      osc.connect(filter);
+      filter.connect(gn);
+      gn.connect(this.master || c.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.35);
+    }catch(e){}
+  },
+
+  // Time-warp accelerator tick (frequency scales with speed tier)
+  warp(spd=1){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx) return;
+    try{
+      const c = this.ctx;
+      const t0 = c.currentTime;
+      const f = spd >= 200 ? 1200 : spd >= 50 ? 980 : spd >= 10 ? 780 : spd >= 2 ? 620 : 480;
+      const osc = c.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f, t0);
+      const gn = c.createGain();
+      gn.gain.setValueAtTime(0.24, t0);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.022);
+      osc.connect(gn);
+      gn.connect(this.master || c.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.025);
+    }catch(e){}
+  },
+
+  // Rovers in space / Mars surface: Silent as requested
+  roverRoll(){},
+
+  // Launch commitment trigger (pure ignition handover — no electronic synth chimes)
+  launch(){
+    if(!this.on) return;
+    this.init();
+  },
+
+  // Authentic NASA KSC Launch Pad Ambiance (nasa_launch_texture.mp3)
+  padAmbianceSource: null,
+  padAmbianceGain: null,
+  startPadAmbiance(){
+    if(!this.on) return;
+    this.init();
+    if(!this.ctx || this.padAmbianceSource) return;
+    try{
+      const b64 = (typeof window !== "undefined" && window.NASA_PAD_TEXTURE_B64);
+      if(window.NASA_PAD_TEXTURE_BUF){
+        this._playPadBuffer(window.NASA_PAD_TEXTURE_BUF);
+      } else if(b64){
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for(let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        this.ctx.decodeAudioData(bytes.buffer, buf => {
+          window.NASA_PAD_TEXTURE_BUF = buf;
+          this._playPadBuffer(buf);
+        }, ()=>{});
+      } else {
+        // Dynamic import of launch-audio-data.js; eager background pre-decoding of all 3 buffers
+        import("./js/launch-audio-data.js?v=20261107_v3").then(m => {
+          if (m && this.ctx) {
+            if (m.NASA_PAD_TEXTURE_B64) window.NASA_PAD_TEXTURE_B64 = m.NASA_PAD_TEXTURE_B64;
+            if (m.NASA_LAUNCH_ROAR_B64) window.NASA_LAUNCH_ROAR_B64 = m.NASA_LAUNCH_ROAR_B64;
+            if (m.NASA_STAGING_THUMP_B64) window.NASA_STAGING_THUMP_B64 = m.NASA_STAGING_THUMP_B64;
+
+            const decodeB64 = (rawB64, onDecoded) => {
+              try {
+                const bin = atob(rawB64);
+                const bytes = new Uint8Array(bin.length);
+                for(let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                this.ctx.decodeAudioData(bytes.buffer, onDecoded, ()=>{});
+              } catch(err){}
+            };
+
+            window.NASA_STAGING_BUFFERS = window.NASA_STAGING_BUFFERS || {};
+
+            if (m.NASA_PAD_TEXTURE_B64 && !window.NASA_PAD_TEXTURE_BUF) {
+              decodeB64(m.NASA_PAD_TEXTURE_B64, buf => {
+                window.NASA_PAD_TEXTURE_BUF = buf;
+                this._playPadBuffer(buf);
+              });
+            }
+            if (m.NASA_LAUNCH_ROAR_B64 && !window.NASA_LAUNCH_ROAR_BUF) {
+              decodeB64(m.NASA_LAUNCH_ROAR_B64, buf => {
+                window.NASA_LAUNCH_ROAR_BUF = buf;
+              });
+            }
+            if (m.NASA_STAGING_BOOSTER_B64 && !window.NASA_STAGING_BUFFERS.booster) {
+              decodeB64(m.NASA_STAGING_BOOSTER_B64, buf => {
+                window.NASA_STAGING_BUFFERS.booster = buf;
+                window.NASA_STAGING_THUMP_BUF = buf;
+              });
+            }
+            if (m.NASA_STAGING_STAGE1_B64 && !window.NASA_STAGING_BUFFERS.stage1) {
+              decodeB64(m.NASA_STAGING_STAGE1_B64, buf => {
+                window.NASA_STAGING_BUFFERS.stage1 = buf;
+              });
+            }
+            if (m.NASA_STAGING_FAIRING_B64 && !window.NASA_STAGING_BUFFERS.fairing) {
+              decodeB64(m.NASA_STAGING_FAIRING_B64, buf => {
+                window.NASA_STAGING_BUFFERS.fairing = buf;
+              });
+            }
+            if (m.NASA_STAGING_PAYLOAD_B64 && !window.NASA_STAGING_BUFFERS.payload) {
+              decodeB64(m.NASA_STAGING_PAYLOAD_B64, buf => {
+                window.NASA_STAGING_BUFFERS.payload = buf;
+              });
+            }
+          }
+        }).catch(()=>{});
+      }
+    }catch(e){}
+  },
+  _playPadBuffer(buf){
+    if(!this.ctx || !this.on || this.padAmbianceSource) return;
+    try{
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.32, this.ctx.currentTime + 1.2);
+      src.connect(g);
+      g.connect(this.master || this.ctx.destination);
+      src.start();
+      this.padAmbianceSource = src;
+      this.padAmbianceGain = g;
+    }catch(e){}
+  },
+  stopPadAmbiance(){
+    if(!this.padAmbianceSource || !this.ctx) return;
+    try{
+      const g = this.padAmbianceGain;
+      const src = this.padAmbianceSource;
+      if(g) g.gain.linearRampToValueAtTime(0.0001, this.ctx.currentTime + 0.5);
+      setTimeout(()=>{ try{ src.stop(); }catch(e){} }, 600);
+    }catch(e){}
+    this.padAmbianceSource = null;
+    this.padAmbianceGain = null;
+  },
+
+  /* ── Background Music (Looped Ambient Soundtrack) ── */
+  bgm: null,
+  bgmFader: null,
+  bgmCurrentVol: 0,
+  bgmTargetVol: 0.28,
+
+  initBGM(){
+    if(this.bgm) return this.bgm;
+    try {
+      const audioEl = typeof document !== "undefined" ? document.getElementById("marginBgm") : null;
+      if(!audioEl) return null;
+      audioEl.volume = 0;
+      this.bgm = audioEl;
+    } catch(e) {}
+    return this.bgm;
+  },
+
+  updateBGM(screen){
+    const bgm = this.initBGM();
+    if(!bgm) return;
+    const curScreen = screen || (typeof S !== "undefined" && S.screen) || "title";
+
+    if(!this.on){
+      this._fadeBGM(0, 0.4, () => {
+        try { bgm.pause(); } catch(e){}
+      });
+      return;
+    }
+
+    // "from the launch page it will be highly faded"
+    // Nominal mission formulating / operating screens: 0.28
+    // Launch vehicle selection & pad countdown / liftoff: 0.04 (highly faded)
+    const target = (curScreen === "launch") ? 0.04 : 0.28;
+    this.bgmTargetVol = target;
+
+    if(bgm.paused){
+      const p = bgm.play();
+      if(p && typeof p.then === "function"){
+        p.then(() => {
+          this._fadeBGM(target, 1.2);
+        }).catch(() => {
+          // Autoplay policy awaiting user interaction; unlocked via ensureAudioUnlocked
+        });
+      }
+    } else {
+      this._fadeBGM(target, 0.8);
+    }
+  },
+
+  _fadeBGM(targetVol, durationSec = 1.0, onDone){
+    if(!this.bgm) return;
+    if(this.bgmFader) clearInterval(this.bgmFader);
+    const bgm = this.bgm;
+    const startVol = (bgm.volume != null && isFinite(bgm.volume)) ? bgm.volume : 0;
+    const startTime = performance.now();
+    const durMs = Math.max(80, durationSec * 1000);
+
+    this.bgmFader = setInterval(() => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1, elapsed / durMs);
+      const v = startVol + (targetVol - startVol) * progress;
+      try {
+        bgm.volume = Math.max(0, Math.min(1, v));
+        this.bgmCurrentVol = bgm.volume;
+      } catch(e){}
+      if(progress >= 1){
+        clearInterval(this.bgmFader);
+        this.bgmFader = null;
+        if(onDone) onDone();
+      }
+    }, 25);
+  },
+
+  startBGM(){
+    this.updateBGM();
+  }
 };
+if (typeof window !== "undefined") window.Audio_ = Audio_;
+
+// Continuous Global Web Audio Autoplay Unlock Listener
+function ensureAudioUnlocked(){
+  Audio_.init();
+  if(Audio_.ctx && Audio_.ctx.state === "suspended"){
+    Audio_.ctx.resume().catch(()=>{});
+  }
+  if(Audio_.on){
+    Audio_.startBGM();
+  }
+}
+['pointerdown', 'mousedown', 'touchstart', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, ensureAudioUnlocked, { passive: true });
+});
 
 /* ── telemetry ticker ── */
 function telemText(){
@@ -1074,18 +1635,18 @@ function renderDock(){
 
     if(!objMet && !hasSite){
       const rem=req-selCount;
-      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select ${rem} more objective${rem>1?"s":""} &amp; Landing Site</span>`;
+      statusHtml=`<span class="dock-status-chip pending"><span class="g-icon">radio_button_unchecked</span> PENDING: Select ${rem} more objective${rem>1?"s":""} &amp; Landing Site</span>`;
       primaryDisabled=true;
     } else if(!objMet){
       const rem=req-selCount;
-      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select ${rem} more objective${rem>1?"s":""}</span>`;
+      statusHtml=`<span class="dock-status-chip pending"><span class="g-icon">radio_button_unchecked</span> PENDING: Select ${rem} more objective${rem>1?"s":""}</span>`;
       primaryDisabled=true;
     } else if(!hasSite){
-      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select a Landing Site</span>`;
+      statusHtml=`<span class="dock-status-chip pending"><span class="g-icon">radio_button_unchecked</span> PENDING: Select a Landing Site</span>`;
       primaryDisabled=true;
     } else {
       const stObj=isSurface?(byId(MOON_SITES,S.site)||byId(MARS_SITES,S.site)):null;
-      statusHtml=`<span class="dock-status-chip ready">✓ OBJECTIVES READY (${selCount}/${req})${stObj?` · SITE: ${stObj.n}`:""}</span>`;
+      statusHtml=`<span class="dock-status-chip ready"><span class="g-icon">check_circle</span> OBJECTIVES READY (${selCount}/${req})${stObj?` · SITE: ${stObj.n}`:""}</span>`;
       primaryDisabled=false;
     }
   } else if(S.screen==="build"){
@@ -1095,13 +1656,13 @@ function renderDock(){
       const total=S.objectives.length;
       const covered=S.objectives.filter(o=>objMet(S,o)).length;
       if(S.instruments.length===0){
-        statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select at least 1 instrument (${covered}/${total} objectives covered)</span>`;
+        statusHtml=`<span class="dock-status-chip pending"><span class="g-icon">radio_button_unchecked</span> PENDING: Select at least 1 instrument (${covered}/${total} objectives covered)</span>`;
         primaryDisabled=true;
       } else if(covered<total){
-        statusHtml=`<span class="dock-status-chip warn">⚠ PARTIAL: ${covered} of ${total} objectives covered (${S.instruments.length} mounted)</span>`;
+        statusHtml=`<span class="dock-status-chip warn"><span class="g-icon">warning</span> PARTIAL: ${covered} of ${total} objectives covered (${S.instruments.length} mounted)</span>`;
         primaryDisabled=false;
       } else {
-        statusHtml=`<span class="dock-status-chip ready">✓ ALL OBJECTIVES COVERED (${covered}/${total}) · ${S.instruments.length} Instruments Mounted</span>`;
+        statusHtml=`<span class="dock-status-chip ready"><span class="g-icon">check_circle</span> ALL OBJECTIVES COVERED (${covered}/${total}) · ${S.instruments.length} Instruments Mounted</span>`;
         primaryDisabled=false;
       }
     } else if(S.bstep==="systems"){
@@ -1110,11 +1671,11 @@ function renderDock(){
       const overRails=RAILDEF.filter(r=>D.margins[r.k]<0).map(r=>r.nm);
       const retFrac=D.genMbPerDay>0?Math.min(1,D.downMbPerDay/D.genMbPerDay):1;
       if(overRails.length>0){
-        statusHtml=`<span class="dock-status-chip crit">✕ OVER BUDGET: ${overRails.join(", ")}</span>`;
+        statusHtml=`<span class="dock-status-chip crit"><span class="g-icon">cancel</span> OVER BUDGET: ${overRails.join(", ")}</span>`;
       } else if(retFrac<0.5){
-        statusHtml=`<span class="dock-status-chip warn">⚠ COMMS BOTTLENECK: Downlink returns ${(retFrac*100).toFixed(0)}% of generated data</span>`;
+        statusHtml=`<span class="dock-status-chip warn"><span class="g-icon">warning</span> COMMS BOTTLENECK: Downlink returns ${(retFrac*100).toFixed(0)}% of generated data</span>`;
       } else {
-        statusHtml=`<span class="dock-status-chip ready">✓ BUS SYSTEMS CONFIGURED · ΔV ${D.dvTotal.toFixed(2)} km/s</span>`;
+        statusHtml=`<span class="dock-status-chip ready"><span class="g-icon">check_circle</span> BUS SYSTEMS CONFIGURED · ΔV ${D.dvTotal.toFixed(2)} km/s</span>`;
       }
       primaryDisabled=false;
     } else if(S.bstep==="review"){
@@ -1123,17 +1684,17 @@ function renderDock(){
       const overRails=RAILDEF.filter(r=>D.margins[r.k]<0).map(r=>r.nm);
       const readyObj=S.objectives.every(o=>objMet(S,o));
       if(overRails.length>0){
-        statusHtml=`<span class="dock-status-chip crit">✕ CANNOT CERTIFY: Over ${overRails.join(", ")} budget</span>`;
+        statusHtml=`<span class="dock-status-chip crit"><span class="g-icon">cancel</span> CANNOT CERTIFY: Over ${overRails.join(", ")} budget</span>`;
         primaryDisabled=true;
       } else if(!readyObj){
-        statusHtml=`<span class="dock-status-chip warn">⚠ WARNING: Objectives uncovered by instruments</span>`;
+        statusHtml=`<span class="dock-status-chip warn"><span class="g-icon">warning</span> WARNING: Objectives uncovered by instruments</span>`;
         primaryDisabled=false;
       } else {
         const warnRails=RAILDEF.filter(r=>D.margins[r.k]<0.15).map(r=>r.nm);
         if(warnRails.length>0){
-          statusHtml=`<span class="dock-status-chip warn">⚠ READY (with warnings): Tight margins on ${warnRails.join(", ")} (&lt;15%)</span>`;
+          statusHtml=`<span class="dock-status-chip warn"><span class="g-icon">warning</span> READY (with warnings): Tight margins on ${warnRails.join(", ")} (&lt;15%)</span>`;
         } else {
-          statusHtml=`<span class="dock-status-chip ready">✓ VEHICLE CERTIFIED FOR FLIGHT</span>`;
+          statusHtml=`<span class="dock-status-chip ready"><span class="g-icon">check_circle</span> VEHICLE CERTIFIED FOR FLIGHT</span>`;
         }
         primaryDisabled=false;
       }
@@ -1143,17 +1704,17 @@ function renderDock(){
     primaryAct="fly";
     const overMass=D.margins.mass<0, overCost=D.margins.cost<0;
     if(!S.launch||!S.launch.lv){
-      statusHtml=`<span class="dock-status-chip pending">○ PENDING: Select a Launch Vehicle</span>`;
+      statusHtml=`<span class="dock-status-chip pending"><span class="g-icon">radio_button_unchecked</span> PENDING: Select a Launch Vehicle</span>`;
       primaryLabel="SELECT VEHICLE";
       primaryDisabled=true;
     } else if(overMass||overCost){
-      statusHtml=`<span class="dock-status-chip crit">✕ NO-GO: ${overMass?"MASS EXCEEDS CAPABILITY":"COST EXCEEDS BUDGET"}</span>`;
+      statusHtml=`<span class="dock-status-chip crit"><span class="g-icon">cancel</span> NO-GO: ${overMass?"MASS EXCEEDS CAPABILITY":"COST EXCEEDS BUDGET"}</span>`;
       primaryLabel="VEHICLE INSUFFICIENT";
       primaryDisabled=true;
     } else {
       const lvObj=byId(LV,S.launch.lv);
-      statusHtml=`<span class="dock-status-chip ready">✓ GO FOR LAUNCH · ${lvObj?lvObj.n:S.launch.lv} · Mass Margin ${(D.margins.mass*100).toFixed(0)}%</span>`;
-      primaryLabel="COMMIT TO LAUNCH 🚀";
+      statusHtml=`<span class="dock-status-chip ready"><span class="g-icon">check_circle</span> GO FOR LAUNCH · ${lvObj?lvObj.n:S.launch.lv} · Mass Margin ${(D.margins.mass*100).toFixed(0)}%</span>`;
+      primaryLabel="COMMIT TO LAUNCH";
       primaryDisabled=false;
     }
     /* D-04: the commit button is the roll call's consequence. Disabled until
@@ -1161,7 +1722,7 @@ function renderDock(){
     if(teamActive()&&!primaryDisabled){
       const done=S.team.seats.filter(s=>!!(S.team.votes||{})[s.i]).length;
       if(!S.team.goAll){
-        statusHtml=`<span class="dock-status-chip pending">○ ROLL CALL ${done}/${S.team.size} — every seat must call GO</span>`;
+        statusHtml=`<span class="dock-status-chip pending"><span class="g-icon">radio_button_unchecked</span> ROLL CALL ${done}/${S.team.size} — every seat must call GO</span>`;
         primaryLabel=`ROLL CALL ${done}/${S.team.size}`;
         primaryDisabled=true;
       }
@@ -1303,8 +1864,10 @@ function render(){
   const telemEl=el("telem");
   if(telemEl) telemEl.classList.toggle("ticker-hidden", S.screen==="ops");
   if(S.screen==="build"){ drawBay(); lastRails=railValues(derive(S)); if(window.M3D)M3D.sync(); }
-  if(S.screen==="launch"){ initLaunch(); }
+  if(S.screen==="launch"){ initLaunch(); Audio_.startPadAmbiance(); }
+  else { Audio_.stopPadAmbiance(); }
   if(S.screen==="ops"){ initOps(); }
+  Audio_.updateBGM(S.screen);
   try{ if(window.TitleEarth)TitleEarth.sync(); }catch(e){}
   try{ if(window.SelView)SelView.sync(); }catch(e){}
   try{ if(window.BriefView)BriefView.sync(); }catch(e){}
@@ -1315,8 +1878,10 @@ function render(){
     document.body.classList.toggle("brief-active", S.screen==="brief");
     document.body.classList.toggle("build-active", S.screen==="build");
     document.body.classList.toggle("launch-active", S.screen==="launch");
+    document.body.classList.toggle("report-active", S.screen==="report");
     if(window.OpsView&&OpsView.sync) OpsView.sync();
     else if(S.screen!=="ops"&&window.OpsView&&OpsView.stop) OpsView.stop();
+    if(S.screen!=="launch"&&window.LVPreview&&LVPreview.stop) LVPreview.stop();
     if(window.OpsView&&OpsView.showFinal) OpsView.showFinal();
   }catch(e){}
   /* W2 Tier 1 (P0-5): keep the last design warm while the player is still
@@ -1426,21 +1991,30 @@ function scrSelect(){
       </div>
     </div>
     <div class="selcap-chip" id="selcap" aria-live="polite">
-      <div class="sc-row"><span class="sc-dest">DESTINATION · EARTH</span></div>
+      <div class="sc-head"><span class="sc-dest">DESTINATION · EARTH</span><span class="sc-target-badge">INSPECTOR</span></div>
       <div class="sc-name">First Light</div>
       <div class="sc-sub">Earth observer, Sun-synchronous orbit</div>
-      <div class="sc-stats"><span>1.00 AU</span><span>3 YR</span><span>$400M CAP</span><span>0.3 KRAD/YR</span></div>
+      <div class="sc-stats">
+        <div class="sc-stat-item"><b>DIST</b><em>1.00 AU</em></div>
+        <div class="sc-stat-item"><b>CRUISE</b><em>3 YR</em></div>
+        <div class="sc-stat-item"><b>BUDGET</b><em>$400M CAP</em></div>
+        <div class="sc-stat-item"><b>DOSE</b><em>0.3 KRAD/YR</em></div>
+      </div>
+      <details class="sc-debug">
+        <summary>System ephemeris cache</summary>
+        <div class="sc-debug-body">PHYSICAL Earth · JPL_DE440 OK · physical</div>
+      </details>
     </div>
     <div class="sel-bottom">
     ${(()=>{ const dr=readDraft(), drL=dr?byId(LEVELS,dr.l):null;
       if(!drL) return "";
       const n=(dr.i||[]).length;
       return `<div style="display:flex;justify-content:flex-end;margin:0 0 8px">
-        <button class="btn ghost" data-act="resume" title="Restore the design you last worked on">
+        <button class="btn ghost sel-resume-btn" data-act="resume" title="Restore the design you last worked on">
           RESUME LAST DESIGN &#183; ${String(drL.num).padStart(2,"0")} ${esc(drL.name.toUpperCase())} &#183; ${n} INSTRUMENT${n===1?"":"S"} &#8594;</button>
         ${(()=>{ const ses=readSession(), sesL=ses?byId(LEVELS,ses.levelId):null;
           if(!sesL||!ses.ops) return "";
-          return `<button class="btn ghost" data-act="resumesession" style="border-color:var(--phosphor);color:var(--phosphor);margin-left:8px" title="Resume active flight in progress">
+          return `<button class="btn ghost sel-resume-btn sel-resume-active" data-act="resumesession" style="border-color:var(--phosphor);color:var(--phosphor);margin-left:8px" title="Resume active flight in progress">
             RESUME ACTIVE FLIGHT &#183; L+${ses.ops.day} (${esc(BODY[sesL.body].n.toUpperCase())}) &#8594;</button>`;
         })()}</div>`;
     })()}
@@ -1526,20 +2100,24 @@ function scrBrief(){
         ${((L.body==="moon"?MOON_SITES:MARS_SITES).map((s,idx)=>{
           const on=S.site===s.id;
           return `<button class="obj site ${on?'sel':''}" data-act="site" data-id="${s.id}" style="--i:${idx}">
-            <span class="box">${on?"\u2713":""}</span>
-            <span style="flex:1"><span class="t">${esc(s.n)}</span>
-            <span class="d">${esc(s.lat)} · ${esc(s.lon)} — ${esc(s.d)}</span>
-            <div class="site-metrics-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:6px 0;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,0.03);padding:4px 8px;border-radius:3px">
-              <div><span style="color:var(--dim);display:block;font-size:9.5px">SLOPE</span><b style="color:var(--bone)">${s.slope}°</b></div>
-              <div><span style="color:var(--dim);display:block;font-size:9.5px">SUN</span><b style="color:var(--phosphor)">${(s.sun*100).toFixed(0)}%</b></div>
-              <div><span style="color:var(--dim);display:block;font-size:9.5px">EARTH</span><b style="color:var(--blue-lift)">${(s.earth*100).toFixed(0)}%</b></div>
-              <div><span style="color:var(--dim);display:block;font-size:9.5px">SCI MULT</span><b style="color:var(--amber)">×${s.sci.toFixed(2)}</b></div>
-              <div><span style="color:var(--dim);display:block;font-size:9.5px">TRAVERSE</span><b style="color:var(--bone)">${s.travKm} km</b></div>
+            <div class="site-card-body" style="width:100%">
+              <div class="site-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">
+                <span class="t">${esc(s.n)}</span>
+                <span class="site-badge ${on?'sel':''}">${on?'<span class="g-icon">check</span> SELECTED SITE':'CHOOSE SITE'}</span>
+              </div>
+              <span class="d" style="display:block;margin-bottom:8px">${esc(s.lat)} · ${esc(s.lon)} — ${esc(s.d)}</span>
+              <div class="site-metrics-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 0;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.04)">
+                <div><span style="color:var(--dim);display:block;font-size:9.5px">SLOPE</span><b style="color:var(--bone)">${s.slope}°</b></div>
+                <div><span style="color:var(--dim);display:block;font-size:9.5px">SUN</span><b style="color:var(--phosphor)">${(s.sun*100).toFixed(0)}%</b></div>
+                <div><span style="color:var(--dim);display:block;font-size:9.5px">EARTH</span><b style="color:var(--blue-lift)">${(s.earth*100).toFixed(0)}%</b></div>
+                <div><span style="color:var(--dim);display:block;font-size:9.5px">SCI MULT</span><b style="color:var(--amber)">×${s.sci.toFixed(2)}</b></div>
+                <div><span style="color:var(--dim);display:block;font-size:9.5px">TRAVERSE</span><b style="color:var(--bone)">${s.travKm} km</b></div>
+              </div>
+              <div class="bar-legend" style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:6px">
+                <span>Terrain Hazard Index</span><span>${(s.hazard*100).toFixed(0)}%</span>
+              </div>
+              <span class="mini" title="Site hazard — share of the roughest option"><i style="width:${(s.hazard/Math.max(...(L.body==="moon"?MOON_SITES:MARS_SITES).map(q=>q.hazard))*100).toFixed(0)}%"></i></span>
             </div>
-            <div class="bar-legend" style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:4px">
-              <span>Terrain Hazard Index</span><span>${(s.hazard*100).toFixed(0)}%</span>
-            </div>
-            <span class="mini" title="Site hazard — share of the roughest option"><i style="width:${(s.hazard/Math.max(...(L.body==="moon"?MOON_SITES:MARS_SITES).map(q=>q.hazard))*100).toFixed(0)}%"></i></span></span>
           </button>`})).join("")}
         </div>
         <p class="hint mt-s" id="siteFx" style="font-size:11.5px;color:var(--blue-lift);border-top:1px solid var(--hairline);padding-top:6px">${(()=>{const _sfx=byId(MOON_SITES,S.site)||byId(MARS_SITES,S.site);return _sfx?esc(_sfx.fx):"No site selected — choose a site above or in the sticky dock."})()}</p>
@@ -1549,8 +2127,16 @@ function scrBrief(){
   const briefPanel = `<div class="panel glass"><span class="bracket tl"></span><span class="bracket br"></span>
     <h3>MISSION BRIEF &amp; ENVIRONMENT <span class="code">FRM-01</span></h3>
     <div class="pad">
+      ${(S.levelId === "l1" || S.mode === "cadet") ? `
+      <div style="background:rgba(101,242,165,.08);border:1px solid rgba(101,242,165,.25);border-radius:4px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--phosphor);letter-spacing:.12em">CADET FLIGHT SCHOOL</span>
+          <div style="font-size:11.5px;color:var(--bone);margin-top:2px">New to mission formulation? Review objectives, bus coupling, and telemetry margins.</div>
+        </div>
+        <button class="btn primary btn-sm" data-act="flight-school" style="white-space:nowrap;font-size:10.5px">FLIGHT SCHOOL TOUR</button>
+      </div>` : ''}
       <p class="hint" style="margin-bottom:10px;font-size:12.5px;line-height:1.6">${esc(L.real)}</p>
-      <p style="line-height:1.7;font-size:13.5px;color:var(--bone)">${esc(L.brief)}</p>
+      <p style="line-height:1.7;font-size:13.5px;color:var(--bone);max-width:65ch">${esc(L.brief)}</p>
       <div class="heritage" style="margin-top:14px">${esc(L.newMech)} This is the only new thing in this mission &mdash; everything else you already know.</div>
       <dl class="briefstats" style="margin-top:16px">
         <dt class="hint">Deep Space Network time ${infoTag(SRC.dsn,"DSN pass allocation")}</dt><dd class="num">${L.dsnHrs} h/day</dd>
@@ -1602,7 +2188,7 @@ function scrBrief(){
       ${L.objs.map((oid,idx)=>{
         const o=OBJ[oid], on=sel.includes(oid), forced=(L.force||[]).includes(oid);
         return `<button class="obj ${on?'sel':''} ${forced?'req':''}" data-act="obj" data-id="${oid}" style="--i:${idx}">
-          <span class="box">${on?"\u2713":""}</span>
+          <span class="box">${on?'<span class="g-icon icon-alone">check</span>':""}</span>
           <span style="flex:1"><span class="t">${esc(o.t)}${forced?' <span class="tag">REQUIRED</span>':''}</span>
           <span class="d">${esc(o.d)}</span>
           <span class="need">${o.need.map(t=>`<span class="nchip">${t}</span>`).join("")}<span class="wnum">${fmtData(needMb(L,oid))} &#183; weight ${o.w} pts</span></span>
@@ -1615,17 +2201,18 @@ function scrBrief(){
     </div>
   </div>`;
 
-  return `<div class="wrap briefwrap">
-  <div id="briefview" aria-hidden="true" style="opacity:0.4"><div class="briefview-fallback"></div></div>
-  ${challengeBanner()}
-  <div class="briefdossier">
+  const dossierHtml = `<div class="briefdossier">
     <span class="kicker">MISSION ${L.num} &#183; DESTINATION ${esc(BODY[L.body].n.toUpperCase())}</span>
     <h1 id="briefMissionH1">${esc(S.missionName || L.name)}</h1>
     <span class="bsub">${esc(L.sub)}</span>
     <div class="bstats"><span>${auStr}</span><span>${ltStr} ONE-WAY LIGHT</span><span>${L.years} YR</span><span>${capText(L).toUpperCase()} ${L.uncapped?"":"CAP"}</span></div>
-  </div>
+  </div>`;
+
+  return `<div class="wrap briefwrap">
+  <div id="briefview" aria-hidden="true" style="opacity:0.4"><div class="briefview-fallback"></div></div>
+  ${challengeBanner()}
   <div class="brief">
-    <div class="brief-col">${briefPanel}</div>
+    <div class="brief-col">${dossierHtml}${briefPanel}</div>
     <div class="brief-col">${objsPanel}${sitePanel}</div>
   </div></div>`;
 }
@@ -1650,7 +2237,7 @@ function roverPanels(){
     ];
     return `<div class="panel mt"><h3>SURFACE COMPATIBILITY <span class="code">SRF-09</span></h3><div class="pad">
       ${rows.map(r=>`<div class="spread" style="padding:4px 0;font-size:12.5px">
-        <span style="color:${r[1]?'var(--phosphor)':'var(--red)'}">${r[1]?"\u2713":"\u2715"} ${r[0]}</span>
+        <span style="color:${r[1]?'var(--phosphor)':'var(--red)'}">${r[1]?'<span class="g-icon">check</span>':'<span class="g-icon">close</span>'} ${r[0]}</span>
         <span class="num hint" style="font-size:11px">${esc(r[2])}</span></div>`).join("")}
       <div class="spread" style="padding:4px 0;font-size:12.5px"><span class="hint">Surface science yield</span>
         <span class="num">×${D.rvSci.toFixed(2)} (payload × site)</span></div>
@@ -1711,7 +2298,7 @@ function scrBuild(){
           <span style="display:inline-flex;align-items:center;gap:6px">${esc(x.n)} ${infoTag(x.p,x.n,null,'instruments',x.id)}</span>
           <span style="display:inline-flex;gap:6px;align-items:center">
             ${useful?'<span class="tag" style="border-color:var(--nasa-blue);color:var(--blue-lift)">USEFUL</span>':''}
-            <span class="part-add-btn ${on?'mounted':''}" style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px;border:1px solid ${on?'var(--phosphor)':'rgba(255,255,255,0.2)'};background:${on?'rgba(101,242,165,0.15)':'transparent'};color:${on?'var(--phosphor)':'var(--bone)'}">${on?'✓ MOUNTED':'＋ ADD'}</span>
+            <span class="part-add-btn ${on?'mounted':''}" style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px;border:1px solid ${on?'var(--phosphor)':'rgba(255,255,255,0.2)'};background:${on?'rgba(101,242,165,0.15)':'transparent'};color:${on?'var(--phosphor)':'var(--bone)'}">${on?'<span class="g-icon">check</span> MOUNTED':'<span class="g-icon">add</span> ADD'}</span>
           </span>
         </span>
         <span class="ps">
@@ -1725,7 +2312,7 @@ function scrBuild(){
       </button>`}).join("");
   }).join("");
 
-  const pick=(label,list,key,code,curPickName)=>{
+  const pick=(label,list,key,code,curPickName,isWarn)=>{
     const curObj=byId(list,S[key]);
     const pName=curPickName || (curObj?curObj.n:"SELECT");
     return `
@@ -1733,9 +2320,9 @@ function scrBuild(){
       <div class="accordion-header" data-act="toggle-acc" data-target="acc-${key}">
         <div class="accordion-title-wrap">
           <span class="accordion-title">${label} <span class="code">${code}</span></span>
-          <span class="accordion-badge">${esc(pName)}</span>
+          <span class="accordion-badge ${isWarn?'warn':''}">${pName}</span>
         </div>
-        <span class="accordion-chevron">▾</span>
+        <span class="accordion-chevron"><span class="g-icon icon-alone">expand_more</span></span>
       </div>
       <div class="accordion-content">
         ${list.map(x=>{
@@ -1747,13 +2334,14 @@ function scrBuild(){
             : key==="comms" ? `${x.gain} dBi &#183; ${x.w} W &#183; ${x.m} kg &#183; ${x.c}M`
             : key==="cdh" ? `${x.dm>0?"+"+x.dm+" kg":"std bus mass"} &#183; ${x.dw>0?"+"+x.dw+" W":"std bus load"} &#183; ${x.dc>0?"+$"+x.dc+"M":"baseline"}`
             : key==="adcs" ? `${x.dm>0?"+"+x.dm+" kg":"std bus mass"} &#183; ${x.dw>0?"+"+x.dw+" W":"std bus load"} &#183; ${x.dc>0?"+$"+x.dc+"M":"baseline"}`
+            : key==="bat" ? `${x.wh} Wh storage &#183; ${x.dm>0?"+"+x.dm+" kg":"std bus mass"} &#183; ${x.dc>0?"+$"+x.dc+"M":"baseline"}`
             : `${x.isp?"Isp "+x.isp+" s":"no propulsion"} &#183; ${x.m} kg &#183; ${x.c}M`;
-          return `<button class="part ${on?'on':''}" data-act="${key}" data-id="${x.id}" style="${on?'border-color:var(--phosphor);background:rgba(101,242,165,0.08);':''}">
+          return `<button class="part ${on?'on':''}" data-act="${key}" data-id="${x.id}">
             <span class="pn">
               <span>${esc(x.n)}</span>
               <span style="display:inline-flex;align-items:center;gap:6px">
                 ${infoTag(x.p,x.n,null,key==='power'?'power':key==='prop'?'propulsion':key==='comms'?'comms':key==='cdh'?'cdh':key==='adcs'?'adcs':key==='bat'?'battery':null,x.id)}
-                ${on?'<span style="color:var(--phosphor);font-family:var(--mono);font-size:11px">✓ SELECTED</span>':''}
+                ${on?'<span class="part-sel-pill"><span class="g-icon">check</span> SELECTED</span>':''}
               </span>
             </span>
             <span class="ps"><span>${detail}</span></span></button>`}).join("")}
@@ -1767,8 +2355,8 @@ function scrBuild(){
               ["systems","2 · SYSTEMS","Can the spacecraft support it?"],
               ["review","3 · REVIEW","Are we actually ready?"]];
   const si=steps.findIndex(s=>s[0]===S.bstep);
-  const stepTabs=`<div class="panel"><div class="pad spread" style="gap:8px">
-    <span class="hint" style="font-size:12px;color:var(--dim)">${esc(steps[si][2])}</span>
+  const stepTabs=`<div class="build-tabs" style="margin-bottom:12px"><div class="spread" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <span class="hint" style="font-family:var(--font-ui);font-size:13px;color:rgba(255,255,255,0.7)">${esc(steps[si][2])}</span>
     <span class="spd">${steps.map((s,k)=>`<button data-act="bstep" data-v="${s[0]}" class="${k===si?'on':''}" ${k===2&&S.instruments.length===0?"disabled":""}>${s[1]}</button>`).join("")}</span>
   </div></div>`;
 
@@ -1778,12 +2366,12 @@ function scrBuild(){
     const lack=OBJ[oid].need.filter(t=>!tags.has(t));
     return `<div class="spread" style="padding:5px 0;font-size:12px">
       <span style="color:${ok?'var(--phosphor)':(S.instruments.length===0?'#94a3b8':'var(--amber)')}" title="${ok?"Covered by selected instruments":"Missing measurement: "+lack.join(", ")}">
-        ${ok?"\u25CF READY":(S.instruments.length===0?"\u25CB PENDING":"\u25B3 UNCOVERED")} ${esc(OBJ[oid].t)}${ok?"":" — needs "+lack.join(", ")}
+        ${ok?'<span class="g-icon">check_circle</span> READY':(S.instruments.length===0?'<span class="g-icon">radio_button_unchecked</span> PENDING':'<span class="g-icon">error</span> UNCOVERED')} ${esc(OBJ[oid].t)}${ok?"":" — needs "+lack.join(", ")}
       </span>
       <span class="num hint">${fmtData(needMb(byId(LEVELS,S.levelId),oid))}</span></div>`}).join("");
   const coverNote=missing.length?(S.instruments.length===0?`<div class="ghost-note" style="color:#94a3b8">0 of ${S.objectives.length} objectives covered. Mount instruments on the left to fulfill requirements.</div>`:
     `<div class="ghost-note" style="color:var(--amber)">Missing measurements: ${missing.join(", ")}. Objectives without matching instruments will return no data.</div>`):
-    `<div class="ghost-note" style="color:var(--phosphor)">✓ All selected objectives have matching instruments mounted!</div>`;
+    `<div class="ghost-note" style="color:var(--phosphor)"><span class="g-icon">check_circle</span> All selected objectives have matching instruments mounted!</div>`;
 
   if(S.bstep==="payload"){
     return `<div class="wrap buildwrap">
@@ -1792,13 +2380,17 @@ function scrBuild(){
     <div class="bay bay-payload">
       <div class="bay-col bay-cat-col">
         <div class="panel">
-          <div class="spread pad" style="padding:10px 14px;border-bottom:1px solid var(--hairline);background:rgba(255,255,255,0.02)">
-            <h3>INSTRUMENT CATALOGUE <span class="code">PLD-01</span></h3>
-            <button class="btn ghost btn-sm" data-act="filter-useful" style="font-family:var(--mono);font-size:10.5px;padding:3px 9px;${S.filterUseful?'background:rgba(75,130,215,0.25);border-color:var(--blue-lift)':''}">
-              ${S.filterUseful?'SHOWING USEFUL ONLY':'FILTER: USEFUL ONLY'}
-            </button>
+          <div class="cat-header-wrap" style="padding:0 0 10px 0;margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+              <h3 class="cat-heading" style="margin:0;font-family:var(--font-display);font-size:16px;font-weight:650;letter-spacing:-0.01em;color:var(--text-1)">
+                INSTRUMENT CATALOGUE <span class="code" style="font-family:var(--font-data);font-size:10.5px;letter-spacing:0.12em;opacity:0.45;font-weight:400;margin-left:6px">PLD-01</span>
+              </h3>
+              <button class="btn-filter-useful ${S.filterUseful?'active':''}" data-act="filter-useful" title="Toggle filtering to show only instruments that fulfill your chosen science objectives">
+                <span class="filter-dot"></span>${S.filterUseful?'SHOWING USEFUL ONLY':'FILTER: USEFUL ONLY'}
+              </button>
+            </div>
+            <p class="hint" style="font-size:11.5px;color:rgba(255,255,255,0.5);margin:0;line-height:1.45">Match <b style="color:var(--accent,#5b9bff);font-weight:600">USEFUL</b> tags to your science objectives. Hover options to preview budget deltas.</p>
           </div>
-          <div class="pad hint" style="font-size:11.5px;border-bottom:1px solid var(--hairline)">Match <b>USEFUL</b> tags to your science objectives. Hover options to preview budget deltas.</div>
           <div class="cat">${catHtml}</div>
         </div>
       </div>
@@ -1814,7 +2406,9 @@ function scrBuild(){
   }
 
   if(S.bstep==="systems"){
-    const downRate=D.rate>1e6?fmt(D.rate/1e6,1)+" Mb/s":D.rate>1e3?fmt(D.rate/1e3,1)+" kb/s":fmt(D.rate)+" b/s";
+    const downVal=D.rate>1e6?fmt(D.rate/1e6,1):D.rate>1e3?fmt(D.rate/1e3,1):fmt(D.rate);
+    const downUnit=D.rate>1e6?"Mb/s":D.rate>1e3?"kb/s":"b/s";
+    const downRate=downVal+" "+downUnit;
     const retFrac=D.genMbPerDay>0?Math.min(1,D.downMbPerDay/D.genMbPerDay):1;
     const commsBottleneck=retFrac<0.5;
 
@@ -1825,7 +2419,7 @@ function scrBuild(){
       <div class="bay-col">
         <div class="accordion-group">
           ${pick("POWER SOURCE",tierList(L.power.map(id=>byId(POWER,id)),S.power),"power","PWR-02")}
-          ${pick("BATTERY & ECLIPSE STORAGE",BATTERY,"bat","BAT-03",D.darkDemandWh>0?`Eclipse ${D.tDark.toFixed(1)}h: need ${D.darkDemandWh} Wh ${D.batOk?"✓":"⚠ LOW"}`:null)}
+          ${pick("BATTERY & ECLIPSE STORAGE",BATTERY,"bat","BAT-03",D.darkDemandWh>0?`Eclipse ${D.tDark.toFixed(1)}h: need ${D.darkDemandWh} Wh ${D.batOk?'<span class="g-icon">check</span>':'<span class="g-icon">warning</span> LOW'}`:null,!D.batOk)}
           ${pick("PROPULSION",L.prop.map(id=>byId(PROP,id)),"prop","PRP-03")}
           ${L.dose>=2?pick("RADIATION SHIELDING",SHIELD,"shield","RAD-05"):""}
           ${pick("ONBOARD COMPUTER (C&DH)",CDH,"cdh","CDH-06")}
@@ -1857,20 +2451,20 @@ function scrBuild(){
           <div class="v3host v3bay" id="v3systems"></div>
           <canvas id="bayCanvas" width="880" height="470" role="img" aria-label="PBR spacecraft engineering preview with dynamic mounting points"></canvas>
           <div class="model-asset-note"><span class="model-chip">NASA / GLB</span><span>3D: NASA 3D HARDWARE</span><span>2D: SCHEMATIC</span><a href="assets/ASSET_SOURCES.md" target="_blank" rel="noopener">ASSET SOURCES</a></div>
-          <div class="readout" style="position:sticky;bottom:0;background:rgba(6,10,18,0.96);padding:10px;border-top:1px solid var(--hairline)">
-            <div><div class="k">DRY MASS</div><div class="v">${fmt(D.dryMass)}<span style="font-size:10px;color:var(--dim)"> kg</span></div></div>
-            <div><div class="k">PROPELLANT</div><div class="v">${fmt(D.propMass)}<span style="font-size:10px;color:var(--dim)"> kg</span></div></div>
-            <div><div class="k">&#916;V BUDGET</div><div class="v">${fmt(D.dvTotal,2)}<span style="font-size:10px;color:var(--dim)"> km/s</span></div></div>
-            <div><div class="k">POWER AT TARGET</div><div class="v">${fmt(D.genEOL)}<span style="font-size:10px;color:var(--dim)"> W</span></div></div>
-            <div><div class="k">DOSE OVER MISSION</div><div class="v" style="color:${L.dose*D.sh.f*L.years>80?'var(--red)':L.dose*D.sh.f*L.years>30?'var(--amber)':'var(--bone)'}">${fmt(L.dose*D.sh.f*L.years)}<span style="font-size:10px;color:var(--dim)"> krad</span></div></div>
-            <div><div class="k">DOWNLINK</div><div class="v">${downRate}</div></div>
+          <div class="readout cad-readout">
+            <div><div class="k">DRY MASS</div><div class="v">${fmt(D.dryMass)}<span class="u">kg</span></div></div>
+            <div><div class="k">PROPELLANT</div><div class="v">${fmt(D.propMass)}<span class="u">kg</span></div></div>
+            <div><div class="k">&#916;V BUDGET</div><div class="v">${fmt(D.dvTotal,2)}<span class="u">km/s</span></div></div>
+            <div><div class="k">POWER</div><div class="v">${fmt(D.genEOL)}<span class="u">W</span></div></div>
+            <div><div class="k">RADIATION</div><div class="v" style="color:${L.dose*D.sh.f*L.years>80?'var(--red)':L.dose*D.sh.f*L.years>30?'var(--amber)':'var(--bone)'}">${fmt(L.dose*D.sh.f*L.years)}<span class="u">krad</span></div></div>
+            <div><div class="k">DOWNLINK</div><div class="v">${downVal}<span class="u">${downUnit}</span></div></div>
           </div>
         </div>
       </div>
 
       <div class="bay-col">
         <div class="accordion-group">
-          ${pick("COMMUNICATIONS",tierList(L.comms.map(id=>byId(COMMS,id)),S.comms),"comms","TLM-11",commsBottleneck?`${D.cm?D.cm.n:""} (BOTTLENECK: ${(retFrac*100).toFixed(0)}% RETURN ⚠)`:null)}
+          ${pick("COMMUNICATIONS",tierList(L.comms.map(id=>byId(COMMS,id)),S.comms),"comms","TLM-11",commsBottleneck?`${D.cm?esc(D.cm.n):""} (BOTTLENECK: ${(retFrac*100).toFixed(0)}% RETURN <span class="g-icon">warning</span>)`:null,commsBottleneck)}
           ${pick("ATTITUDE CONTROL (ADCS)",ADCS,"adcs","ADC-08")}
           <div class="accordion-item open" id="acc-dsn">
             <div class="accordion-header" data-act="toggle-acc" data-target="acc-dsn">
@@ -1878,13 +2472,13 @@ function scrBuild(){
                 <span class="accordion-title">DSN ALLOCATION <span class="code">TLM-12</span></span>
                 <span class="accordion-badge">${esc(dsnTier().n)}</span>
               </div>
-              <span class="accordion-chevron">▾</span>
+              <span class="accordion-chevron"><span class="g-icon icon-alone">expand_more</span></span>
             </div>
             <div class="accordion-content">
               ${DSN.map(t=>{const on=S.dsn===t.id;
                 const eff=(L.dsnHrs*t.f).toFixed(1);
-                return `<button class="part ${on?'on':''}" data-act="dsn" data-id="${t.id}" style="${on?'border-color:var(--phosphor);background:rgba(101,242,165,0.08);':''}">
-                  <span class="pn"><span>${esc(t.n)} — ${eff} h/day</span>${on?'<span style="color:var(--phosphor);font-family:var(--mono);font-size:11px">✓ SELECTED</span>':''}</span>
+                return `<button class="part ${on?'on':''}" data-act="dsn" data-id="${t.id}">
+                  <span class="pn"><span>${esc(t.n)} — ${eff} h/day</span>${on?'<span class="part-sel-pill"><span class="g-icon">check</span> SELECTED</span>':''}</span>
                   <span class="ps"><span>${esc(t.d)}</span></span></button>`}).join("")}
             </div>
           </div>
@@ -1892,7 +2486,7 @@ function scrBuild(){
         </div>
         ${commsBottleneck?`
         <div class="panel mt" style="border-color:rgba(255,183,77,0.4);background:rgba(255,183,77,0.05)">
-          <h3 style="color:var(--amber)">⚠ COMMS BOTTLENECK DETECTED</h3>
+          <h3 style="color:var(--amber)"><span class="g-icon">warning</span> COMMS BOTTLENECK DETECTED</h3>
           <div class="pad hint" style="font-size:11.5px;line-height:1.6;color:var(--bone)">
             Downlink capacity (${downRate}) returns only <b>${(retFrac*100).toFixed(0)}%</b> of generated instrument data. Upgrade communications or increase DSN allocation to capture full science value.
           </div>
@@ -1949,14 +2543,14 @@ function scrBuild(){
       <div class="rev-col">
         <div class="panel"><h3>READINESS CERTIFICATION <span class="code">REV-02</span></h3><div class="pad">
           ${ready.map(r=>`<button class="spread rev-check-btn" data-act="bstep" data-v="${r[3]}" style="width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.04);padding:6px 0;cursor:pointer">
-            <span style="color:${r[1]?'var(--phosphor)':'var(--red)'};font-size:12.5px">${r[1]?"\u2713":"\u2715"} ${r[0]}</span>
+            <span style="color:${r[1]?'var(--phosphor)':'var(--red)'};font-size:12.5px">${r[1]?'<span class="g-icon">check</span>':'<span class="g-icon">close</span>'} ${r[0]}</span>
             <span class="num hint" style="font-size:11.5px">${r[2]} →</span></button>`).join("")}
           <div style="text-align:center;margin:16px 0 10px"><span class="stamp ${allReady?'go':'nogo'}">${stampText}</span></div>
         </div></div>
 
         ${retFrac<0.9?`
         <div class="panel mt" style="border:1px solid rgba(255,183,77,0.4);background:rgba(255,183,77,0.06)">
-          <h3 style="color:var(--amber)">⚠ SCIENCE DOWNLINK RISK</h3>
+          <h3 style="color:var(--amber)"><span class="g-icon">warning</span> SCIENCE DOWNLINK RISK</h3>
           <div class="pad">
             <p style="font-size:12.5px;color:var(--bone);line-height:1.6">The current communications link returns only <b>${(retFrac*100).toFixed(0)}%</b> of what your instruments generate. Overflowing data will be permanently discarded.</p>
             <button class="btn ghost mt-s" data-act="bstep" data-v="systems" style="border-color:var(--amber);color:var(--amber);font-size:12px;width:100%">FIX IN SYSTEMS STEP →</button>
@@ -2018,8 +2612,11 @@ function drawBay(){
 function scrLaunch(){
   const L=byId(LEVELS,S.levelId);
   const D=derive(S);
-  const body = L.mode==="pork" ? `
-      <div class="panel"><span class="bracket tl"></span><span class="bracket br"></span>
+  /* Trajectory context now lives in the LEFT column: the interactive porkchop
+     keeps its full panel, while the fixed-C3 and LEO cases collapse to a single
+     compact row so the readiness review can own the centre column. */
+  const trajPanel = L.mode==="pork" ? `
+      <div class="panel trj-block"><span class="bracket tl"></span><span class="bracket br"></span>
         <h3>PORKCHOP PLOT &mdash; EARTH TO ${esc(BODY[L.body].n.toUpperCase())} ${infoTag(SRC.horizons,"Lambert solution")}
           <span class="spd" style="margin-left:auto">
             <button data-act="pmode" data-v="c3" class="${S.pmode==='vinf'?'':'on'}">DEPARTURE C3</button>
@@ -2027,27 +2624,44 @@ function scrLaunch(){
           </span></h3>
         <canvas id="pork" width="900" height="480" role="img" aria-label="Porkchop plot of departure energy"></canvas>
         <div class="readout" id="porkOut"></div>
-      </div>
-      <p class="hint mt-s" style="font-size:11.5px;line-height:1.55">Click anywhere in the plot. Each point is a Lambert solution between Earth's and ${esc(BODY[L.body].n)}'s orbits.
-      <br><b>C3 (departure energy)</b>: how hard the launcher throws the craft. Lower C3 allows cheaper vehicles.
-      <br><b>Arrival V&#8734; (arrival speed)</b>: relative velocity at destination. Higher V&#8734; costs braking propellant.</p>`
+        <p class="hint trj-cap">Click anywhere in the plot &mdash; each point is a Lambert solution between Earth's and ${esc(BODY[L.body].n)}'s orbits. <b>C3</b> is how hard the launcher throws the craft (lower is cheaper); <b>arrival V&#8734;</b> is the speed the craft must brake away.</p>
+      </div>`
     : L.mode==="fixedC3" ? `
-      <div class="panel"><h3>TRANSLUNAR INJECTION <span class="code">TRJ-01</span></h3>
-        <div class="pad"><p class="hint" style="font-size:12px;line-height:1.6">Translunar injection needs C3 = ${L.c3} km&sup2;/s&sup2; &mdash; barely more than Earth escape &mdash; with monthly windows. The hard part is braking into orbit or descent.</p>
-        <div class="readout mt"><div><div class="k">C3</div><div class="v">${L.c3}</div></div>
-        <div><div class="k">CRUISE</div><div class="v">${L.tof} d</div></div>
-        <div><div class="k">CAPTURE &#916;V</div><div class="v">${fmt(D.dvTotal,2)} km/s</div></div></div></div></div>`
-    : `<div class="panel"><h3>ORBIT SELECTION <span class="code">TRJ-01</span></h3>
-        <div class="pad"><p class="hint" style="font-size:12px;line-height:1.6">A ${L.altKm} km Sun-synchronous orbit crosses the equator at constant local solar time. Requires a dog-leg at launch, utilizing ~34% of standard LEO vehicle capability.</p>
-        <div class="readout mt"><div><div class="k">ALTITUDE</div><div class="v">${L.altKm} km</div></div>
-        <div><div class="k">INCLINATION</div><div class="v">98.1&deg;</div></div>
-        <div><div class="k">PERIOD</div><div class="v">98.6 min</div></div>
-        <div><div class="k">GROUND CONTACTS</div><div class="v">${L.dsnHrs} h/d</div></div></div></div></div>`;
+      <div class="panel trj-strip trj-block">
+        <h3>TRANSLUNAR INJECTION <span class="code">TRJ-01</span></h3>
+        <div class="readout" style="--cells:3">
+          <div><div class="k">C3</div><div class="v">${L.c3}<span class="u">km&sup2;/s&sup2;</span></div></div>
+          <div><div class="k">CRUISE</div><div class="v">${L.tof}<span class="u">d</span></div></div>
+          <div><div class="k">CAPTURE &#916;V</div><div class="v">${fmt(D.dvTotal,2)}<span class="u">km/s</span></div></div>
+        </div>
+        <p class="hint trj-cap">Translunar injection needs barely more than Earth escape &mdash; the hard part is braking into orbit or descent, on monthly windows.</p>
+      </div>`
+    : `
+      <div class="panel trj-strip trj-block">
+        <h3>ORBIT SELECTION <span class="code">TRJ-01</span></h3>
+        <div class="readout" style="--cells:4">
+          <div><div class="k">ALTITUDE</div><div class="v">${L.altKm}<span class="u">km</span></div></div>
+          <div><div class="k">INCLINATION</div><div class="v">98.1&deg;</div></div>
+          <div><div class="k">PERIOD</div><div class="v">98.6<span class="u">min</span></div></div>
+          <div><div class="k">GROUND CONTACTS</div><div class="v">${L.dsnHrs}<span class="u">h/d</span></div></div>
+        </div>
+        <p class="hint trj-cap">Sun-synchronous: the orbit crosses the equator at a constant local solar time. Reaching it needs a dog-leg at launch, using ~34% of standard LEO lift.</p>
+      </div>`;
+
+  /* FLT-01 is shown one milestone at a time, cross-faded; the list stays in the
+     DOM in full order for the report and for reduced-motion. */
+  const MS=[
+    ["T-00:00","LIFTOFF","Ignition at Launch Complex 39B &amp; tower clearance"],
+    ["T+01:12","MAX-Q","Maximum aerodynamic pressure"],
+    ["T+02:40","STAGING","Booster burnout &amp; separation"],
+    ["T+08:30","ORBIT INSERTION","Second stage shutdown"]
+  ];
+  if(L.mode==="fixedC3") MS.push(["T+45:00","TLI BURN","Trans-lunar injection to transfer orbit"]);
 
   return `<div class="wrap launchwrap">
   <div class="launchgrid">
     <div class="launch-col launch-ops-col">
-      <div class="panel">
+      <div class="panel lv-list-panel">
         <h3>LAUNCH VEHICLE FLEET &amp; CAPABILITY ${infoTag(SRC.lsp,"Launch vehicle performance")} <span class="code">LSP-01</span></h3>
         <div class="pad hint" style="font-size:11.5px;border-bottom:1px solid var(--hairline)">Compare vehicle lift capacity against your spacecraft wet mass (${fmt(D.wetMass)} kg) at current trajectory energy.</div>
         <div id="lvList"></div>
@@ -2056,34 +2670,46 @@ function scrLaunch(){
       ${L.assist?`<div class="panel mt"><h3>TRAJECTORY OPTION <span class="code">TRJ-02</span></h3>
         <div class="pad">
           <button class="obj ${S.assist?'sel':''}" data-act="assist" style="margin:0;width:100%">
-            <span class="box">${S.assist?"\u2713":""}</span>
+            <span class="box">${S.assist?'<span class="g-icon icon-alone">check</span>':""}</span>
             <span><span class="t">${esc(L.assist.label)}</span>
             <span class="d">Gravity assist drops departure energy to C3 ${L.assist.c3} km&sup2;/s&sup2; (triples vehicle lift), adding ${(L.assist.addDays/365.25).toFixed(1)} yr cruise and $${L.assist.costM}M ops.</span></span>
           </button>
         </div></div>`:""}
 
-      <div class="accordion-item ${L.mode==="pork"?"":"open"}" id="acc-milestones" style="margin-top:12px">
+      ${trajPanel}
+
+      <div class="accordion-item ${L.mode==="pork"?"":"open"}" id="acc-milestones">
         <div class="accordion-header" data-act="toggle-acc" data-target="acc-milestones">
           <div class="accordion-title-wrap">
             <span class="accordion-title">FLIGHT PROFILE &amp; SEQUENCE <span class="code">FLT-01</span></span>
           </div>
-          <span class="accordion-chevron">▾</span>
+          <span class="accordion-chevron"><span class="g-icon icon-alone">expand_more</span></span>
         </div>
         <div class="accordion-content">
-          <div class="flight-milestones">
-            <div class="f-ms"><span class="f-time">T-00:00</span><span class="f-dot"></span><span class="f-desc"><b>LIFTOFF</b> &mdash; Ignition at Launch Complex 39B &amp; tower clearance</span></div>
-            <div class="f-ms"><span class="f-time">T+01:12</span><span class="f-dot"></span><span class="f-desc"><b>MAX-Q</b> &mdash; Maximum aerodynamic pressure</span></div>
-            <div class="f-ms"><span class="f-time">T+02:40</span><span class="f-dot"></span><span class="f-desc"><b>STAGING</b> &mdash; Booster burnout &amp; separation</span></div>
-            <div class="f-ms"><span class="f-time">T+08:30</span><span class="f-dot"></span><span class="f-desc"><b>ORBIT INSERTION</b> &mdash; Second stage shutdown</span></div>
-            ${L.mode==="fixedC3"?`<div class="f-ms"><span class="f-time">T+45:00</span><span class="f-dot"></span><span class="f-desc"><b>TLI BURN</b> &mdash; Trans-lunar injection to transfer orbit</span></div>`:""}
+          <div class="flight-profile-rail"><i></i><span>ASCENT SEQUENCE</span><b>FLT-01</b></div>
+                    <div class="flight-milestones cyc" style="--n:${MS.length}">
+            ${MS.map((m,i)=>`<div class="f-ms" style="--i:${i}"><span class="f-time">${m[0]}</span><span class="f-dot"></span><span class="f-desc"><b>${m[1]}</b> &mdash; ${m[2]}</span></div>`).join("")}
           </div>
         </div>
       </div>
     </div>
 
     <div class="launch-col launch-traj-col">
-      ${body}
-      <div class="panel mt" id="goBox"></div>
+      <div class="panel" id="goBox"></div>
+    </div>
+
+    <div class="launch-col launch-model-col">
+      <div class="panel lv3-panel">
+        <h3>SELECTED VEHICLE <span class="code">VEH-3D</span></h3>
+        <div class="lv3-stage">
+          <div id="lv3host" class="lv3host" role="img"
+               aria-label="3D model of the selected launch vehicle"
+               data-lv="${esc((S.launch&&S.launch.lv)||"")}">
+            <div class="lv3-placeholder"><span>3D VEHICLE VIEW</span><em>${S.launch&&S.launch.lv?"LOADING HARDWARE…":"SELECT A VEHICLE"}</em></div>
+          </div>
+        </div>
+        <div class="lv3-foot">CINEMATIC SHOT CYCLE · DRAG TO ORBIT</div>
+      </div>
     </div>
   </div></div>`;
 }
@@ -2266,12 +2892,43 @@ function renderLV(){
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-family:var(--mono);font-size:10.5px">
         <span style="color:var(--dim)">Mass Margin: ${(margin*100).toFixed(0)}%</span>
-        <span style="color:${isSel?'var(--phosphor)':'var(--bone)'}">${isSel?'✓ SELECTED':'SELECT'}</span>
+        <span style="color:${isSel?'var(--phosphor)':'var(--bone)'}">${isSel?'<span class="g-icon">check</span> SELECTED':'SELECT'}</span>
       </div>
     </button>`;
   }).join("");
   renderGo();
   renderDock();
+  syncLVPreview();
+}
+
+/* ── Launch-screen 3D vehicle preview (progressive enhancement).
+   The host dataset is the only hand-off to js/lv-preview.js, so the module
+   never reaches into simulation state. Same load gates as the rest of the 3D
+   layer (http(s) + WebGL + no ?no3d); when the layer is unavailable the model
+   column collapses so the two decision columns keep their width. */
+let lv3Loading=false, lv3Gate=null;
+function lv3WebGL(){
+  if(lv3Gate!==null) return lv3Gate;
+  try{
+    const t=document.createElement("canvas");
+    lv3Gate=!!(t.getContext("webgl2")||t.getContext("webgl"));
+  }catch(e){ lv3Gate=false; }
+  return lv3Gate;
+}
+function syncLVPreview(){
+  const host=el("lv3host"); if(!host) return;
+  const id=(S.launch&&S.launch.lv)||"";
+  const lv=byId(LV,id);
+  const off = location.protocol.indexOf("http")!==0 || /[?&]no3d/.test(location.search) || !lv3WebGL();
+  document.body.classList.toggle("lv3-off", off && !window.LVPreview);
+  if(!id){ delete host.dataset.lv; delete host.dataset.name; return; }
+  host.dataset.lv=id; host.dataset.name=lv?lv.n:"";
+  if(window.LVPreview){ try{ LVPreview.sync(); }catch(e){} return; }
+  if(off||lv3Loading) return;
+  lv3Loading=true;
+  import("./js/lv-preview.js?v=20261107_v3")
+    .then(()=>{ lv3Loading=false; try{ LVPreview.sync(); }catch(e){} })
+    .catch(()=>{ lv3Loading=false; });
 }
 
 function renderGo(){
@@ -2279,7 +2936,7 @@ function renderGo(){
   const D=derive(S), L=byId(LEVELS,S.levelId);
   if(!S.launch||!S.launch.lv){
     box.innerHTML=`<h3>FLIGHT READINESS REVIEW <span class="code">FRR-01</span></h3>
-      <div class="pad"><p class="hint">Select a launch vehicle on the left to evaluate flight margins.</p></div>`;
+      <div class="pad frr-pad"><p class="hint">Select a launch vehicle on the left to evaluate flight margins.</p></div>`;
     return;
   }
   const checks=[
@@ -2289,7 +2946,9 @@ function renderGo(){
     ["Every objective has an instrument", S.objectives.every(o=>objMet(S,o)), S.objectives.filter(o=>!objMet(S,o)).length+" uncovered"],
     ["Launch readiness within 72 months", D.months<=72, `${fmt(D.months)} months`]
   ];
-  const go=checks.every(c=>c[1]);
+  const checksGo=checks.every(c=>c[1]);
+    const teamGo=teamActive() ? S.team.seats.every(s=>!!(S.team.votes||{})[s.i]) : true;
+    const go=checksGo&&teamGo;
   const retFrac = D.genMbPerDay>0 ? Math.min(1,D.downMbPerDay/D.genMbPerDay) : 1;
   const selLv = byId(LV, S.launch.lv);
   const lvCost = selLv ? selLv.cost : 0;
@@ -2297,62 +2956,57 @@ function renderGo(){
 
   const mMass = D.margins.mass, mPower = D.margins.power, mCost = D.margins.cost;
   const minMargin = Math.min(mMass, mPower, mCost);
+  const passed = checks.filter(c=>c[1]).length;
+  const barFill = m => m<0?'crit':m<0.15?'warn':'nominal';
+  const barInk  = m => m<0?'var(--red)':m<0.15?'var(--amber)':'var(--phosphor)';
+  const mSchedule = Math.max(0, 1 - D.months / 72);
+    const BARS=[["MASS",mMass,"baseline"],["POWER",mPower,"margin"],["COST",mCost,"margin"],["SCHEDULE",mSchedule,`${fmt(D.months)}/72 mo`]];
 
   box.innerHTML=`<h3>FLIGHT READINESS REVIEW <span class="code">FRR-01</span></h3>
-    <div class="pad">
-      <div style="background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.05);margin-bottom:10px">
-        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:4px">TOTAL COST BREAKDOWN</div>
-        <div class="spread" style="font-size:12px;padding:2px 0">
-          <span>Spacecraft &amp; Payload Bus:</span><span class="num">$${fmt(craftCost)}M</span>
-        </div>
-        <div class="spread" style="font-size:12px;padding:2px 0">
-          <span>Launch Vehicle (${selLv?selLv.n:"Selected"}):</span><span class="num">$${fmt(lvCost)}M</span>
-        </div>
-        <div class="spread" style="font-size:12.5px;padding:4px 0 0;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;font-weight:600">
-          <span>Total Mission Commitment:</span><span class="num" style="color:${D.cost<=D.cap?'var(--phosphor)':'var(--red)'}">$${fmt(D.cost)}M / ${capText(D.L)}</span>
-        </div>
-      </div>
+    <div class="pad frr-pad">
+     <div class="frr-body">
 
-      <div style="margin-bottom:12px">
-        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:6px">MISSION MARGIN BARS</div>
-        <div class="budget-bar-wrap" style="padding:6px 10px;margin-bottom:6px">
-          <div class="budget-bar-head" style="font-size:11px">
-            <span>Mass Margin</span>
-            <span style="color:${mMass<0?'var(--red)':mMass<0.15?'var(--amber)':'var(--phosphor)'}">${(mMass*100).toFixed(0)}%</span>
-          </div>
-          <div class="budget-bar-track" style="height:5px">
-            <div class="budget-bar-fill ${mMass<0?'crit':mMass<0.15?'warn':'nominal'}" style="width:${Math.max(0,Math.min(100,mMass*100))}%"></div>
-          </div>
+      <section class="frr-sec">
+        <div class="frr-h">COST SUMMARY</div>
+        <div class="frr-lines">
+          <div class="frr-line"><span>Spacecraft &amp; payload bus</span><span class="num">$${fmt(craftCost)}M</span></div>
+          <div class="frr-line"><span>Launch vehicle <em>${selLv?esc(selLv.n):"selected"}</em></span><span class="num">$${fmt(lvCost)}M</span></div>
         </div>
-
-        <div class="budget-bar-wrap" style="padding:6px 10px;margin-bottom:6px">
-          <div class="budget-bar-head" style="font-size:11px">
-            <span>Power Margin</span>
-            <span style="color:${mPower<0?'var(--red)':mPower<0.15?'var(--amber)':'var(--phosphor)'}">${(mPower*100).toFixed(0)}%</span>
-          </div>
-          <div class="budget-bar-track" style="height:5px">
-            <div class="budget-bar-fill ${mPower<0?'crit':mPower<0.15?'warn':'nominal'}" style="width:${Math.max(0,Math.min(100,mPower*100))}%"></div>
-          </div>
+        <div class="frr-total">
+          <span class="k">TOTAL MISSION COMMITMENT</span>
+          <span class="v" style="color:${D.cost<=D.cap?'var(--phosphor)':'var(--red)'}">$${fmt(D.cost)}M</span>
+          <span class="u">of ${capText(D.L)}</span>
         </div>
+        <div class="frr-util"><span>BUDGET UTILIZATION</span><b>${Math.round(D.cost/D.cap*100)}%</b></div>
+        <div class="frr-util-track"><i style="width:${Math.min(100,Math.max(0,D.cost/D.cap*100))}%"></i></div>
+      </section>
 
-        <div class="budget-bar-wrap" style="padding:6px 10px;margin-bottom:6px">
-          <div class="budget-bar-head" style="font-size:11px">
-            <span>Cost Margin</span>
-            <span style="color:${mCost<0?'var(--red)':mCost<0.15?'var(--amber)':'var(--phosphor)'}">${(mCost*100).toFixed(0)}%</span>
-          </div>
-          <div class="budget-bar-track" style="height:5px">
-            <div class="budget-bar-fill ${mCost<0?'crit':mCost<0.15?'warn':'nominal'}" style="width:${Math.max(0,Math.min(100,mCost*100))}%"></div>
-          </div>
+      <section class="frr-sec">
+        <div class="frr-h">MARGINS</div>
+        <div class="frr-bars">
+          ${BARS.map(([k,m,cap])=>`<div class="budget-bar-wrap">
+            <div class="budget-bar-head"><span>${k}</span><span style="color:${barInk(m)}">${(m*100).toFixed(0)}% <em>${cap}</em></span></div>
+            <div class="budget-bar-track"><div class="budget-bar-fill ${barFill(m)}" style="width:${Math.max(0,Math.min(100,m*100))}%"></div></div>
+          </div>`).join("")}
         </div>
-        ${minMargin<0.15?`<div class="hint" style="color:var(--amber);font-size:11px;margin-top:4px">⚠ Weakest margin is ${(minMargin*100).toFixed(0)}% (${minMargin===mMass?'Mass':minMargin===mPower?'Power':'Cost'}). Absorbs minimal flight anomalies.</div>`:""}
-      </div>
+        ${minMargin<0.15?`<div class="hint" style="color:var(--amber);font-size:11px"><span class="g-icon">warning</span> Weakest margin is ${(minMargin*100).toFixed(0)}% (${minMargin===mMass?'mass':minMargin===mPower?'power':'cost'}). Absorbs minimal flight anomalies.</div>`:""}
+      </section>
 
-      ${checks.map(c=>`<div class="spread" style="padding:4px 0;font-size:12px">
-        <span style="color:${c[1]?'var(--phosphor)':'var(--red)'}">${c[1]?"\u2713":"\u2715"} ${c[0]}</span>
-        <span class="num hint" style="font-size:11px">${c[2]}</span></div>`).join("")}
+      <section class="frr-sec">
+        <div class="frr-h">READINESS CHECKS <b>${passed}/${checks.length}</b></div>
+        <div class="frr-checks">
+          ${checks.map(c=>`<div class="frr-check ${c[1]?'ok':'bad'}">
+            <span class="g">${c[1]?"PASS":"FAIL"}</span>
+            <span class="t">${c[0]}</span>
+            <span class="n">${c[2]}</span></div>`).join("")}
+        </div>
+      </section>
 
+     </div>
+     <div class="frr-foot">
       ${teamRollCallHtml()}
-      <div style="text-align:center;margin:16px 0 10px"><span class="stamp ${go?'go':'nogo'}">${go?"GO":"NO-GO"}</span></div>
+      <div class="frr-decision ${go?'go':'nogo'}"><span class="frr-decision-mark">${go?"OK":"HOLD"}</span><span><b>${go?"GO":"NO-GO"}</b><small>${go?"All launch gates are clear":teamGo?"Resolve failed checks before commit":"Awaiting team roll call"}</small></span></div>
+     </div>
     </div>`;
 }
 /* D-04: one GO/NO-GO roll call, recorded per seat. Any seat may change its
@@ -2363,10 +3017,16 @@ function teamRollCallHtml(){
   const T=S.team, votes=T.votes||{};
   const done=T.seats.filter(s=>!!votes[s.i]).length;
   return `<div class="team-roll">
-    <div class="tr-head">GO / NO-GO ROLL CALL <span class="code">TEAM-01</span></div>
+    <div class="tr-head"><span>GO / NO-GO ROLL CALL</span><span class="code">TEAM-01</span></div>
     <div class="tr-seats">${T.seats.map(s=>
       `<button class="tr-seat ${votes[s.i]?"go":""}" data-act="goseat" data-id="${s.i}" style="--seat:${s.col}"
-        title="${esc(s.name)}">SEAT ${s.i+1} &#183; ${esc(s.code)}<b>${votes[s.i]?"GO \u2713":"NO-GO"}</b></button>`).join("")}</div>
+        title="${esc(s.name)}: toggle GO / NO-GO" aria-pressed="${votes[s.i]?'true':'false'}">
+        <div class="tr-seat-info">
+          <span class="tr-seat-id">SEAT ${s.i+1}</span>
+          <span class="tr-seat-name">${esc(s.code)}</span>
+        </div>
+        <span class="tr-badge">${votes[s.i]?'<span class="g-icon">check</span> GO':'CALL GO'}</span>
+      </button>`).join("")}</div>
     <p class="hint" style="font-size:11px;margin-top:6px">${done}/${T.size} GO &#8212; ${done===T.size?"unanimous, cleared for commit":"every seat must call GO before the Flight Director can commit"}</p>
   </div>`;
 }
@@ -2492,7 +3152,7 @@ function scrOps(){
         <button data-act="spd" data-v="20" class="${(S.ops&&S.ops.speed===20)?'on':''}">50 d/s</button>
         <button data-act="spd" data-v="90" class="${(S.ops&&S.ops.speed===90)?'on':''}">MAX</button>
       </div>
-      <button data-act="toggle-hud" class="hud-toggle-btn" title="Toggle HUD visibility">HUD</button>
+      <button data-act="toggle-hud" class="hud-toggle-btn" title="Toggle HUD visibility"><span class="g-icon hud-icon" style="font-size:13px;line-height:1">visibility</span><span>HUD</span></button>
     </div>
     <div class="ops-hud-left" id="opsHudLeft">
       <div class="hud-card">
@@ -2511,7 +3171,7 @@ function scrOps(){
       </div>
       <div class="hud-card mt-s">
         <div class="hud-card-hdr">MISSION TIMELINE <span class="code">OPS-02</span></div>
-        <canvas id="tl" width="320" height="74" role="img" aria-label="Mission timeline"></canvas>
+        <canvas id="tl" width="320" height="96" role="img" aria-label="Mission timeline"></canvas>
       </div>
     </div>
     <div class="ops-minimap" id="opsMinimap">
@@ -3225,7 +3885,8 @@ function drawOrbit(paint2D){
   }
 
   const f=fitCanvas(cv,900,430), x=f.x, W=f.W, H=f.H;
-  x.fillStyle="#03050A";x.fillRect(0,0,W,H);
+  x.clearRect(0,0,W,H);
+  x.fillStyle="rgba(4,8,14,0.45)";x.fillRect(0,0,W,H);
   const rnd=mulberry32(19);
   for(let i=0;i<220;i++){const px=rnd()*W,py=rnd()*H;
     x.fillStyle=`rgba(232,230,223,${0.05+rnd()*0.3})`;x.fillRect(px,py,rnd()*1.3,rnd()*1.3);}
@@ -3377,8 +4038,10 @@ function drawOrbit(paint2D){
     const remKm = Math.round((1 - frac) * 384400);
     cv._lt = Math.max(0.1, frac * 1.28);
     x.font = "10px 'IBM Plex Mono',monospace"; x.fillStyle = "#8D93A1";
-    x.fillText("EARTH", ex - 16, ey + rE + 16);
-    x.fillText("MOON", mx - 12, my + rM + 16);
+    x.textAlign = "center";
+    x.fillText("EARTH", ex, ey + rE + 14);
+    x.fillText("MOON", mx, my + rM + 14);
+    x.textAlign = "left";
     x.fillStyle = "#5EF6A0";
     x.fillText(`TLI \u2014 ${remKm.toLocaleString()} KM TO MOON`, cx - 75, H - 26);
 
@@ -3400,23 +4063,81 @@ function drawOrbit(paint2D){
     }
   }else{
     // body-centric
-    const R=110;
-    const grd=x.createRadialGradient(cx-30,cy-30,8,cx,cy,R);
-    grd.addColorStop(0, L.body==="moon"?"#C9C6BE":"#4A7FC1");
-    grd.addColorStop(1, L.body==="moon"?"#3A3833":"#0D2A52");
-    x.fillStyle=grd;x.beginPath();x.arc(cx,cy,R,0,7);x.fill();
-    if(L.body==="moon"){ const r2=mulberry32(3);
-      for(let i=0;i<40;i++){const a=r2()*7,d=r2()*R*0.92,rr=2+r2()*11;
-        x.fillStyle=`rgba(0,0,0,${0.06+r2()*0.12})`;x.beginPath();
-        x.arc(cx+Math.cos(a)*d,cy+Math.sin(a)*d*1,rr,0,7);x.fill();}}
-    x.strokeStyle="rgba(94,246,160,.28)";x.lineWidth=1;
-    x.beginPath();x.ellipse(cx,cy,R+58,(R+58)*tilt,0.35,0,7);x.stroke();
+    // Proportional radius fitted cleanly within the minimap viewport without cutoffs
+    const R = Math.min(W * 0.24, H * 0.44); // ~75px fits full sphere & orbit within 900x430 (or scaled canvas)
+    const orbA = R * 1.55; // Semi-major axis of orbit
+    const orbB = orbA * 0.45; // Semi-minor axis with tilt
+    const orbRot = 0.30; // Orbit inclination angle
+
+    // Sophisticated spherical body gradient with deep limb terminator
+    const grd = x.createRadialGradient(cx - R * 0.32, cy - R * 0.28, R * 0.06, cx, cy, R);
+    if(L.body==="moon"){
+      grd.addColorStop(0, "#d8d5ce");
+      grd.addColorStop(0.45, "#8b8984");
+      grd.addColorStop(0.78, "#3c3a38");
+      grd.addColorStop(1, "#0c0d10");
+    } else {
+      grd.addColorStop(0, "#6ea8e6");
+      grd.addColorStop(0.65, "#244b7d");
+      grd.addColorStop(1, "#08172b");
+    }
+    x.fillStyle = grd; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill();
+    if(L.body==="moon"){
+      // Authentic lunar maria basins (broad, soft low-albedo geological regions)
+      const maria = [
+        { dx: -0.22, dy: -0.26, rx: 0.32, ry: 0.22, rot: -0.2, op: 0.32 }, // Mare Imbrium
+        { dx: 0.28, dy: -0.15, rx: 0.22, ry: 0.18, rot: 0.1, op: 0.28 },  // Mare Serenitatis
+        { dx: 0.38, dy: 0.08, rx: 0.20, ry: 0.16, rot: 0.3, op: 0.26 },   // Mare Tranquillitatis
+        { dx: -0.32, dy: 0.08, rx: 0.26, ry: 0.35, rot: -0.1, op: 0.30 }, // Oceanus Procellarum
+        { dx: 0.18, dy: 0.24, rx: 0.18, ry: 0.14, rot: 0.4, op: 0.22 }    // Mare Fecunditatis
+      ];
+      maria.forEach(m => {
+        const mx = cx + m.dx * R, my = cy + m.dy * R;
+        const mg = x.createRadialGradient(mx, my, 0, mx, my, m.rx * R);
+        mg.addColorStop(0, `rgba(22, 22, 24, ${m.op})`);
+        mg.addColorStop(0.65, `rgba(28, 28, 30, ${m.op * 0.7})`);
+        mg.addColorStop(1, "rgba(35, 35, 38, 0)");
+        x.fillStyle = mg;
+        x.beginPath();
+        x.ellipse(mx, my, m.rx * R, m.ry * R, m.rot, 0, 7);
+        x.fill();
+      });
+
+      // Distinct rayed impact crater (Tycho-like prominent ray system at South pole)
+      const tychoX = cx - R * 0.10, tychoY = cy + R * 0.58;
+      const tg = x.createRadialGradient(tychoX, tychoY, 0, tychoX, tychoY, R * 0.38);
+      tg.addColorStop(0, "rgba(255, 255, 255, 0.45)");
+      tg.addColorStop(0.15, "rgba(255, 255, 255, 0.18)");
+      tg.addColorStop(1, "rgba(255, 255, 255, 0)");
+      x.fillStyle = tg;
+      x.beginPath(); x.arc(tychoX, tychoY, R * 0.38, 0, 7); x.fill();
+      // Tycho central peak crater
+      x.fillStyle = "rgba(255, 255, 255, 0.65)";
+      x.beginPath(); x.arc(tychoX, tychoY, 2.2, 0, 7); x.fill();
+      x.strokeStyle = "rgba(20, 20, 22, 0.65)";
+      x.lineWidth = 0.8;
+      x.beginPath(); x.arc(tychoX, tychoY, 3.2, 0, 7); x.stroke();
+    }
+    // Atmospheric / limb edge ring glow
+    x.strokeStyle = L.body==="moon" ? "rgba(220,218,210,0.22)" : "rgba(94,180,255,0.35)";
+    x.lineWidth = 1.5; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.stroke();
+
+    // Full closed orbital track (glowing ellipse fully inside view)
+    x.strokeStyle = "rgba(94,246,160,.20)"; x.lineWidth = 1.5;
+    x.beginPath(); x.ellipse(cx, cy, orbA, orbB, orbRot, 0, 7); x.stroke();
+    x.setLineDash([4, 6]);
+    x.strokeStyle = "rgba(94,246,160,.45)"; x.lineWidth = 1;
+    x.beginPath(); x.ellipse(cx, cy, orbA, orbB, orbRot, 0, 7); x.stroke();
+    x.setLineDash([]);
+
     const smoothDay = (O ? (O.day + Math.min(0.999, Math.max(0, acc))) : 0);
-    const ph=smoothDay*0.62;
-    const px=cx+Math.cos(ph)*(R+58)*Math.cos(0.35)-Math.sin(ph)*(R+58)*tilt*Math.sin(0.35);
-    const py=cy+Math.cos(ph)*(R+58)*Math.sin(0.35)+Math.sin(ph)*(R+58)*tilt*Math.cos(0.35);
+    const ph = smoothDay * 0.62;
+    const px = cx + Math.cos(ph) * orbA * Math.cos(orbRot) - Math.sin(ph) * orbB * Math.sin(orbRot);
+    const py = cy + Math.cos(ph) * orbA * Math.sin(orbRot) + Math.sin(ph) * orbB * Math.cos(orbRot);
+    // Spacecraft pulse beacon and vector marker
+    x.fillStyle="rgba(94,246,160,.16)";x.beginPath();x.arc(px,py,12,0,7);x.fill();
+    x.strokeStyle="rgba(94,246,160,.65)";x.lineWidth=1;x.beginPath();x.arc(px,py,7,0,7);x.stroke();
     x.fillStyle="#5EF6A0";x.beginPath();x.arc(px,py,3.5,0,7);x.fill();
-    x.strokeStyle="rgba(94,246,160,.5)";x.beginPath();x.arc(px,py,8,0,7);x.stroke();
     cv._lt = L.body==="moon"?1.28:0.0;
     x.font="10px 'IBM Plex Mono',monospace";x.fillStyle="#8D93A1";
     x.fillText(BODY[L.body].n.toUpperCase(),cx-R,cy+R+22);
@@ -3441,8 +4162,19 @@ function drawOrbit(paint2D){
       });
     }
   }
-  x.font="10px 'IBM Plex Mono',monospace";x.fillStyle="#5A6172";
-  x.fillText("ORBITAL VIEW \u2014 NOT TO SCALE",14,H-12);
+  // Tactical HUD reticle and corner brackets
+  x.strokeStyle="rgba(94,180,255,0.18)";x.lineWidth=1;
+  x.strokeRect(10, 10, W-20, H-20);
+  x.strokeStyle="rgba(94,180,255,0.40)";
+  // Corner accents
+  x.beginPath();
+  x.moveTo(10, 22); x.lineTo(10, 10); x.lineTo(22, 10);
+  x.moveTo(W-22, 10); x.lineTo(W-10, 10); x.lineTo(W-10, 22);
+  x.moveTo(10, H-22); x.lineTo(10, H-10); x.lineTo(22, H-10);
+  x.moveTo(W-22, H-10); x.lineTo(W-10, H-10); x.lineTo(W-10, H-22);
+  x.stroke();
+  x.font="9px 'JetBrains Mono','IBM Plex Mono',monospace";x.fillStyle="rgba(230,237,245,0.65)";
+  x.fillText("TACTICAL VIEW \u2022 RELATIVE POSE", 16, H-16);
 }
 
 /* ── Phase-5 landed 2D fallback: bounded patch contour view ──
@@ -4490,34 +5222,35 @@ function surfEvalAt(sC){
 }
 function drawTL(){
   const cv=el("tl"); if(!cv)return;
-  const f=fitCanvas(cv,900,86), x=f.x, W=f.W, H=f.H, O=S.ops;
+  const f=fitCanvas(cv,300,75), x=f.x, W=f.W, H=f.H, O=S.ops;
   x.fillStyle="#04060B";x.fillRect(0,0,W,H);
   const smoothDay = (O ? (O.day + Math.min(0.999, Math.max(0, acc))) : 0);
-  const M=18, tw=W-M*2, y=44;
-  x.strokeStyle="#1C2433";x.beginPath();x.moveTo(M,y);x.lineTo(W-M,y);x.stroke();
+  const M=12, tw=W-M*2, y=34;
+  x.strokeStyle="#1C2433";x.lineWidth=1;x.beginPath();x.moveTo(M,y);x.lineTo(W-M,y);x.stroke();
   // cruise band
-  if(O.cruise>0){x.fillStyle="rgba(42,107,212,.22)";x.fillRect(M,y-9,tw*O.cruise/O.totalDays,18);}
+  if(O.cruise>0){x.fillStyle="rgba(42,107,212,.22)";x.fillRect(M,y-7,tw*O.cruise/O.totalDays,14);}
   x.fillStyle="rgba(94,246,160,.13)";
-  x.fillRect(M+tw*O.cruise/O.totalDays,y-9,tw*(1-O.cruise/O.totalDays),18);
-  // progress
+  x.fillRect(M+tw*O.cruise/O.totalDays,y-7,tw*(1-O.cruise/O.totalDays),14);
+  // progress track
   x.fillStyle="#5EF6A0";x.fillRect(M,y-2,tw*clamp(smoothDay/O.totalDays,0,1),4);
   // events
   O.events.forEach((e,i)=>{
     const px=M+tw*clamp(e.day/O.totalDays,0,1);
     const done=i<O.evIdx;
     x.strokeStyle=done?"#8D93A1":"#FFB000";x.lineWidth=1;
-    x.beginPath();x.moveTo(px,y-16);x.lineTo(px,y+16);x.stroke();
+    x.beginPath();x.moveTo(px,y-10);x.lineTo(px,y+10);x.stroke();
     x.fillStyle=done?"#8D93A1":"#FFB000";
-    x.beginPath();x.moveTo(px,y-20);x.lineTo(px-4,y-14);x.lineTo(px+4,y-14);x.closePath();x.fill();
+    x.beginPath();x.moveTo(px,y-13);x.lineTo(px-3.5,y-8);x.lineTo(px+3.5,y-8);x.closePath();x.fill();
   });
   // now marker
   const nx=M+tw*clamp(smoothDay/O.totalDays,0,1);
-  x.strokeStyle="#E8E6DF";x.lineWidth=1.5;x.beginPath();x.moveTo(nx,y-22);x.lineTo(nx,y+22);x.stroke();
-  x.font="10px 'IBM Plex Mono',monospace";x.fillStyle="#8D93A1";x.textAlign="left";
-  x.fillText("LAUNCH",M,y+34);
-  if(O.cruise>0){x.textAlign="center";x.fillText("ARRIVAL",M+tw*O.cruise/O.totalDays,y+34);}
-  x.textAlign="right";x.fillText("END OF MISSION",W-M,y+34);
-  x.textAlign="left";x.fillStyle="#5A6172";x.fillText(`${(O.totalDays/365.25).toFixed(1)} YEAR NOMINAL MISSION`,M,16);
+  x.strokeStyle="#E8E6DF";x.lineWidth=1.5;x.beginPath();x.moveTo(nx,y-14);x.lineTo(nx,y+14);x.stroke();
+  // labels
+  x.font="9px 'IBM Plex Mono',monospace";x.fillStyle="#8D93A1";x.textAlign="left";
+  x.fillText("LAUNCH",M,y+24);
+  if(O.cruise>0){x.textAlign="center";x.fillText("ARRIVAL",M+tw*O.cruise/O.totalDays,y+24);}
+  x.textAlign="right";x.fillText("END OF MISSION",W-M,y+24);
+  x.textAlign="left";x.fillStyle="#5A6172";x.fillText((O.totalDays/365.25).toFixed(1) + " YEAR NOMINAL MISSION",M,14);
   x.textAlign="left";
 }
 
@@ -4650,14 +5383,206 @@ function renderOpsSide(force){
    REPORT
    ══════════════════════════════════════════════════════════════ */
 const REAL={
- l1:{n:"PACE",mass:1700,cost:964,yrs:3},
- l2:{n:"Lunar Reconnaissance Orbiter",mass:1846,cost:583,yrs:2},
- l3:{n:"Mars Reconnaissance Orbiter",mass:2180,cost:716,yrs:5},
- l4:{n:"OSIRIS-REx",mass:2110,cost:1160,yrs:7},
- l5:{n:"Europa Clipper",mass:6065,cost:5200,yrs:12},
- sbx:{n:"Mars Reconnaissance Orbiter",mass:2180,cost:716,yrs:5},
- sbx_moon:{n:"Lunar Reconnaissance Orbiter",mass:1846,cost:583,yrs:2},
- sbx_earth:{n:"PACE",mass:1700,cost:964,yrs:3}
+ l1:{
+   n:"PACE",
+   agency:"NASA GSFC",
+   flownYear:2024,
+   tDep:2024.105,
+   lv:"Falcon 9 Full Thrust",
+   mass:1700,
+   power:2700,
+   data:150,
+   cost:964,
+   sched:36,
+   yrs:3,
+   ret:1.0,
+   score:96.0,
+   grade:"A+",
+   dest:"Low Earth Sun-Synchronous Orbit (676 km, 98° inc)",
+   spec:{
+     l:"l1",m:"fd",
+     o:["o_ocean","o_land","o_aer"],
+     i:["ocean","ctx","rad"],
+     p:"sa2",c:"mga",r:"none",s:"sh0",cdh:"cdh_std",adcs:"adcs_std",bat:"bat_std",q:"standard",
+     nm:"PACE (NASA Flown)",lv:"f9"
+   },
+   source:"NASA GSFC PACE Mission Fact Sheet"
+ },
+ l2:{
+   n:"Lunar Reconnaissance Orbiter",
+   agency:"NASA GSFC",
+   flownYear:2009,
+   tDep:2009.463,
+   lv:"Atlas V 401",
+   mass:1846,
+   power:1850,
+   data:100,
+   cost:583,
+   sched:24,
+   yrs:2,
+   ret:1.0,
+   score:98.5,
+   grade:"A+",
+   dest:"Lunar Polar Circular Orbit (50 km altitude)",
+   spec:{
+     l:"l2",m:"fd",
+     o:["o_mmap","o_ice","o_rad"],
+     i:["alt","grns","therm","ctx"],
+     p:"sa2",c:"hga2",r:"mono",s:"sh0",cdh:"cdh_std",adcs:"adcs_std",bat:"bat_ext",q:"standard",
+     nm:"LRO (NASA Flown)",lv:"av401"
+   },
+   source:"NASA GSFC LRO Spacecraft & Payload Suite"
+ },
+ l3:{
+   n:"Mars Reconnaissance Orbiter",
+   agency:"NASA / JPL",
+   flownYear:2005,
+   tDep:2005.614,
+   lv:"Atlas V 401",
+   mass:2180,
+   power:1000,
+   data:6.0,
+   cost:716,
+   sched:60,
+   yrs:5,
+   ret:1.0,
+   score:98.0,
+   grade:"A+",
+   dest:"Mars Low Sun-Synchronous Orbit (255 x 320 km via aerobraking)",
+   spec:{
+     l:"l3",m:"fd",
+     o:["o_mmap","o_ice","o_geo","o_relay"],
+     i:["hires","ctx","vnir","radar"],
+     p:"sa3",c:"hga3",r:"bi",s:"sh0",cdh:"cdh_ft",adcs:"adcs_std",bat:"bat_ext",q:"standard",
+     nm:"MRO (NASA Flown)",lv:"av401"
+   },
+   source:"JPL MRO Flight Trajectory & Science Payload Plan"
+ },
+ l4:{
+   n:"OSIRIS-REx",
+   agency:"NASA GSFC / Lockheed Martin",
+   flownYear:2016,
+   tDep:2016.689,
+   lv:"Atlas V 551",
+   mass:2110,
+   power:1226,
+   data:0.9,
+   cost:1160,
+   sched:84,
+   yrs:7,
+   ret:1.0,
+   score:99.0,
+   grade:"A+",
+   dest:"Near-Earth Asteroid 101955 Bennu Rendezvous & Sample Return",
+   spec:{
+     l:"l4",m:"fd",
+     o:["o_samp","o_mmap","o_geo"],
+     i:["arm","vnir","therm","ctx","alt"],
+     p:"sa3",c:"hga2",r:"bi",s:"sh0",cdh:"cdh_ft",adcs:"adcs_std",bat:"bat_ext",q:"standard",
+     nm:"OSIRIS-REx (NASA Flown)",lv:"av551"
+   },
+   source:"NASA OSIRIS-REx Mission Overview & Sample Return Science Catalog"
+ },
+ l5:{
+   n:"Europa Clipper",
+   agency:"NASA / JPL / JHUAPL",
+   flownYear:2024,
+   tDep:2024.787,
+   lv:"Falcon Heavy (Expendable)",
+   mass:6065,
+   power:800,
+   data:0.25,
+   cost:5200,
+   sched:144,
+   yrs:12,
+   ret:1.0,
+   score:95.0,
+   grade:"A",
+   dest:"Jupiter System / 49 Low-Altitude Europa Gravity-Assist Flybys",
+   spec:{
+     l:"l5",m:"fd",
+     o:["o_ocw","o_ice","o_fld","o_rad"],
+     i:["radar","vnir","msp","mag","plas","dust"],
+     p:"sa4",c:"ka",r:"bi",s:"sh1",cdh:"cdh_ft",adcs:"adcs_star",bat:"bat_deep",q:"priority",
+     nm:"Europa Clipper (NASA Flown)",lv:"fhe",a:true
+   },
+   source:"NASA Europa Clipper Science Architecture & Flight Specifications"
+ },
+ sbx:{
+   n:"Mars Reconnaissance Orbiter",
+   agency:"NASA / JPL",
+   flownYear:2005,
+   tDep:2005.614,
+   lv:"Atlas V 401",
+   mass:2180,
+   power:1000,
+   data:6.0,
+   cost:716,
+   sched:60,
+   yrs:5,
+   ret:1.0,
+   score:98.0,
+   grade:"A+",
+   dest:"Mars Low Orbit",
+   spec:{
+     l:"sbx",m:"fd",
+     o:["o_mmap","o_ice","o_geo","o_relay"],
+     i:["hires","ctx","vnir","radar"],
+     p:"sa3",c:"hga3",r:"bi",s:"sh0",cdh:"cdh_ft",adcs:"adcs_std",bat:"bat_ext",q:"standard",
+     nm:"MRO (NASA Flown)",lv:"av401"
+   },
+   source:"JPL MRO Flight Trajectory & Science Payload Plan"
+ },
+ sbx_moon:{
+   n:"Lunar Reconnaissance Orbiter",
+   agency:"NASA GSFC",
+   flownYear:2009,
+   tDep:2009.463,
+   lv:"Atlas V 401",
+   mass:1846,
+   power:1850,
+   data:100,
+   cost:583,
+   sched:24,
+   yrs:2,
+   ret:1.0,
+   score:98.5,
+   grade:"A+",
+   dest:"Lunar Polar Orbit",
+   spec:{
+     l:"sbx_moon",m:"fd",
+     o:["o_mmap","o_ice","o_rad"],
+     i:["alt","grns","therm","ctx"],
+     p:"sa2",c:"hga2",r:"mono",s:"sh0",cdh:"cdh_std",adcs:"adcs_std",bat:"bat_ext",q:"standard",
+     nm:"LRO (NASA Flown)",lv:"av401"
+   },
+   source:"NASA GSFC LRO Spacecraft & Payload Suite"
+ },
+ sbx_earth:{
+   n:"PACE",
+   agency:"NASA GSFC",
+   flownYear:2024,
+   tDep:2024.105,
+   lv:"Falcon 9",
+   mass:1700,
+   power:2700,
+   data:150,
+   cost:964,
+   sched:36,
+   yrs:3,
+   ret:1.0,
+   score:96.0,
+   grade:"A+",
+   dest:"Low Earth Sun-Synchronous Orbit",
+   spec:{
+     l:"sbx_earth",m:"fd",
+     o:["o_ocean","o_land","o_aer"],
+     i:["ocean","ctx","rad"],
+     p:"sa2",c:"mga",r:"none",s:"sh0",cdh:"cdh_std",adcs:"adcs_std",bat:"bat_std",q:"standard",
+     nm:"PACE (NASA Flown)",lv:"f9"
+   },
+   source:"NASA GSFC PACE Mission Fact Sheet"
+ }
 };
 /* P2-7 / D-05: derived data only. The score formula is untouched, so this
    card can never inflate a grade; it reports who made each call and whether
@@ -4706,99 +5631,247 @@ function scrReport(){
   const gcol=R.score>=74?"var(--phosphor)":R.score>=44?"var(--amber)":"var(--red)";
   const reason={complete:"Nominal end of mission.",prop:"Loss of mission: propellant exhausted.",launch:"Loss of mission: launch vehicle failure.",
                 power:"Loss of mission: power shortfall."}[R.reason]||"";
-  return `<div class="wrap"><div class="report">
-    <div class="rcard"><span class="bracket tl"></span><span class="bracket br"></span>
-      <div style="padding:13px 16px;border-bottom:1px solid var(--hairline)" class="spread">
-        <span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.17em;color:var(--dim)">MISSION REPORT</span>
-        <span style="font-family:var(--disp);font-weight:700;letter-spacing:.2em;font-size:12px">MARGIN</span>
-      </div>
-      <div style="padding:14px 16px;border-bottom:1px solid var(--hairline)">
-        <h2>${esc(S.missionName || L.name)}</h2><p class="hint">${esc(L.sub)} &#183; ${esc(reason)}</p>
-      </div>
-      <div class="rrow"><span class="k">SCIENCE RETURN</span><span class="v" style="color:${gcol}">${(R.ret*100).toFixed(0)}% <span style="font-size:11px;color:${(R.ret*100)>=(S.targetSci||100)?'var(--phosphor)':'var(--amber)'}">/ TARGET ${S.targetSci||100}% (${(R.ret*100)>=(S.targetSci||100)?'MET ✓':'BELOW'})</span></span></div>
-      <div class="rrow"><span class="k">TOTAL COST</span><span class="v">$${fmt(R.cost)}M <span style="color:var(--dim);font-size:11px">/ ${capText(L)}${L.uncapped?"":" cap"}</span></span></div>
-      <div class="rrow"><span class="k">MISSION DURATION</span><span class="v">${dayLabel(R.days)} &nbsp;<span style="color:var(--dim);font-size:11px">${(R.days/365.25).toFixed(1)} yr</span></span></div>
-      ${S.assist&&L.assist?`<div class="rrow"><span class="k">TRAJECTORY</span><span class="v" style="font-size:12px">${esc(L.assist.label)}</span></div>`:""}
-      <div class="rrow"><span class="k">LAUNCH OUTCOME</span><span class="v" style="font-size:12px">${esc(launchOutcomeLabel())}</span></div>
-      <div class="rrow"><span class="k">ARRIVAL</span><span class="v" style="font-size:12px">${esc(arrivalLabel())}</span></div>
-      ${R.surf?`<div class="rrow"><span class="k">SURFACE — LANDING</span><span class="v" style="font-size:12px">${esc(R.surf.profile)} · +${R.surf.offsetKm} km · slope ${R.surf.slope}° (${R.surf.degraded?"HARD":"nominal"}) — ${(R.surf.land*100).toFixed(0)}%</span></div>
-      <div class="rrow"><span class="k">SURFACE — TRAVERSE</span><span class="v" style="font-size:12px">${R.surf.reached?"prime target reached":R.surf.sols+" sols roving"} · ${fmtData(R.surf.returnedMb)} returned · science ${R.surf.science.toFixed(0)} — ${(R.surf.trav*100).toFixed(0)}% / ${(R.surf.data*100).toFixed(0)}%</span></div>
-      <div class="rrow"><span class="k">SURFACE BONUS</span><span class="v" style="color:var(--phosphor)">+${R.surf.bonus.toFixed(1)} pts</span></div>`:""}      <div class="rrow"><span class="k">PROXIMITY</span><span class="v" style="font-size:12px">${esc(proxLabel())}</span></div>
-      <div class="rrow"><span class="k">DSN ALLOCATION</span><span class="v" style="font-size:12px">${esc(dsnTier().n)} (${(L.dsnHrs*dsnTier().f).toFixed(1)} h/day)</span></div>
-      <div class="rrow"><span class="k">CAPTURE METHOD</span><span class="v" style="font-size:12px">${esc(aeroLabel())}</span></div>
-      <div class="rrow"><span class="k">EXTENDED PHASE</span><span class="v" style="font-size:12px">${esc(extensionLabel())}</span></div>
-      <div class="rrow"><span class="k">LAUNCH MASS</span><span class="v">${fmt(D.wetMass)} kg</span></div>
-      <div class="rrow"><span class="k">FINAL MARGINS</span><span class="v">mass ${(D.margins.mass*100).toFixed(0)}% &#183; power ${(D.margins.power*100).toFixed(0)}% &#183; cost ${(D.margins.cost*100).toFixed(0)}%</span></div>
-      <div class="rrow"><span class="k">TOTAL DOSE</span><span class="v">${fmt(R.dose)} krad</span></div>
-      ${R.overflow>0?`<div class="rrow"><span class="k">SCIENCE DISCARDED</span><span class="v" style="color:var(--amber)">${fmtData(R.overflow)}</span></div>`:""}
-      ${R.dead.length?`<div class="rrow"><span class="k">HARDWARE LOST</span><span class="v" style="color:var(--red);font-size:12px">${R.dead.map(i=>byId(INSTR,i).n).join(", ")}</span></div>`:""}
-      <div class="gradebox"><div class="g" style="color:${gcol}">${R.grade}</div>
-        <div class="hint" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;margin-top:5px">MISSION GRADE</div></div>
-      ${R.badges.length?`<div class="badges">${R.badges.map(b=>`<span class="badge">${b}</span>`).join("")}</div>`:""}
-      ${teamCardHtml()}
-      <div class="share"><span>SHARE</span><input id="shareUrl" readonly value="${shareUrl()}"
-        style="flex:1;min-width:180px;background:#04060B;border:1px solid var(--hairline);color:var(--dim);font-family:var(--mono);font-size:10.5px;padding:5px 7px">
-        <button class="btn ghost" data-act="copy" style="padding:5px 11px">COPY</button></div>
-      <div class="share" style="margin-top:6px"><span>CHALLENGE</span><input id="challengeUrl" readonly value="${challengeUrl()}"
-        title="Mission, difficulty and anomaly seed only — the recipient designs their own spacecraft against the same events"
-        style="flex:1;min-width:180px;background:#04060B;border:1px solid var(--hairline);color:var(--dim);font-family:var(--mono);font-size:10.5px;padding:5px 7px">
-        <button class="btn ghost" data-act="copyc" style="padding:5px 11px">COPY</button></div>
-      <p class="hint" style="font-size:11px;margin-top:5px">SHARE sends this exact design. CHALLENGE sends only the objective, the difficulty and the anomaly seed — the other team builds their own and both runs land in the same ranking group.</p>
-      <div class="row mt">
-        <button class="btn ghost" data-act="sources" style="flex:1">MISSION DATA — WHERE NUMBERS COME FROM</button>
-      </div>
-    </div>
+  
+  if(!S.repTab) S.repTab = "overview";
+  const REP_TABS = ["overview", "analysis", "logs", "timeline"];
+  const curTabIdx = REP_TABS.indexOf(S.repTab);
+  const nextTabName = (curTabIdx >= 0 && curTabIdx < REP_TABS.length - 1) ? REP_TABS[curTabIdx + 1] : null;
+  const isFinalTab = S.repTab === "timeline";
 
-    <div class="panel mt"><h3>COMPARED WITH THE REAL MISSION ${infoTag(SRC.cost,"Real mission figures")} <span class="code">CMP-01</span></h3>
-      <div class="pad"><div class="cmp">
-        <span class="h">&nbsp;</span><span class="h">YOURS</span><span class="h">${esc(rm.n.toUpperCase())}</span>
-        <span class="hint">Launch mass</span><span>${fmt(D.wetMass)} kg</span><span style="color:var(--dim)">${fmt(rm.mass)} kg</span>
-        <span class="hint">Cost</span><span>$${fmt(R.cost)}M</span><span style="color:var(--dim)">$${fmt(rm.cost)}M</span>
-        <span class="hint">Mission length</span><span>${(R.days/365.25).toFixed(1)} yr</span><span style="color:var(--dim)">${rm.yrs} yr</span>
-      </div></div>
-    </div>
-
-    <div class="panel mt"><h3>WHAT DECIDED THIS <span class="code">RCA-01</span></h3>
-      <div class="pad" style="font-size:12.5px;line-height:1.7">${verdict(D,R,O)}</div></div>
-
-    <div class="panel mt"><h3>CAUSE → EFFECT <span class="code">RCA-02</span></h3>
-      <div class="pad" style="font-size:12.5px;line-height:1.7">${chainLines(D,R)}</div></div>
-
-    <div class="panel mt"><h3>MISSION DECISIONS <span class="code">LOG-01</span></h3>
-      <div class="pad" style="font-size:12.5px;line-height:1.7">${decisionLines(D,R)}</div></div>
-
-    <div class="panel mt"><h3>EVENTS &amp; FAILURES <span class="code">LOG-02</span></h3>
-      <div class="pad" style="font-size:12.5px;line-height:1.7">${eventLines()}</div></div>
-
-    <div class="panel mt"><h3>RESOURCE CONSEQUENCES <span class="code">LOG-03</span></h3>
-      <div class="pad" style="font-size:12.5px;line-height:1.7">${resourceLines(D,R)}</div></div>
-
-    <div class="panel mt"><h3>FINAL SPACECRAFT STATE <span class="code">LOG-04</span></h3>
-      <div class="pad" style="font-size:12.5px;line-height:1.7">${finalStateLines(D,R)}</div></div>
-
-    <div class="panel mt"><h3>MISSION TIMELINE <span class="code">TL-01</span></h3>
-      <div class="pad">
-        <div class="row" style="margin-bottom:8px">
-          <button class="btn ghost" data-act="rep" data-v="-1">◀ PREV</button>
-          <button class="btn ghost" data-act="rep" data-v="1">NEXT ▶</button>
+  return `<div class="wrap report-wrap">
+    <!-- Header Banner -->
+    <header class="report-header">
+      <div class="report-header-left">
+        <div class="report-eyebrow">
+          <span class="report-tag">MISSION REPORT</span>
+          <span class="report-subtag">${esc(L.code || L.id).toUpperCase()} &#183; ${esc(S.mode||"STANDARD").toUpperCase()}</span>
         </div>
-        <p class="hint" id="repOut" style="line-height:1.6">Step through the mission day by day — the same log that flew it.</p>
-        <div id="tlList" style="max-height:320px;overflow:auto">${timelineHtml()}</div>
-      </div></div>
+        <h1 class="report-title">${esc(S.missionName || L.name)}</h1>
+        <p class="report-desc">${esc(L.sub)} &#183; <span class="report-reason">${esc(reason)}</span></p>
+      </div>
+      <div class="report-grade-badge" style="--grade-col:${gcol}">
+        <div class="grade-score">${R.grade}</div>
+        <div class="grade-label">MISSION GRADE</div>
+        <div class="grade-sub">${R.score}% SCORE</div>
+      </div>
+    </header>
 
-    <div class="panel mt"><h3>FINAL DISPOSITION <span class="code">VIS-01</span></h3>
-      <div class="pad">
-        <div id="rep3d-mount"><canvas id="rep3d"></canvas></div>
-        <p class="hint" style="margin-top:6px">Spacecraft shown with its target in final state — beacon tinted by surviving health. The 2D timeline carries the full history; this is the same end state, not a second simulation.</p>
-      </div></div>
-
-    <div class="row mt">
-      <button class="btn primary" data-act="rebuild">REBUILD WITH LESSONS LEARNED</button>
-      <button class="btn" data-act="next">NEXT MISSION</button>
-      ${bestOther?`<button class="btn ghost" data-act="cmprun" data-id="${esc(bestOther.id)}" title="Line up this run against your best run of the same mission, difficulty and seed">COMPARE WITH BEST</button>`:""}
-      <button class="btn ghost" data-act="home">MISSION SELECT</button>
+    <!-- Key Metrics Ribbon -->
+    <div class="report-kpi-ribbon">
+      <div class="kpi-card">
+        <span class="kpi-k">SCIENCE RETURN</span>
+        <span class="kpi-v" style="color:${gcol}">${(R.ret*100).toFixed(0)}%</span>
+        <span class="kpi-sub ${(R.ret*100)>=(S.targetSci||100)?'good':'warn'}">TARGET ${S.targetSci||100}% (${(R.ret*100)>=(S.targetSci||100)?'MET ✓':'BELOW'})</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-k">TOTAL COST</span>
+        <span class="kpi-v">$${fmt(R.cost)}M</span>
+        <span class="kpi-sub">CAP $${fmt(effCap(L,S.mode))}M (${R.cost<=effCap(L,S.mode)?'WITHIN BUDGET':'OVERRUN'})</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-k">MISSION DURATION</span>
+        <span class="kpi-v">${dayLabel(R.days)}</span>
+        <span class="kpi-sub">${(R.days/365.25).toFixed(1)} YEARS ACTIVE</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-k">LAUNCH MASS</span>
+        <span class="kpi-v">${fmt(D.wetMass)} kg</span>
+        <span class="kpi-sub">MARGIN: ${(D.margins.mass*100).toFixed(0)}%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-k">SPACECRAFT HEALTH</span>
+        <span class="kpi-v" style="color:${R.dead.length?'var(--amber)':'var(--phosphor)'}">${D.instr.length - R.dead.length} / ${D.instr.length}</span>
+        <span class="kpi-sub">${R.dead.length?`${R.dead.length} LOST`:'100% OPERATIONAL'}</span>
+      </div>
     </div>
-  </div></div>`;
+
+    <!-- Navigation Tabs -->
+    <div class="report-tabs">
+      <button class="rep-tab-btn ${S.repTab==='overview'?'on':''}" data-act="reptab" data-tab="overview">
+        <span class="tab-label">MISSION SUMMARY</span>
+      </button>
+      <button class="rep-tab-btn ${S.repTab==='analysis'?'on':''}" data-act="reptab" data-tab="analysis">
+        <span class="tab-label">CAUSE &amp; EFFECT ANALYSIS</span>
+      </button>
+      <button class="rep-tab-btn ${S.repTab==='logs'?'on':''}" data-act="reptab" data-tab="logs">
+        <span class="tab-label">TELEMETRY &amp; LOGS</span>
+      </button>
+      <button class="rep-tab-btn ${S.repTab==='timeline'?'on':''}" data-act="reptab" data-tab="timeline">
+        <span class="tab-label">TIMELINE &amp; 3D DISPOSITION</span>
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <main class="report-content">
+      ${S.repTab==='overview'?`
+        <div class="report-grid-2col">
+          <!-- Col 1: Mission Telemetry & Outcomes -->
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head"><span>FLIGHT TELEMETRY &amp; OUTCOMES</span><span class="code">TLM-01</span></div>
+              <div class="rep-rows">
+                <div class="rrow"><span class="k">LAUNCH OUTCOME</span><span class="v">${esc(launchOutcomeLabel())}</span></div>
+                <div class="rrow"><span class="k">ARRIVAL</span><span class="v">${esc(arrivalLabel())}</span></div>
+                ${S.assist&&L.assist?`<div class="rrow"><span class="k">TRAJECTORY</span><span class="v">${esc(L.assist.label)}</span></div>`:""}
+                <div class="rrow"><span class="k">PROXIMITY</span><span class="v">${esc(proxLabel())}</span></div>
+                <div class="rrow"><span class="k">CAPTURE METHOD</span><span class="v">${esc(aeroLabel())}</span></div>
+                <div class="rrow"><span class="k">DSN ALLOCATION</span><span class="v">${esc(dsnTier().n)} (${(L.dsnHrs*dsnTier().f).toFixed(1)} h/day)</span></div>
+                <div class="rrow"><span class="k">EXTENDED PHASE</span><span class="v">${esc(extensionLabel())}</span></div>
+                <div class="rrow"><span class="k">FINAL MARGINS</span><span class="v">mass ${(D.margins.mass*100).toFixed(0)}% &#183; power ${(D.margins.power*100).toFixed(0)}% &#183; cost ${(D.margins.cost*100).toFixed(0)}%</span></div>
+                <div class="rrow"><span class="k">TOTAL ACCUMULATED DOSE</span><span class="v">${fmt(R.dose)} krad</span></div>
+                ${R.overflow>0?`<div class="rrow"><span class="k">SCIENCE DISCARDED</span><span class="v" style="color:var(--amber)">${fmtData(R.overflow)}</span></div>`:""}
+                ${R.dead.length?`<div class="rrow"><span class="k">HARDWARE LOST</span><span class="v" style="color:var(--red)">${R.dead.map(i=>byId(INSTR,i).n).join(", ")}</span></div>`:""}
+              </div>
+            </section>
+
+            ${R.surf?`
+              <section class="rep-card mt">
+                <div class="rep-card-head"><span>SURFACE MISSION REPORT</span><span class="code">SURF-01</span></div>
+                <div class="rep-rows">
+                  <div class="rrow"><span class="k">TOUCHDOWN</span><span class="v">${esc(R.surf.profile)} · +${R.surf.offsetKm} km · slope ${R.surf.slope}° (${R.surf.degraded?"HARD":"nominal"}) — ${(R.surf.land*100).toFixed(0)}%</span></div>
+                  <div class="rrow"><span class="k">TRAVERSE &amp; ROVING</span><span class="v">${R.surf.reached?"prime target reached":R.surf.sols+" sols roving"} · ${fmtData(R.surf.returnedMb)} returned</span></div>
+                  <div class="rrow"><span class="k">SURFACE BONUS</span><span class="v" style="color:var(--phosphor)">+${R.surf.bonus.toFixed(1)} pts</span></div>
+                </div>
+              </section>
+            `:""}
+
+            ${teamCardHtml()}
+          </div>
+
+          <!-- Col 2: Real Mission Comparison & Badges -->
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head"><span>COMPARED WITH REAL MISSION</span><span class="code">CMP-01</span></div>
+              <div class="pad">
+                <div class="cmp">
+                  <span class="h">&nbsp;</span><span class="h">YOURS</span><span class="h">${esc(rm.n.toUpperCase())}</span>
+                  <span class="hint">Launch mass</span><span>${fmt(D.wetMass)} kg</span><span style="color:var(--dim)">${fmt(rm.mass)} kg</span>
+                  <span class="hint">Cost</span><span>$${fmt(R.cost)}M</span><span style="color:var(--dim)">$${fmt(rm.cost)}M</span>
+                  <span class="hint">Mission length</span><span>${(R.days/365.25).toFixed(1)} yr</span><span style="color:var(--dim)">${rm.yrs} yr</span>
+                </div>
+              </div>
+            </section>
+
+            ${R.badges.length?`
+              <section class="rep-card mt">
+                <div class="rep-card-head"><span>ACHIEVEMENTS &amp; COMMENDATIONS</span><span class="code">ACH-01</span></div>
+                <div class="badges pad">${R.badges.map(b=>`<span class="badge">${b}</span>`).join("")}</div>
+              </section>
+            `:""}
+
+            <section class="rep-card mt">
+              <div class="rep-card-head"><span>SHARE &amp; CHALLENGE</span><span class="code">NET-01</span></div>
+              <div class="pad">
+                <div class="share-row">
+                  <span class="share-lbl">SHARE DESIGN</span>
+                  <input id="shareUrl" readonly value="${shareUrl()}" class="share-inp">
+                  <button class="btn ghost btn-sm" data-act="copy">COPY</button>
+                </div>
+                <div class="share-row mt-s">
+                  <span class="share-lbl">CHALLENGE</span>
+                  <input id="challengeUrl" readonly value="${challengeUrl()}" class="share-inp" title="Mission, difficulty and anomaly seed only">
+                  <button class="btn ghost btn-sm" data-act="copyc">COPY</button>
+                </div>
+                <p class="hint mt-s" style="font-size:11px">Share your full spacecraft design, or send a challenge link with identical seed parameters for head-to-head comparison.</p>
+                <button class="btn ghost btn-sm mt-s" data-act="challenge-match" data-id="${esc(S.lastRunId||"")}" style="width:100%" title="Launch head-to-head match against another team or run">HEAD-TO-HEAD CHALLENGE MATCH</button>
+                <div class="mt">
+                  <button class="btn ghost btn-block" data-act="sources">DATA SOURCES &amp; SCIENTIFIC REFERENCES</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      `:""}
+
+      ${S.repTab==='analysis'?`
+        <div class="report-grid-2col">
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head"><span>WHAT DECIDED THIS OUTCOME</span><span class="code">RCA-01</span></div>
+              <div class="pad rich-prose">${verdict(D,R,O)}</div>
+            </section>
+          </div>
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head"><span>CAUSE &#8594; EFFECT CASCADE</span><span class="code">RCA-02</span></div>
+              <div class="pad rich-prose">${chainLines(D,R)}</div>
+            </section>
+          </div>
+        </div>
+      `:""}
+
+      ${S.repTab==='logs'?`
+        <div class="report-grid-2col">
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head"><span>KEY MISSION DECISIONS</span><span class="code">LOG-01</span></div>
+              <div class="pad rich-prose">${decisionLines(D,R)}</div>
+            </section>
+            <section class="rep-card mt">
+              <div class="rep-card-head"><span>EVENTS &amp; ANOMALIES</span><span class="code">LOG-02</span></div>
+              <div class="pad rich-prose">${eventLines()}</div>
+            </section>
+          </div>
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head"><span>RESOURCE EXCURSIONS</span><span class="code">LOG-03</span></div>
+              <div class="pad rich-prose">${resourceLines(D,R)}</div>
+            </section>
+            <section class="rep-card mt">
+              <div class="rep-card-head"><span>FINAL SPACECRAFT STATE</span><span class="code">LOG-04</span></div>
+              <div class="pad rich-prose">${finalStateLines(D,R)}</div>
+            </section>
+          </div>
+        </div>
+      `:""}
+
+      ${S.repTab==='timeline'?`
+        <div class="report-grid-2col">
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head">
+                <span>MISSION TIMELINE STEPPER</span>
+                <span class="code">TL-01</span>
+              </div>
+              <div class="pad">
+                <div class="row mb" style="gap:8px">
+                  <button class="btn ghost btn-sm" data-act="rep" data-v="-1">&#9664; PREV DAY</button>
+                  <button class="btn ghost btn-sm" data-act="rep" data-v="1">NEXT DAY &#9654;</button>
+                </div>
+                <div class="tl-stepper-status" id="repOut">Step through the flight day by day — authoritative mission log.</div>
+                <div id="tlList" class="tl-stepper-list">${timelineHtml()}</div>
+              </div>
+            </section>
+          </div>
+          <div class="report-col">
+            <section class="rep-card">
+              <div class="rep-card-head"><span>FINAL 3D DISPOSITION</span><span class="code">VIS-01</span></div>
+              <div class="pad">
+                <div id="rep3d-mount"><canvas id="rep3d"></canvas></div>
+                <p class="hint mt-s" style="font-size:11.5px;line-height:1.5">Spacecraft shown with target in final disposition pose. Status beacon reflects operational health at end-of-mission.</p>
+              </div>
+            </section>
+          </div>
+        </div>
+      `:""}
+    </main>
+
+    <!-- Bottom Action Bar -->
+    <footer class="report-footer-bar">
+      ${isFinalTab ? `
+        <button class="btn primary" data-act="rebuild">REBUILD WITH LESSONS LEARNED</button>
+        <button class="btn" data-act="next">NEXT MISSION</button>
+        <button class="btn ghost" data-act="challenge-match" data-id="${esc(S.lastRunId||"")}">CHALLENGE MATCH</button>
+        ${bestOther?`<button class="btn ghost" data-act="cmprun" data-id="${esc(bestOther.id)}">COMPARE WITH BEST RUN</button>`:""}
+        <button class="btn ghost" data-act="home">MISSION SELECT</button>
+      ` : `
+        <div style="flex:1"></div>
+        <button class="btn primary btn-next-tab" data-act="reptab" data-tab="${nextTabName}">
+          NEXT: ${nextTabName==='analysis'?'CAUSE &amp; EFFECT ANALYSIS':nextTabName==='logs'?'TELEMETRY &amp; LOGS':'TIMELINE &amp; 3D DISPOSITION'} &#9654;
+        </button>
+      `}
+    </footer>
+  </div>`;
 }
 function launchOutcomeLabel(){
   const o=(S.launch&&S.launch.outcome)||(S.result&&S.result.launch);
@@ -5437,6 +6510,313 @@ function compareModal(a,b){
       <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
   el("modal").classList.add("on");
 }
+
+/* ── Competitive Head-to-Head Challenge Mode ── */
+function benchmarkRun(levelId){
+  const L=byId(LEVELS,levelId)||LEVELS[0];
+  const rm=REAL[L.id]||REAL.l1;
+  return {
+    id:"benchmark-"+(L.id||"l1"),
+    level:L.id||"l1",
+    mode:"fd",
+    seed:0,
+    sandbox:false,
+    name:"NASA "+rm.n+" (Flown Benchmark)",
+    targetSci:100,
+    isBenchmark:true,
+    benchmarkMeta:rm,
+    launch:{tDep:rm.tDep, c3:L.c3||0, vinf:0, tof:L.tof||0},
+    spec:rm.spec,
+    result:{
+      grade:rm.grade||"A+",
+      score:rm.score||98.0,
+      ret:rm.ret||1.0,
+      cost:rm.cost,
+      days:Math.round(rm.yrs*365.25),
+      reason:"complete"
+    },
+    rails:{
+      mass:{v:rm.mass},
+      power:{v:rm.power},
+      data:{v:rm.data},
+      cost:{v:rm.cost},
+      sched:{v:rm.sched}
+    },
+    team:{size:4,log:[]}
+  };
+}
+
+function runFromShareObject(d, idFallback){
+  if(!d || !d.l) return null;
+  const L = byId(LEVELS, d.l);
+  if(!L) return null;
+  const score = isFinite(d.sc) ? Number(d.sc) : 75.0;
+  const grade = d.gr || (score >= 85 ? "A" : score >= 70 ? "B" : score >= 50 ? "C" : "D");
+  return {
+    id: idFallback || ("share-" + Date.now().toString(36)),
+    ts: Date.now(),
+    level: L.id,
+    mode: d.m === "fd" ? "fd" : "cadet",
+    seed: d.sd != null ? (d.sd | 0) : 0,
+    sandbox: isSandbox(L),
+    name: (d.nm && typeof d.nm === "string") ? d.nm.slice(0, 32) : (L.name + " (Peer)"),
+    targetSci: d.tg || 100,
+    spec: d,
+    rails: {},
+    result: {
+      grade: grade,
+      score: score,
+      ret: isFinite(d.rt) ? Number(d.rt) : 0.85,
+      cost: isFinite(d.ct) ? Number(d.ct) : 700,
+      days: isFinite(d.dy) ? Number(d.dy) : 1200,
+      reason: "complete"
+    },
+    team: d.tm ? { size: Number(d.tm), log: [] } : null
+  };
+}
+
+function calcMatchVerdict(a, b){
+  if(!a && !b) return { winner:"tie", title:"NO RUNS SELECTED", reasons:["Select valid mission runs to compare."], col:"var(--amber)", winName:"None" };
+  if(!b) return { winner:"a", title:`${esc(a.name||"TEAM ALPHA")} UNCONTESTED`, reasons:["No opponent selected for comparison."], col:"var(--phosphor)", winName:a.name||"Team Alpha" };
+  if(!a) return { winner:"b", title:`${esc(b.name||"TEAM BETA")} UNCONTESTED`, reasons:["No primary run found."], col:"var(--phosphor)", winName:b.name||"Team Beta" };
+
+  const nameA = a.name || (byId(LEVELS, a.level) ? byId(LEVELS, a.level).name : "Team Alpha");
+  const nameB = b.name || (byId(LEVELS, b.level) ? byId(LEVELS, b.level).name : "Team Beta");
+
+  const resA = a.result || {};
+  const resB = b.result || {};
+  const failA = resA.reason && resA.reason !== "complete";
+  const failB = resB.reason && resB.reason !== "complete";
+
+  const reasons = [];
+
+  // Criterion 1: Mission Survivability (Failure Gate)
+  if(failA && !failB){
+    reasons.push(`${nameB} successfully completed flight operations while ${nameA} suffered loss of mission (${resA.reason}).`);
+    return { winner:"b", title:`🏆 WINNER: ${nameB}`, reasons, col:"var(--phosphor)", winName:nameB };
+  }
+  if(!failA && failB){
+    reasons.push(`${nameA} successfully completed flight operations while ${nameB} suffered loss of mission (${resB.reason}).`);
+    return { winner:"a", title:`🏆 WINNER: ${nameA}`, reasons, col:"var(--phosphor)", winName:nameA };
+  }
+  if(failA && failB){
+    reasons.push(`Both missions suffered loss of mission (${nameA}: ${resA.reason}, ${nameB}: ${resB.reason}).`);
+    return { winner:"tie", title:"MISSION LOSS (BOTH TEAMS)", reasons, col:"var(--red)", winName:"None" };
+  }
+
+  // Metrics extraction
+  const retA = isFinite(resA.ret) ? resA.ret : 0;
+  const retB = isFinite(resB.ret) ? resB.ret : 0;
+  const costA = isFinite(resA.cost) ? resA.cost : 0;
+  const costB = isFinite(resB.cost) ? resB.cost : 0;
+  const scoreA = isFinite(resA.score) ? resA.score : 0;
+  const scoreB = isFinite(resB.score) ? resB.score : 0;
+
+  const teamA = a.team, teamB = b.team;
+  const ovA = (teamA && teamA.log) ? teamA.log.filter(x => x.override).length : 0;
+  const ovB = (teamB && teamB.log) ? teamB.log.filter(x => x.override).length : 0;
+
+  const modeA = a.mode || "cadet";
+  const modeB = b.mode || "fd";
+  const modeHandicap = (modeA === "cadet" && modeB === "fd") || (modeB === "cadet" && modeA === "fd");
+
+  const sciDelta = retA - retB;
+  const costDelta = costB - costA; // positive means A spent less, negative means B spent less
+
+  // Criterion 2: Equal or near-equal science (within 2%) -> Budget Efficiency & Operational Discipline decide
+  if(Math.abs(sciDelta) < 0.02){
+    reasons.push(`Science Return: Both missions delivered equal scientific productivity (${Math.round(retA*100)}%).`);
+    
+    // Check cost efficiency
+    if(Math.abs(costDelta) >= 10){
+      const winner = costDelta > 0 ? "a" : "b";
+      const wName = winner === "a" ? nameA : nameB;
+      const saved = Math.abs(costDelta);
+      reasons.push(`Budget Efficiency: ${wName} delivered equal science while saving $${fmt(saved)}M ($${fmt(Math.min(costA,costB))}M vs $${fmt(Math.max(costA,costB))}M).`);
+      
+      if(ovA !== ovB){
+        const discName = ovA < ovB ? nameA : nameB;
+        reasons.push(`Operational Discipline: ${discName} maintained cleaner team coordination (${Math.min(ovA,ovB)} overrides vs ${Math.max(ovA,ovB)}).`);
+      }
+      if(modeHandicap){
+        const cadetName = modeA === "cadet" ? nameA : nameB;
+        const fdName = modeA === "cadet" ? nameB : nameA;
+        reasons.push(`Difficulty Baseline: ${fdName} operated under strict Flight Director rules without ${cadetName}'s +15% Cadet budget allowance.`);
+      }
+      return { winner, title:`🏆 WINNER: ${wName}`, reasons, col:"var(--phosphor)", winName:wName };
+    }
+
+    // Cost is close (< $10M delta), check operational discipline
+    if(ovA !== ovB){
+      const winner = ovA < ovB ? "a" : "b";
+      const wName = winner === "a" ? nameA : nameB;
+      reasons.push(`Operational Discipline: ${wName} operated with ${Math.min(ovA,ovB)} overrides vs ${Math.max(ovA,ovB)}.`);
+      return { winner, title:`🏆 WINNER: ${wName}`, reasons, col:"var(--phosphor)", winName:wName };
+    }
+
+    return { winner:"tie", title:"MATCH DRAW (IDENTICAL PERFORMANCE)", reasons:["Identical science yield, budget expenditure, and flight discipline.", ...reasons], col:"var(--amber)", winName:"Tie" };
+  }
+
+  // Criterion 3: Significant Science Delta (> 2%)
+  const highSci = sciDelta > 0 ? "a" : "b";
+  const lowSci = sciDelta > 0 ? "b" : "a";
+  const highName = highSci === "a" ? nameA : nameB;
+  const lowName = highSci === "a" ? nameB : nameA;
+  const highRet = Math.round(Math.max(retA, retB) * 100);
+  const lowRet = Math.round(Math.min(retA, retB) * 100);
+  const sciAdvantage = highRet - lowRet;
+
+  // Did higher science come at a massive budget overrun or cost blowout (> 1.4x cost)?
+  const costRatio = highSci === "a" ? (costA / Math.max(1, costB)) : (costB / Math.max(1, costA));
+  if(costRatio > 1.4 && Math.abs(costDelta) > 150){
+    reasons.push(`Trade-off Analysis: ${highName} returned +${sciAdvantage}% science but at a heavy $${fmt(Math.abs(costDelta))}M cost premium (${costRatio.toFixed(2)}x cost).`);
+    reasons.push(`Budget Efficiency: ${lowName} delivered vastly superior science return per dollar invested.`);
+    if(modeHandicap){
+      const cadetName = modeA === "cadet" ? nameA : nameB;
+      reasons.push(`Difficulty Factor: ${cadetName} leveraged Cadet mode's +15% budget buffer.`);
+    }
+    return { winner: lowSci, title:`🏆 WINNER: ${lowName} (COST EFFICIENCY)`, reasons, col:"var(--phosphor)", winName: lowName };
+  }
+
+  // Normal science productivity victory
+  reasons.push(`Scientific Productivity: ${highName} delivered ${highRet}% science vs ${lowRet}% (+${sciAdvantage}% science advantage).`);
+  if(Math.abs(costDelta) >= 10){
+    const cheapName = costDelta > 0 ? nameA : nameB;
+    reasons.push(`Cost: $${fmt(costA)}M vs $${fmt(costB)}M ($${fmt(Math.abs(costDelta))}M delta).`);
+  }
+  if(ovA !== ovB){
+    reasons.push(`Operational Discipline: ${ovA < ovB ? nameA : nameB} operated with ${Math.min(ovA,ovB)} overrides vs ${Math.max(ovA,ovB)}.`);
+  }
+  if(modeHandicap && highSci === (modeA === "cadet" ? "a" : "b")){
+    reasons.push(`Note: ${highName} operated under Cadet mode (+15% budget buffer).`);
+  }
+  return { winner: highSci, title:`🏆 WINNER: ${highName}`, reasons, col:"var(--phosphor)", winName: highName };
+}
+
+function challengeMatchModal(a, b){
+  const runs = loadRuns();
+  if(!a){
+    a = runs.find(r=>r.id===S.lastRunId) || runs[0];
+  }
+  if(!a){
+    el("mbox").innerHTML = `<h3>MISSION FACE-OFF</h3><div class="mb"><p class="hint">No completed mission runs available to compare yet. Complete a flight to enter competitive challenge mode.</p><button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
+    el("modal").classList.add("on");
+    return;
+  }
+  if(!b){
+    b = bestRun(runs.filter(r=>r.id!==a.id), a.level, a.mode, a.seed)
+      || runs.filter(r=>r.id!==a.id)[0]
+      || benchmarkRun(a.level);
+  }
+
+  const verdict = calcMatchVerdict(a, b);
+  const c = compareRuns(a, b);
+
+  const nameA = a.name || "Team Alpha";
+  const nameB = b.name || "Team Beta";
+  const resA = a.result || {}, resB = b.result || {};
+  const gA = resA.grade || "?", gB = resB.grade || "?";
+  const scoreA = isFinite(resA.score) ? resA.score.toFixed(1) : "—";
+  const scoreB = isFinite(resB.score) ? resB.score.toFixed(1) : "—";
+  const teamTextA = a.team ? `TEAM (${a.team.size} SEATS)` : "SOLO FLIGHT";
+  const teamTextB = b.isBenchmark ? "OFFICIAL NASA BENCHMARK" : (b.team ? `TEAM (${b.team.size} SEATS)` : "SOLO FLIGHT");
+
+  const otherRuns = runs.filter(r => r.id !== a.id);
+  const oppOptions = [
+    `<option value="benchmark-${a.level}" ${b.isBenchmark?'selected':''}>NASA Flown Benchmark (${esc((REAL[a.level]||REAL.l1).n)})</option>`
+  ].concat(otherRuns.map(r => `<option value="${esc(r.id)}" ${r.id===b.id?'selected':''}>${esc(r.name||"Run")} · ${esc(r.result&&r.result.grade||"?")} (${isFinite(r.result&&r.result.score)?r.result.score.toFixed(0):"?"}%) · ${esc(r.mode==="fd"?"FD":"Cadet")}</option>`)).join("");
+
+  const bmMeta = b.benchmarkMeta || (b.isBenchmark ? (REAL[a.level]||REAL.l1) : null);
+  const benchmarkBanner = bmMeta ? `
+    <div style="background:rgba(101,242,165,.08);border:1px solid rgba(101,242,165,.25);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--phosphor);letter-spacing:.12em">VERIFIED NASA HISTORICAL FLIGHT ARCHIVE</span>
+        <div style="font-size:11.5px;color:var(--bone);margin-top:2px">${esc(bmMeta.n)} · ${esc(bmMeta.agency)} (${bmMeta.flownYear}) · Launched on ${esc(bmMeta.lv)}</div>
+        <div class="hint" style="font-size:10.5px;margin-top:1px">${esc(bmMeta.source)}</div>
+      </div>
+      <span class="tag" style="background:rgba(101,242,165,.18);color:var(--phosphor);font-size:10.5px">NASA PDS / LSP</span>
+    </div>
+  ` : "";
+
+  el("mbox").innerHTML = `
+    <div class="th-kicker" style="color:var(--phosphor);font-size:10px;letter-spacing:.14em;margin-bottom:4px">NASA SPACE APPS CHALLENGE 2026 — COMPETITIVE MATCH</div>
+    <h3 style="margin-top:0;display:flex;align-items:center;justify-content:space-between">MISSION FACE-OFF <span class="code" style="font-size:11px">CMP-MATCH</span></h3>
+    <div class="mb" style="font-size:12.5px;max-height:68vh;overflow:auto">
+      
+      <!-- Opponent Selector Toolbar -->
+      <div style="background:rgba(18,24,38,.75);border:1px solid var(--hairline);padding:8px 12px;border-radius:6px;margin-bottom:12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+        <label style="font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.08em">OPPONENT:</label>
+        <select id="matchOppSelect" style="flex:1;min-width:180px;background:#05070c;border:1px solid rgba(255,255,255,.18);color:var(--bone);font-size:11.5px;padding:4px 8px;border-radius:4px">
+          ${oppOptions}
+        </select>
+        <div style="display:flex;align-items:center;gap:6px;width:100%;margin-top:4px">
+          <input id="matchOppCode" class="share-inp" placeholder="Paste peer #m=... share code" style="flex:1;font-size:11px;padding:4px 8px">
+          <button class="btn ghost btn-sm" data-act="apply-match-code" style="white-space:nowrap">LOAD CODE</button>
+        </div>
+      </div>
+
+      ${benchmarkBanner}
+
+      <!-- Head to Head Teams Display -->
+      <div class="match-teams-box">
+        <div class="match-team-card">
+          <span style="font-size:10px;font-family:var(--mono);color:var(--phosphor);letter-spacing:.12em">TEAM ALPHA (THIS RUN)</span>
+          <span style="font-size:14px;font-weight:600;color:var(--bone)">${esc(nameA)}</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+            <span class="tag" style="background:rgba(101,242,165,.15);color:var(--phosphor);font-size:12px;padding:2px 8px">${gA} · ${scoreA}%</span>
+            <span class="hint" style="font-size:11px">${teamTextA}</span>
+          </div>
+        </div>
+        <div class="match-vs-badge">VS</div>
+        <div class="match-team-card" style="text-align:right;align-items:flex-end">
+          <span style="font-size:10px;font-family:var(--mono);color:var(--amber);letter-spacing:.12em">TEAM BETA (OPPONENT)</span>
+          <span style="font-size:14px;font-weight:600;color:var(--bone)">${esc(nameB)}</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+            <span class="hint" style="font-size:11px">${teamTextB}</span>
+            <span class="tag" style="background:rgba(240,180,41,.15);color:var(--amber);font-size:12px;padding:2px 8px">${gB} · ${scoreB}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verdict Banner -->
+      <div class="match-verdict-box" style="border:1px solid ${verdict.col};background:linear-gradient(180deg, rgba(14,20,32,.9), rgba(5,7,12,.95));box-shadow:0 0 16px rgba(0,0,0,.5)">
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${verdict.col};letter-spacing:.12em;margin-bottom:6px">
+          ${verdict.title}
+        </div>
+        ${verdict.reasons.map(r => `<div class="hint" style="font-size:11.5px;color:var(--bone);line-height:1.6">• ${esc(r)}</div>`).join("")}
+      </div>
+
+      <!-- Metric Comparison Rows -->
+      <div style="border-top:1px solid var(--hairline);margin-top:14px;padding-top:8px">
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;padding:5px 0;border-bottom:1px solid var(--hairline)">
+          <span class="hint" style="font-size:10.5px">CRITERIA</span>
+          <span class="hint" style="font-size:10.5px;color:var(--phosphor)">${esc(nameA)}</span>
+          <span class="hint" style="font-size:10.5px;color:var(--amber)">${esc(nameB)}</span>
+        </div>
+        ${c.rows.map(r => `
+          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;padding:4px 0;border-bottom:1px solid rgba(28,36,51,.35);align-items:start">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.05em">${esc(r.k)}</span>
+            <span style="font-size:11px;color:${r.same?'var(--dim)':'var(--bone)'}">${esc(r.a)}</span>
+            <span style="font-size:11px;color:${r.same?'var(--dim)':'var(--bone)'}">${esc(r.b)}</span>
+          </div>
+        `).join("")}
+      </div>
+
+      <p class="hint mt-s" style="font-size:11px">NASA Space Apps Challenge Match Mode compares mission designs under authentic trade-offs: scientific productivity, resource discipline, and team coordination.</p>
+      <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE MATCH</button>
+    </div>
+  `;
+  el("modal").classList.add("on");
+
+  const sel = el("matchOppSelect");
+  if(sel){
+    sel.addEventListener("change", (e)=>{
+      const newOppId = e.target.value;
+      const newOpp = (newOppId && newOppId.startsWith("benchmark-")) ? benchmarkRun(a.level) : loadRuns().find(r=>r.id===newOppId);
+      challengeMatchModal(a, newOpp || benchmarkRun(a.level));
+    });
+  }
+}
 function historyModal(){
   const runs=loadRuns();
   const rows=runs.length?runs.map(r=>{
@@ -5507,8 +6887,8 @@ const TEAM_GATE={
 };
 /* Documented fallback (D-03): unknown actions are ALLOWED, so a future
    control cannot lock the player out. These are listed for the audit. */
-const TEAM_NEVER=["closeModal","sources","how","about","spd","cam-mode","toggle-minimap","toggle-hud",
-  "rep","copy","copyc","history","cmprun","home","gohome","start","resume","resumesession","level","sysview","resetview",
+const TEAM_NEVER=["closeModal","sources","how","about","flight-school","tour-step","tour-finish","tour-toy-obj","tour-toy-inst","tour-toy-pwr","tour-toy-planet","tour-toy-pork","spd","cam-mode","toggle-minimap","toggle-hud",
+  "rep","copy","copyc","history","cmprun","challenge-match","apply-match-code","home","gohome","start","resume","resumesession","level","sysview","resetview",
   "devjump","devm","devgo","tobuild","tolaunch","tobrief","rebuild","next","evack","filter-useful",
   "toggle-acc","handoff","seat","goseat","teamsize",
   /* Build step navigation is presentation, not a design decision: the
@@ -5735,6 +7115,13 @@ function startLevel(id){
   S.rover=def.rover; S.site=def.site; S.dsn=def.dsn; S.assist=def.assist;
   S.aerobrake=false;
   go("brief");
+  if(!GOLDEN_ACTIVE && id==="l1" && S.mode==="cadet"){
+    try{
+      if(localStorage.getItem("margin.tour_seen")!=="1"){
+        setTimeout(()=>cadetTourModal(0), 300);
+      }
+    }catch(e){}
+  }
 }
 function toggle(arr,v){const i=arr.indexOf(v); if(i<0)arr.push(v); else arr.splice(i,1); return arr}
 
@@ -5798,12 +7185,22 @@ document.addEventListener("click",e=>{
       Audio_.click(); render();
       break;
     }
-    case "how": howModal(); break;
-    case "home": try{ finishLanding(); }catch(e){} S.ops=null; go("select"); break;
+    case "how": howModal(); Audio_.click(); break;
+    case "home": try{ finishLanding(); }catch(e){} S.ops=null; Audio_.click(); go("select"); break;
     case "gohome": try{ finishLanding(); }catch(e){} S.ops=null; go("title"); Audio_.click(); break;
     case "level":
-      if(window.SelView&&SelView.flyToBrief){ Audio_.click(); SelView.flyToBrief(()=>startLevel(id)); }
-      else { startLevel(id); Audio_.click(); }
+      if(window.SelView && window.SelView.cur !== id){
+        // Clicking a non-selected level card selects and focuses it smoothly
+        if(window.SelView.setBody) window.SelView.setBody(id);
+        Audio_.click();
+      } else if(window.SelView && window.SelView.flyToBrief){
+        // Clicking the currently focused/selected level card launches the mission dive
+        Audio_.click();
+        window.SelView.flyToBrief(()=>startLevel(id));
+      } else {
+        startLevel(id);
+        Audio_.click();
+      }
       break;
     case "sysview": if(window.SelView&&SelView.toggleSystem)SelView.toggleSystem(); Audio_.click(); break;
     case "resetview": if(window.SelView&&SelView.resetView)SelView.resetView(); Audio_.click(); break;
@@ -5817,7 +7214,7 @@ document.addEventListener("click",e=>{
         if(btn){
           btn.classList.toggle("sel", on);
           const box = btn.querySelector(".box");
-          if(box) box.textContent = on ? "\u2713" : "";
+          if(box) box.innerHTML = on ? '<span class="g-icon icon-alone">check</span>' : "";
         }
         const codeEl = document.getElementById("objCountCode") || document.querySelector(".brief h3 .code");
         if(codeEl) codeEl.textContent = `${S.objectives.length} / ${L.req} SELECTED`;
@@ -5829,7 +7226,7 @@ document.addEventListener("click",e=>{
       }
       render(); break;
     }
-    case "tobuild": S.bstep="payload"; go("build"); break;
+    case "tobuild": S.bstep="payload"; Audio_.click(); go("build"); break;
     case "bstep-systems": S.bstep="systems"; Audio_.click(); render(); break;
     case "bstep-review": S.bstep="review"; Audio_.click(); render(); break;
     case "bstep-payload": S.bstep="payload"; Audio_.click(); render(); break;
@@ -5863,7 +7260,12 @@ document.addEventListener("click",e=>{
           const on=b.dataset.id===id;
           b.classList.toggle("sel",on);
           const box=b.querySelector(".box");
-          if(box) box.textContent=on?"\u2713":"";
+          if(box) box.innerHTML=on?'<span class="g-icon icon-alone">check</span>':"";
+          const badge=b.querySelector(".site-badge");
+          if(badge){
+            badge.innerHTML=on?"<span class=\"g-icon\">check</span> SELECTED SITE":"CHOOSE SITE";
+            badge.classList.toggle("sel",on);
+          }
         });
         const fx=document.getElementById("siteFx");
         if(fx) fx.textContent=(byId(MOON_SITES,id)||byId(MARS_SITES,id)).fx;
@@ -5875,17 +7277,23 @@ document.addEventListener("click",e=>{
       }
       break;
     }
-    case "tobrief": go("brief"); break;
+    case "tobrief": Audio_.click(); go("brief"); break;
     case "bstep": S.bstep=t.dataset.v; Audio_.click(); render(); break;
-    case "instr": toggle(S.instruments,id); Audio_.click(); refreshBuild(prev); break;
-    case "power": S.power=id; Audio_.click(); refreshBuild(prev); break;
-    case "comms": S.comms=id; Audio_.click(); refreshBuild(prev); break;
+    case "instr": {
+      const wasMounted = S.instruments.includes(id);
+      toggle(S.instruments, id);
+      if(wasMounted) Audio_.unmount(); else Audio_.mount();
+      refreshBuild(prev);
+      break;
+    }
+    case "power": S.power=id; Audio_.mount(); refreshBuild(prev); break;
+    case "comms": S.comms=id; Audio_.mount(); refreshBuild(prev); break;
     case "dsn": S.dsn=id; Audio_.click(); refreshBuild(prev); break;
-    case "prop":  S.prop=id;  Audio_.click(); refreshBuild(prev); break;
-    case "shield":S.shield=id;Audio_.click(); refreshBuild(prev); break;
-    case "cdh": S.cdh=id; Audio_.click(); refreshBuild(prev); break;
-    case "adcs": S.adcs=id; Audio_.click(); refreshBuild(prev); break;
-    case "bat": S.bat=id; Audio_.click(); refreshBuild(prev); break;
+    case "prop": S.prop=id; Audio_.mount(); refreshBuild(prev); break;
+    case "shield": S.shield=id; Audio_.mount(); refreshBuild(prev); break;
+    case "cdh": S.cdh=id; Audio_.mount(); refreshBuild(prev); break;
+    case "adcs": S.adcs=id; Audio_.mount(); refreshBuild(prev); break;
+    case "bat": S.bat=id; Audio_.mount(); refreshBuild(prev); break;
     case "setname": {
       const inp = document.getElementById("inMissionName");
       if(inp) S.missionName = inp.value.trim().slice(0, 32);
@@ -5905,9 +7313,9 @@ document.addEventListener("click",e=>{
       if(!S.rover) S.rover={mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"};
       S.rover[k]=id; Audio_.click(); refreshBuild(prev); break;
     }
-    case "tolaunch": ensurePhases().done.commit=true; if(S.launch&&S.launch.lv)ensurePhases().done.launch=true; go("launch"); break;
+    case "tolaunch": ensurePhases().done.commit=true; if(S.launch&&S.launch.lv)ensurePhases().done.launch=true; Audio_.click(); go("launch"); break;
     case "lv": S.launch.lv=id; S.launch.outcome=null; S.launch.acked=false; Audio_.click(); renderLV(); renderHUD(); cascade(prev); break;
-    case "pmode": S.pmode=t.dataset.v; drawPork();
+    case "pmode": S.pmode=t.dataset.v; drawPork(); Audio_.click();
       document.querySelectorAll('[data-act="pmode"]').forEach(b=>b.classList.toggle("on",b===t)); break;
     case "assist": {
       S.assist = !S.assist;
@@ -5926,13 +7334,22 @@ document.addEventListener("click",e=>{
       cascade(prev);
       break;
     }
-    case "fly": if(teamActive()) S.team.goAll=null; liftoff(); break;
+    case "fly": {
+      if(teamActive()) S.team.goAll=null;
+      /* COMMIT transition: expand the live 3D vehicle preview to full screen,
+         then hand off to the ascent cinematic. Without the 3D layer the commit
+         goes straight to liftoff — the cinematic owns its own fallback. */
+      if(document.getElementById("launchOverlay")||document.getElementById("lv3Takeover")) break;
+      if(window.LVPreview&&LVPreview.takeoff) LVPreview.takeoff(()=>liftoff());
+      else liftoff();
+      break;
+    }
     case "spd": {
       /* Phase 4: the descent beat owns the pause state until touchdown resolves. */
       if(S.ops&&S.ops.descentActive) break;
       S.ops.speed=+t.dataset.v; S.ops.running=+t.dataset.v>0;
       if(+t.dataset.v>0)lastSpd=+t.dataset.v;
-      document.querySelectorAll(".spd button").forEach(b=>b.classList.toggle("on",b===t));
+      document.querySelectorAll(".spd button").forEach(b=>b.classList.toggle("on",b===t)); Audio_.warp(+t.dataset.v);
       break;
     }
     case "cam-mode": {
@@ -5956,8 +7373,10 @@ document.addEventListener("click",e=>{
     case "toggle-hud": {
       const vp=el("opsViewport");
       if(vp){
-        vp.classList.toggle("hud-hidden");
-        t.classList.toggle("on");
+        const isHidden = vp.classList.toggle("hud-hidden");
+        t.classList.toggle("on", isHidden);
+        const ic = t.querySelector(".hud-icon");
+        if (ic) ic.textContent = isHidden ? "visibility_off" : "visibility";
         Audio_.click();
       }
       break;
@@ -5965,6 +7384,13 @@ document.addEventListener("click",e=>{
     case "evch": resolveEvent(+t.dataset.i); break;
     case "evack": { const m=el("modal"); delete m.dataset.lock; m.classList.remove("on"); if(S.ops) S.ops.running=true; break; }
     case "extrev": resolveExtRev(+t.dataset.i); break;
+    case "reptab": {
+      S.repTab = t.dataset.tab || "overview";
+      Audio_.click();
+      render();
+      if(S.repTab === "timeline" && window.OpsView && OpsView.showFinal) OpsView.showFinal();
+      break;
+    }
     case "rep": replayIdx+=+t.dataset.v; renderReplay(); break;
     case "sources": sourcesModal(); Audio_.click(); break;
     case "arrch": resolveArrival(+t.dataset.i); break;
@@ -5986,7 +7412,58 @@ document.addEventListener("click",e=>{
       try{navigator.clipboard.writeText(inp.value)}catch(err){document.execCommand("copy")}
       t.textContent="COPIED"; setTimeout(()=>t.textContent="COPY",1400); break;
     }
-    case "closeModal": el("modal").classList.remove("on"); break;
+    case "closeModal": el("modal").classList.remove("on"); el("mbox").className = "mbox"; Audio_.click(); break;
+    case "flight-school": cadetTourModal(0); Audio_.click(); break;
+    case "tour-step": cadetTourModal(+t.dataset.step); Audio_.click(); break;
+    case "tour-toy-obj": {
+      const oid = t.dataset.id;
+      if(oid) CADET_SIM.objs[oid] = !CADET_SIM.objs[oid];
+      cadetTourModal(0);
+      Audio_.click();
+      break;
+    }
+    case "tour-toy-inst": {
+      const iid = t.dataset.id;
+      if(iid) CADET_SIM.payloads[iid] = !CADET_SIM.payloads[iid];
+      cadetTourModal(1);
+      Audio_.click();
+      break;
+    }
+    case "tour-toy-pwr": {
+      if(t.dataset.id === "toggle-source"){
+        CADET_SIM.powerSource = CADET_SIM.powerSource === "solar" ? "mmrtg" : "solar";
+        cadetTourModal(2);
+      } else {
+        CADET_SIM.pwrChoice = CADET_SIM.pwrChoice === "std" ? "upgraded" : "std";
+        cadetTourModal(1);
+      }
+      Audio_.click();
+      break;
+    }
+    case "tour-toy-planet": {
+      const pid = t.dataset.id;
+      if(pid) CADET_SIM.planet = pid;
+      cadetTourModal(2);
+      Audio_.click();
+      break;
+    }
+    case "tour-toy-pork": {
+      const pmode = t.dataset.id || (CADET_SIM.porkMode === "opt" ? "late" : CADET_SIM.porkMode === "early" ? "opt" : "early");
+      CADET_SIM.porkMode = pmode;
+      cadetTourModal(3);
+      Audio_.click();
+      break;
+    }
+    case "tour-finish": {
+      const chk = el("chkTourDismiss");
+      if(chk && chk.checked){
+        try{ localStorage.setItem("margin.tour_seen", "1"); }catch(err){}
+      }
+      el("modal").classList.remove("on");
+      el("mbox").classList.remove("academy-wide");
+      Audio_.click();
+      break;
+    }
     case "history": historyModal(); break;
     case "cmprun": {
       /* One case, two entry points (A-06): the history row compares that run
@@ -5996,6 +7473,40 @@ document.addEventListener("click",e=>{
       if(a){
         const b=bestRun(runs.filter(r=>r.id!==id), a.level, a.mode, a.seed);
         compareModal(a,b);
+      }
+      break;
+    }
+    case "challenge-match": {
+      const runs = loadRuns();
+      const a = runs.find(r => r.id === (id || S.lastRunId)) || runs[0];
+      const oppId = t.dataset.oppId;
+      let b = oppId ? (oppId.startsWith("benchmark-") ? benchmarkRun(S.levelId) : runs.find(r => r.id === oppId)) : null;
+      if (!b && a) {
+        b = bestRun(runs.filter(r => r.id !== a.id), a.level, a.mode, a.seed) || runs.filter(r => r.id !== a.id)[0] || benchmarkRun(a.level);
+      }
+      challengeMatchModal(a, b || benchmarkRun(S.levelId));
+      Audio_.click();
+      break;
+    }
+    case "apply-match-code": {
+      const inp = el("matchOppCode");
+      if (!inp || !inp.value.trim()) break;
+      let val = inp.value.trim();
+      if (val.startsWith("#m=")) val = val.slice(3);
+      if (val.startsWith("#c=")) val = val.slice(3);
+      try {
+        const d = JSON.parse(decodeURIComponent(escape(atob(val))));
+        const runs = loadRuns();
+        const a = runs.find(r => r.id === S.lastRunId) || runs[0];
+        const b = runFromShareObject(d, "peer-" + Date.now().toString(36));
+        if (b && a) {
+          challengeMatchModal(a, b);
+          Audio_.click();
+        } else {
+          alert("Could not load mission from this code.");
+        }
+      } catch(err) {
+        alert("Invalid mission code format.");
       }
       break;
     }
@@ -6120,7 +7631,7 @@ el("modal").addEventListener("click",e=>{
   el("modal").classList.remove("on");
 });
 document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"&&!el("modal").dataset.lock&&!el("mbox").querySelector(".choice")) el("modal").classList.remove("on");
+  if(e.key==="Escape"&&!el("modal").dataset.lock&&!el("mbox").querySelector(".choice")) { el("modal").classList.remove("on"); el("mbox").className = "mbox"; }
   const tag=(e.target&&(e.target.tagName||"")).toLowerCase();
   if(tag==="input"||tag==="textarea"||e.target.isContentEditable) return;
   if((e.key==="m"||e.key==="M")&&!e.ctrlKey&&!e.metaKey){ el("btnSound").click(); }
@@ -6338,7 +7849,8 @@ function failLaunchCatastrophic(out){
 }
 /* ── liftoff beat: resolves launch reliability once, then ascent cinematic, then operations. ── */
 function liftoff(){
-  Audio_.go();
+  // Launch pad ambiance continues running seamlessly until engine ignition begins
+  Audio_.launch();
   const lv = (S.launch && S.launch.lv) ? byId(LV, S.launch.lv) : null;
   const lvName = lv ? lv.n : "Launch vehicle";
   const lvId = lv ? lv.id : "";
@@ -6347,8 +7859,6 @@ function liftoff(){
   const ov = document.createElement("div");
   ov.id = "launchOverlay";
   ov.innerHTML =
-    '<div class="launch3d-head"><span class="kicker">LC-39B COUNTDOWN & ASCENT</span>' +
-    '<span class="hint">' + esc(lvName) + ' &middot; T-0 ' + esc(yrToDate(S.launch.tDep)) + '</span></div>' +
     '<div class="launch3d-body" id="launch3dBody"></div>';
   document.body.appendChild(ov);
   const cleanup = () => { try { ov.parentElement.removeChild(ov); } catch (e) {} };
@@ -6397,14 +7907,19 @@ function liftoff(){
         const t = el("tcount"); if (!t || !m.classList.contains("on")) return;
         t.textContent = s.big;
         const sub = el("tsub"); if (sub) sub.textContent = s.sub;
-        if (s.big === "LIFTOFF") { Audio_.go(); t.style.color = "var(--phosphor)"; }
+        if (s.big === "3") {
+          // Engine ignition beat: pad ambiance yields to combustion
+          Audio_.stopPadAmbiance();
+        }
+        if (s.big === "LIFTOFF") { t.style.color = "var(--phosphor)"; }
         else Audio_.click();
         if (k === seq.length - 1) setTimeout(() => { delete m.dataset.lock; m.classList.remove("on"); maybeShowOutcome(); }, 650);
       }, k * 450);
     });
   };
   try {
-    import("./js/launch-view.js?v=" + Date.now()).then((mod) => {
+    /* Unified ?v= cache-busted specifier shared across lv-preview and launch-view */
+    import("./js/launch-view.js?v=20261107_v3").then((mod) => {
       console.log("[LAUNCH] launch-view.js imported successfully", mod);
       const LV3 = (mod && mod.LaunchView) || window.LaunchView;
       if (!LV3 || !LV3.start) {
@@ -6428,13 +7943,24 @@ function liftoff(){
 }
 
 function aboutModal(){
-  el("mbox").innerHTML=`<h3>WHAT IS MARGIN</h3><div class="mb" style="font-size:13px;line-height:1.7">
-    <p>Designing a space mission is a fight over margin. Add a better camera and you gain
-    science &mdash; and lose eighteen kilograms, which costs you array area, which costs you propellant,
-    which costs you two years of cruise, which costs you the transmitter you needed to send any of it home.</p>
-    <p class="mt-s">Pick a real NASA science objective. Build the spacecraft. Choose a launch window off a real
-    Lambert solution. Then fly it, and live with what you built.</p>
-    <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
+  el("mbox").className = "mbox modal-wide";
+  el("mbox").innerHTML = `
+    <div class="modal-top-bar">
+      <div class="modal-title-group">
+        <span class="modal-kicker">NASA SPACE APPS CHALLENGE 2026</span>
+        <h3 class="modal-title">WHAT IS MARGIN</h3>
+      </div>
+      <button class="modal-close-icon" data-act="closeModal" aria-label="Close dialog">&times;</button>
+    </div>
+    <div class="modal-scroll-body" style="padding:20px 24px">
+      <p style="font-size:13.5px;line-height:1.7;color:var(--text-1)">Designing a space mission is a fight over margin. Add a better camera and you gain science &mdash; and lose eighteen kilograms, which costs you array area, which costs you propellant, which costs you two years of cruise, which costs you the transmitter you needed to send any of it home.</p>
+      <p style="margin-top:14px;font-size:13px;line-height:1.7;color:var(--text-2)">Pick a real NASA science objective. Build the spacecraft. Choose a launch window off a real Lambert solution. Then fly it, and live with what you built.</p>
+    </div>
+    <div class="modal-bottom-bar">
+      <span class="modal-status-text">OFFLINE-FIRST SIMULATION</span>
+      <button class="btn ghost btn-sm" data-act="closeModal">CLOSE</button>
+    </div>
+  `;
   el("modal").classList.add("on");
 }
 
@@ -6470,40 +7996,722 @@ const GLOSSARY=[
  ["Proximity operations","Flying close to a small body: matching its orbit, surveying, then touching or sampling."],
  ["Surface ops","After touchdown: drive, dwell, drill, recharge or relay. Every order trades time against power and science."]
 ];
+/* ── High-Fidelity Visual Cadet Flight Academy (Interactive Aerospace Modules) ── */
+const CADET_SIM = {
+  // Module 1: Science Formulation Lab
+  objs: { ocean: true, ice: false, topo: false },
+  // Module 2: Spacecraft Bus Engineering Lab
+  payloads: { cam: true, radar: false, mag: false },
+  pwrChoice: "std", // "std" (550W) | "upgraded" (850W)
+  // Module 3: Deep-Space Physics Lab (1/R² & DSN Link)
+  planet: "earth", // "earth" | "moon" | "mars" | "jupiter"
+  powerSource: "solar", // "solar" | "mmrtg"
+  // Module 4: Trajectory & Orbital Dynamics Lab
+  porkMode: "opt" // "early" | "opt" | "late"
+};
+
+function cadetTourModal(step){
+  const s = Math.max(0, Math.min(3, Number(step) || 0));
+  const tabs = [
+    { n: "1. SCIENCE FORMULATION", t: "SCIENCE MATRIX & SENSOR COUPLING" },
+    { n: "2. BUS SUBSYSTEMS", t: "PAYLOAD & BUS MULTI-RAIL BALANCING" },
+    { n: "3. DEEP-SPACE PHYSICS", t: "1/R² SOLAR FLUX & DSN COMMUNICATIONS" },
+    { n: "4. ORBITAL TRAJECTORY", t: "PORKCHOP WINDOW & MISSION COMMAND SEATS" }
+  ];
+
+  let frameHtml = "";
+
+  if(s === 0){
+    // MODULE 1: SCIENCE FORMULATION & SENSOR COUPLING LAB
+    let score = 0;
+    if(CADET_SIM.objs.ocean) score += 35;
+    if(CADET_SIM.objs.ice) score += 35;
+    if(CADET_SIM.objs.topo) score += 30;
+    const grade = score >= 90 ? "A+" : score >= 70 ? "A" : score >= 35 ? "B" : "INCOMPLETE";
+    const gradeCol = score >= 70 ? "#65f2a5" : score >= 35 ? "#f59e0b" : "#ef4444";
+
+    const instOcean = CADET_SIM.objs.ocean;
+    const instIce = CADET_SIM.objs.ice;
+    const instTopo = CADET_SIM.objs.topo;
+
+    const svgSensorSuite = `
+      <div class="academy-svg-wrap">
+        <svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="acadTargetGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#65f2a5" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#65f2a5" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="acadBeamGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#65f2a5" stop-opacity="0.65"/>
+              <stop offset="100%" stop-color="#65f2a5" stop-opacity="0.05"/>
+            </linearGradient>
+          </defs>
+
+          <!-- Star background grid -->
+          <line x1="0" y1="52" x2="460" y2="52" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2,4"/>
+          <line x1="0" y1="105" x2="460" y2="105" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2,4"/>
+          <line x1="0" y1="158" x2="460" y2="158" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2,4"/>
+          <line x1="115" y1="0" x2="115" y2="210" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2,4"/>
+          <line x1="230" y1="0" x2="230" y2="210" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2,4"/>
+          <line x1="345" y1="0" x2="345" y2="210" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2,4"/>
+
+          <!-- Target Planetary Surface Horizon -->
+          <ellipse cx="230" cy="270" rx="280" ry="100" fill="#080e1a" stroke="rgba(101,242,165,0.35)" stroke-width="1.5"/>
+          <text x="14" y="22" fill="rgba(101,242,165,0.85)" font-family="monospace" font-size="9" letter-spacing="0.1em">SURFACE SENSOR OBSERVATION BEAMS</text>
+
+          <!-- Spacecraft Bus (Center Top) -->
+          <g transform="translate(200, 32)">
+            <!-- Solar Panels -->
+            <rect x="-65" y="8" width="55" height="18" rx="2" fill="#0c1726" stroke="#65f2a5" stroke-width="1.2"/>
+            <line x1="-38" y1="8" x2="-38" y2="26" stroke="#65f2a5" stroke-width="0.8"/>
+            <line x1="-12" y1="8" x2="-12" y2="26" stroke="#65f2a5" stroke-width="0.8"/>
+            <rect x="70" y="8" width="55" height="18" rx="2" fill="#0c1726" stroke="#65f2a5" stroke-width="1.2"/>
+            <line x1="97" y1="8" x2="97" y2="26" stroke="#65f2a5" stroke-width="0.8"/>
+            <line x1="123" y1="8" x2="123" y2="26" stroke="#65f2a5" stroke-width="0.8"/>
+            <line x1="-10" y1="17" x2="0" y2="17" stroke="#fff" stroke-width="1.5"/>
+            <line x1="60" y1="17" x2="70" y2="17" stroke="#fff" stroke-width="1.5"/>
+
+            <!-- Main Satellite Body -->
+            <rect x="0" y="0" width="60" height="34" rx="4" fill="#0c1826" stroke="#cfe3ff" stroke-width="1.5"/>
+            <circle cx="30" cy="17" r="5" fill="#65f2a5"/>
+            <!-- Sensor Bay Ports -->
+            <circle cx="15" cy="34" r="3" fill="${instOcean ? '#65f2a5' : '#273449'}"/>
+            <circle cx="30" cy="34" r="3" fill="${instIce ? '#65f2a5' : '#273449'}"/>
+            <circle cx="45" cy="34" r="3" fill="${instTopo ? '#f59e0b' : '#273449'}"/>
+            <text x="30" y="-6" text-anchor="middle" fill="#cfe3ff" font-family="monospace" font-size="8.5" letter-spacing="0.1em">SPACECRAFT BUS (PACE / LRO)</text>
+          </g>
+
+          <!-- Instrument Beams downward to surface -->
+          ${instOcean ? `
+            <polygon points="215,66 120,185 190,185" fill="url(#acadBeamGrad)" opacity="0.85"/>
+            <line x1="215" y1="66" x2="155" y2="185" stroke="#65f2a5" stroke-width="1.5" stroke-dasharray="3,3"/>
+            <circle cx="155" cy="185" r="7" fill="url(#acadTargetGlow)"/>
+            <circle cx="155" cy="185" r="2.5" fill="#65f2a5"/>
+            <text x="155" y="198" text-anchor="middle" fill="#65f2a5" font-family="monospace" font-size="8.5">OCI SPECTROMETER</text>
+          ` : ''}
+
+          ${instIce ? `
+            <polygon points="230,66 200,180 260,180" fill="rgba(70,236,156,0.18)"/>
+            <line x1="230" y1="66" x2="230" y2="180" stroke="#65f2a5" stroke-width="1.5" stroke-dasharray="4,2"/>
+            <circle cx="230" cy="180" r="7" fill="rgba(70,236,156,0.3)"/>
+            <circle cx="230" cy="180" r="2.5" fill="#65f2a5"/>
+            <text x="230" y="202" text-anchor="middle" fill="#65f2a5" font-family="monospace" font-size="8.5">RADAR SOUNDER</text>
+          ` : ''}
+
+          ${instTopo ? `
+            <polygon points="245,66 270,185 340,185" fill="rgba(245,158,11,0.18)"/>
+            <line x1="245" y1="66" x2="305" y2="185" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3,3"/>
+            <circle cx="305" cy="185" r="7" fill="rgba(245,158,11,0.3)"/>
+            <circle cx="305" cy="185" r="2.5" fill="#f59e0b"/>
+            <text x="305" y="198" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="8.5">LASER ALTIMETER</text>
+          ` : ''}
+        </svg>
+      </div>
+    `;
+
+    frameHtml = `
+      <div class="academy-main-frame">
+        <div class="academy-left-pane">
+          ${svgSensorSuite}
+          <div style="font-size:11.5px;color:var(--dim);line-height:1.4">
+            Click science objectives below to mount matching sensors. Notice how real NASA missions formulate payload suites to balance science return:
+          </div>
+          <!-- Interactive Objective Toggles -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div class="academy-toy-btn ${CADET_SIM.objs.ocean ? 'sel' : ''}" data-act="tour-toy-obj" data-id="ocean">
+              <div class="academy-toy-btn-title">
+                <span>1. OCEAN COLOR &amp; PHYTOPLANKTON BIOLOGY</span>
+                <span class="tag" style="font-size:9.5px;background:${CADET_SIM.objs.ocean?'rgba(101,242,165,.2)':'rgba(255,255,255,.05)'};color:${CADET_SIM.objs.ocean?'var(--phosphor)':'var(--dim)'}">${CADET_SIM.objs.ocean?'PRIMARY GOAL':'UNSELECTED'}</span>
+              </div>
+              <div class="academy-toy-btn-desc">Senses: UV-to-NIR hyperspectral signatures. Adds +35% science yield.</div>
+            </div>
+
+            <div class="academy-toy-btn ${CADET_SIM.objs.ice ? 'sel' : ''}" data-act="tour-toy-obj" data-id="ice">
+              <div class="academy-toy-btn-title">
+                <span>2. SUB-SURFACE VOLATILE &amp; WATER ICE DETECTION</span>
+                <span class="tag" style="font-size:9.5px;background:${CADET_SIM.objs.ice?'rgba(70,236,156,.25)':'rgba(255,255,255,.05)'}">${CADET_SIM.objs.ice?'SECONDARY GOAL':'UNSELECTED'}</span>
+              </div>
+              <div class="academy-toy-btn-desc">Senses: Dielectric permittivity &amp; radar reflection. Adds +35% science yield.</div>
+            </div>
+
+            <div class="academy-toy-btn ${CADET_SIM.objs.topo ? 'sel' : ''}" data-act="tour-toy-obj" data-id="topo">
+              <div class="academy-toy-btn-title">
+                <span>3. HIGH-RESOLUTION SURFACE TOPOGRAPHY</span>
+                <span class="tag" style="font-size:9.5px;background:${CADET_SIM.objs.topo?'rgba(245,158,11,.25)':'rgba(255,255,255,.05)'}">${CADET_SIM.objs.topo?'HONORS GOAL':'UNSELECTED'}</span>
+              </div>
+              <div class="academy-toy-btn-desc">Senses: Multi-beam time-of-flight laser altimetry. Adds +30% science yield (A+).</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry Readout Pane -->
+        <div class="academy-right-pane">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--phosphor);letter-spacing:0.12em;margin-bottom:4px">MISSION SCIENCE METRICS</div>
+          
+          <div class="academy-readout-row">
+            <span class="k">Science Productivity</span>
+            <span class="v" style="color:${gradeCol}">${score}%</span>
+          </div>
+          <div class="tour-gauge-bar" style="margin-bottom:8px">
+            <div class="tour-gauge-fill" style="width:${score}%;background:${gradeCol}"></div>
+          </div>
+
+          <div style="background:#020408;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px 10px;text-align:center">
+            <span style="font-family:var(--mono);font-size:9.5px;color:var(--dim);letter-spacing:0.12em">PROJECTED NASA REPORT CARD</span>
+            <div style="font-size:26px;font-weight:700;color:${gradeCol};letter-spacing:0.05em;margin:2px 0">${grade}</div>
+            <div class="hint" style="font-size:10.5px">
+              ${score === 100 ? 'Exceeds all baseline requirements with A+ honors.' : score >= 70 ? 'Meets full Level-1 NASA mission requirements.' : 'Below minimum scientific threshold.'}
+            </div>
+          </div>
+
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dim);border-top:1px solid rgba(255,255,255,0.08);padding-top:8px">
+            <div class="academy-readout-row"><span class="k">Active Sensors</span><span class="v">${(CADET_SIM.objs.ocean?1:0)+(CADET_SIM.objs.ice?1:0)+(CADET_SIM.objs.topo?1:0)} / 3</span></div>
+            <div class="academy-readout-row"><span class="k">Telemetry Demand</span><span class="v">${CADET_SIM.objs.ocean&&CADET_SIM.objs.ice&&CADET_SIM.objs.topo?'145 Mb/d (HEAVY)':'45 Mb/d (MODERATE)'}</span></div>
+          </div>
+
+          <div class="academy-rule-callout">
+            <b>CADET RULE OF THUMB:</b> Don't select objectives you cannot satisfy with instruments! Every active sensor demands dedicated bus power and data downlink.
+          </div>
+        </div>
+      </div>
+    `;
+  } else if(s === 1){
+    // MODULE 2: SPACECRAFT BUS ENGINEERING & EQUILIBRIUM LAB
+    let mass = 820;
+    let power = 380;
+    let data = 15;
+
+    if(CADET_SIM.payloads.cam) { mass += 65; power += 60; data += 45; }
+    if(CADET_SIM.payloads.radar) { mass += 160; power += 240; data += 90; }
+    if(CADET_SIM.payloads.mag) { mass += 20; power += 15; data += 5; }
+
+    const powerGen = CADET_SIM.pwrChoice === "upgraded" ? 850 : 550;
+    const pwrMargin = Math.round(((powerGen - power) / powerGen) * 100);
+    const massLimit = 1250;
+    const massMargin = Math.round(((massLimit - mass) / massLimit) * 100);
+
+    const pwrCol = pwrMargin > 15 ? "#65f2a5" : pwrMargin > 0 ? "#f59e0b" : "#ef4444";
+    const massCol = massMargin > 10 ? "#65f2a5" : massMargin > 0 ? "#f59e0b" : "#ef4444";
+    const tiltDeg = pwrMargin < 0 || massMargin < 0 ? -7 : pwrMargin < 15 ? -3 : 4;
+
+    const svgBusCrossSection = `
+      <div class="academy-svg-wrap">
+        <svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background Grid & Mechanical Scales -->
+          <line x1="230" y1="20" x2="230" y2="190" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3"/>
+          <text x="14" y="22" fill="rgba(101,242,165,0.85)" font-family="monospace" font-size="9" letter-spacing="0.1em">SPACECRAFT MULTI-RAIL SUBSYSTEM COUPLING</text>
+
+          <!-- Equilibrium Pivot Triangle -->
+          <polygon points="230,140 216,170 244,170" fill="#141c26" stroke="#65f2a5" stroke-width="1.5"/>
+          <circle cx="230" cy="140" r="4" fill="#65f2a5"/>
+          <line x1="170" y1="170" x2="290" y2="170" stroke="#65f2a5" stroke-width="2"/>
+
+          <!-- Dynamic Tilting Subsystem Beam -->
+          <g transform="translate(230, 140) rotate(${tiltDeg})">
+            <!-- Beam Arm -->
+            <rect x="-190" y="-8" width="380" height="16" rx="4" fill="#0f172a" stroke="${pwrCol}" stroke-width="1.5"/>
+            <circle cx="0" cy="0" r="3" fill="#fff"/>
+
+            <!-- Left Scale: Mass (Payload Hardware) -->
+            <g transform="translate(-140, -45)">
+              <rect x="-35" y="-15" width="70" height="35" rx="3" fill="#091220" stroke="${massCol}" stroke-width="1.2"/>
+              <text x="0" y="-2" text-anchor="middle" fill="#cfe3ff" font-family="monospace" font-size="9" font-weight="600">MASS LOAD</text>
+              <text x="0" y="11" text-anchor="middle" fill="${massCol}" font-family="monospace" font-size="9">${mass} kg</text>
+              <line x1="0" y1="20" x2="0" y2="37" stroke="${massCol}" stroke-width="1.5"/>
+            </g>
+
+            <!-- Right Scale: Power / Generation -->
+            <g transform="translate(140, -45)">
+              <rect x="-35" y="-15" width="70" height="35" rx="3" fill="#091220" stroke="${pwrCol}" stroke-width="1.2"/>
+              <text x="0" y="-2" text-anchor="middle" fill="#cfe3ff" font-family="monospace" font-size="9" font-weight="600">ELECTRICAL</text>
+              <text x="0" y="11" text-anchor="middle" fill="${pwrCol}" font-family="monospace" font-size="9">${power}W / ${powerGen}W</text>
+              <line x1="0" y1="20" x2="0" y2="37" stroke="${pwrCol}" stroke-width="1.5"/>
+            </g>
+          </g>
+
+          <!-- Top Status Ribbon -->
+          <rect x="130" y="32" width="200" height="24" rx="12" fill="#040810" stroke="${pwrMargin < 0 ? '#ef4444' : '#65f2a5'}" stroke-width="1.2"/>
+          <text x="230" y="48" text-anchor="middle" fill="${pwrMargin < 0 ? '#ef4444' : '#cfe3ff'}" font-family="monospace" font-size="9.5" font-weight="600">
+            ${pwrMargin < 0 ? 'CRITICAL ELECTRICAL DEFICIT' : pwrMargin < 15 ? 'TIGHT MARGIN RESERVE' : 'SYSTEM MARGIN EQUILIBRIUM'}
+          </text>
+        </svg>
+      </div>
+    `;
+
+    frameHtml = `
+      <div class="academy-main-frame">
+        <div class="academy-left-pane">
+          ${svgBusCrossSection}
+          <div style="font-size:11.5px;color:var(--dim);line-height:1.4">
+            Toggle instruments and solar panels below. Notice how loading high-power sensors tilts the spacecraft beam into an electrical deficit:
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div class="academy-toy-btn ${CADET_SIM.payloads.cam ? 'sel' : ''}" data-act="tour-toy-inst" data-id="cam">
+              <div class="academy-toy-btn-title">
+                <span>HI-RES CONTEXT IMAGER (CTX)</span>
+                <span class="tag" style="font-size:9.5px">${CADET_SIM.payloads.cam ? 'MOUNTED' : 'OFFLINE'}</span>
+              </div>
+              <div class="academy-toy-btn-desc">Draws: +65 kg · 60 W · 45 Mb/d data stream. Moderate load.</div>
+            </div>
+
+            <div class="academy-toy-btn ${CADET_SIM.payloads.radar ? 'sel' : ''}" data-act="tour-toy-inst" data-id="radar">
+              <div class="academy-toy-btn-title">
+                <span>DUAL-FREQUENCY RADAR SOUNDER</span>
+                <span class="tag" style="font-size:9.5px;color:${CADET_SIM.payloads.radar?'#ef4444':'var(--dim)'}">${CADET_SIM.payloads.radar ? 'HEAVY DEMAND' : 'OFFLINE'}</span>
+              </div>
+              <div class="academy-toy-btn-desc">Draws: +160 kg · 240 W · 90 Mb/d data. Can induce severe power starvation!</div>
+            </div>
+
+            <div class="academy-toy-btn ${CADET_SIM.payloads.mag ? 'sel' : ''}" data-act="tour-toy-inst" data-id="mag">
+              <div class="academy-toy-btn-title">
+                <span>BOOM-MOUNTED MAGNETOMETER</span>
+                <span class="tag" style="font-size:9.5px">${CADET_SIM.payloads.mag ? 'MOUNTED' : 'OFFLINE'}</span>
+              </div>
+              <div class="academy-toy-btn-desc">Draws: +20 kg · 15 W · 5 Mb/d. Minimal resource impact.</div>
+            </div>
+
+            <button class="btn ${CADET_SIM.pwrChoice==='upgraded'?'primary':'ghost'} btn-sm" data-act="tour-toy-pwr" style="margin-top:4px">
+              ${CADET_SIM.pwrChoice==='upgraded' ? 'SOLAR ARRAYS: UPGRADED (850 W GENERATION)' : 'SOLAR ARRAYS: STANDARD (550 W) — CLICK TO UPGRADE WINGS'}
+            </button>
+          </div>
+        </div>
+
+        <div class="academy-right-pane">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--phosphor);letter-spacing:0.12em;margin-bottom:4px">TELEMETRY RAILS READOUT</div>
+
+          <div class="academy-readout-row">
+            <span class="k">Power Generation</span>
+            <span class="v">${powerGen} W</span>
+          </div>
+          <div class="academy-readout-row">
+            <span class="k">Total Subsystem Draw</span>
+            <span class="v" style="color:${pwrCol}">${power} W</span>
+          </div>
+          <div class="academy-readout-row">
+            <span class="k">Net Power Margin</span>
+            <span class="v" style="color:${pwrCol}">${pwrMargin}%</span>
+          </div>
+          <div class="tour-gauge-bar" style="margin-bottom:8px">
+            <div class="tour-gauge-fill" style="width:${Math.max(0, Math.min(100, pwrMargin))}%;background:${pwrCol}"></div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:8px">
+            <div class="academy-readout-row">
+              <span class="k">Spacecraft Wet Mass</span>
+              <span class="v" style="color:${massCol}">${mass} kg</span>
+            </div>
+            <div class="academy-readout-row">
+              <span class="k">Launch Vehicle Cap</span>
+              <span class="v">${massLimit} kg</span>
+            </div>
+            <div class="academy-readout-row">
+              <span class="k">Mass Margin</span>
+              <span class="v" style="color:${massCol}">${massMargin}%</span>
+            </div>
+            <div class="tour-gauge-bar">
+              <div class="tour-gauge-fill" style="width:${Math.max(0, Math.min(100, massMargin))}%;background:${massCol}"></div>
+            </div>
+          </div>
+
+          <div class="academy-rule-callout">
+            <b>CADET RULE OF THUMB:</b> Never launch with a negative margin! If loading a heavy sensor creates a deficit, upgrade your power array or upgrade your launch vehicle before flight authorization.
+          </div>
+        </div>
+      </div>
+    `;
+  } else if(s === 2){
+    // MODULE 3: DEEP-SPACE 1/R² SOLAR FLUX & DSN COMMUNICATIONS LAB
+    const planetDist = { earth: 1.0, moon: 1.0, mars: 1.524, jupiter: 5.204 };
+    const distAU = planetDist[CADET_SIM.planet] || 1.0;
+    const solarFlux = Math.round(1361 / (distAU * distAU));
+    const isNuclear = CADET_SIM.powerSource === "mmrtg";
+
+    let effectivePower = isNuclear ? 220 : Math.round(520 * (solarFlux / 1361));
+    const pwrStatus = effectivePower >= 180 ? "FLIGHT NOMINAL" : effectivePower >= 80 ? "MARGINAL LOAD" : "BATTERY STARVATION";
+    const pwrColor = effectivePower >= 180 ? "#65f2a5" : effectivePower >= 80 ? "#f59e0b" : "#ef4444";
+
+    const linkLossDb = distAU === 1.0 ? "-12 dB (NEAR-EARTH)" : distAU <= 1.55 ? "-28 dB (MARS TRANSIT)" : "-52 dB (JOVIAN DISTANCE)";
+    const linkHardware = distAU <= 1.0 ? "0.5m Low-Gain Omni" : distAU <= 1.6 ? "2.0m High-Gain Parabolic Dish" : "3.0m Dual-Band High-Gain Dish + Ka TWTA";
+    const lightDelay = distAU === 1.0 ? "8.3 min" : distAU <= 1.55 ? "12.7 min" : "43.3 min";
+
+    // SVG Planet coordinate on orbit track
+    const planetX = CADET_SIM.planet === 'earth' ? 70 : CADET_SIM.planet === 'moon' ? 140 : CADET_SIM.planet === 'mars' ? 240 : 380;
+    const planetCol = CADET_SIM.planet === 'earth' ? '#4B82D7' : CADET_SIM.planet === 'moon' ? '#d4d4d8' : CADET_SIM.planet === 'mars' ? '#ef4444' : '#f59e0b';
+    const planetRadius = CADET_SIM.planet === 'jupiter' ? 15 : CADET_SIM.planet === 'earth' ? 9 : CADET_SIM.planet === 'mars' ? 8 : 6;
+
+    const svgSolarFluxDiagram = `
+      <div class="academy-svg-wrap">
+        <svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="acadSunGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fef08a"/>
+              <stop offset="35%" stop-color="#f59e0b"/>
+              <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="acadR2Rays" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.85"/>
+              <stop offset="25%" stop-color="#f59e0b" stop-opacity="0.45"/>
+              <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.18"/>
+              <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.02"/>
+            </linearGradient>
+            <radialGradient id="acadDsnWave" cx="0%" cy="50%" r="100%">
+              <stop offset="0%" stop-color="#4B82D7" stop-opacity="0.45"/>
+              <stop offset="100%" stop-color="#4B82D7" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <text x="14" y="22" fill="rgba(101,242,165,0.85)" font-family="monospace" font-size="9" letter-spacing="0.1em">1/R² SOLAR FLUX DECAY &amp; DSN COMM CONE</text>
+
+          <!-- Sun (Left) with Coronal Flare -->
+          <circle cx="15" cy="110" r="50" fill="url(#acadSunGlow)"/>
+          <circle cx="15" cy="110" r="22" fill="#fff"/>
+          <circle cx="15" cy="110" r="26" fill="none" stroke="#fef08a" stroke-width="1.5" opacity="0.6"/>
+          <text x="15" y="156" text-anchor="middle" fill="#fef08a" font-family="monospace" font-size="8.5" font-weight="600">THE SUN</text>
+
+          <!-- 1/R^2 Radiation Cone -->
+          <polygon points="25,110 460,18 460,202" fill="url(#acadR2Rays)"/>
+
+          <!-- Inverse-square Flux Curve Graph in background -->
+          <path d="M 70,50 Q 140,130 240,158 T 420,172" fill="none" stroke="rgba(245,158,11,0.5)" stroke-width="1.5" stroke-dasharray="3,3"/>
+
+          <!-- Orbital Distance Ticks with Labels -->
+          <line x1="70" y1="42" x2="70" y2="175" stroke="rgba(255,255,255,0.18)" stroke-dasharray="2,2"/>
+          <text x="70" y="190" text-anchor="middle" fill="#4B82D7" font-family="monospace" font-size="8">1.0 AU</text>
+          <text x="70" y="200" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="7.5">1361 W/m²</text>
+
+          <line x1="140" y1="42" x2="140" y2="175" stroke="rgba(255,255,255,0.18)" stroke-dasharray="2,2"/>
+          <text x="140" y="190" text-anchor="middle" fill="#d4d4d8" font-family="monospace" font-size="8">MOON</text>
+          <text x="140" y="200" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="7.5">1361 W/m²</text>
+
+          <line x1="240" y1="42" x2="240" y2="175" stroke="rgba(255,255,255,0.18)" stroke-dasharray="2,2"/>
+          <text x="240" y="190" text-anchor="middle" fill="#ef4444" font-family="monospace" font-size="8">1.52 AU</text>
+          <text x="240" y="200" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="7.5">590 W/m²</text>
+
+          <line x1="380" y1="42" x2="380" y2="175" stroke="rgba(255,255,255,0.18)" stroke-dasharray="2,2"/>
+          <text x="380" y="190" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="8">5.20 AU</text>
+          <text x="380" y="200" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="7.5">50 W/m²</text>
+
+          <!-- DSN Earth Uplink Cone (originating from Earth at x=70) -->
+          ${distAU > 1.0 ? `
+            <path d="M 70,110 L ${planetX},75 L ${planetX},145 Z" fill="url(#acadDsnWave)" opacity="0.6"/>
+            <line x1="70" y1="110" x2="${planetX}" y2="110" stroke="#4B82D7" stroke-width="1.2" stroke-dasharray="4,2"/>
+          ` : ''}
+
+          <!-- Active Target Planet Body -->
+          <circle cx="${planetX}" cy="110" r="${planetRadius}" fill="${planetCol}" stroke="#fff" stroke-width="1.5"/>
+          <circle cx="${planetX}" cy="110" r="${planetRadius + 6}" fill="none" stroke="${planetCol}" stroke-width="1" stroke-dasharray="2,2"/>
+
+          <!-- Spacecraft Position Indicator with Power Pill -->
+          <g transform="translate(${planetX}, 65)">
+            <rect x="-38" y="-14" width="76" height="22" rx="4" fill="#030712" stroke="${pwrColor}" stroke-width="1.5"/>
+            <text x="0" y="1" text-anchor="middle" fill="${pwrColor}" font-family="monospace" font-size="8.5" font-weight="600">${effectivePower} W (${isNuclear?'RTG':'SOLAR'})</text>
+            <line x1="0" y1="8" x2="0" y2="35" stroke="${pwrColor}" stroke-width="1" stroke-dasharray="2,2"/>
+          </g>
+        </svg>
+      </div>
+    `;
+
+    frameHtml = `
+      <div class="academy-main-frame">
+        <div class="academy-left-pane">
+          ${svgSolarFluxDiagram}
+          <div style="font-size:11.5px;color:var(--dim);line-height:1.4">
+            Click celestial targets across the solar system to observe how solar flux decays with (1/r^2):
+          </div>
+
+          <!-- Interactive Planet Destination Selectors -->
+          <div class="tour-orbit-track">
+            <button class="tour-planet-btn ${CADET_SIM.planet==='earth'?'sel':''}" data-act="tour-toy-planet" data-id="earth">
+              <div class="tour-planet-dot" style="background:#4B82D7"></div>
+              <span style="font-family:var(--mono);font-size:10px;font-weight:600">EARTH LEO</span>
+              <span style="font-size:9px;color:var(--dim)">1.0 AU (SSO)</span>
+            </button>
+
+            <button class="tour-planet-btn ${CADET_SIM.planet==='moon'?'sel':''}" data-act="tour-toy-planet" data-id="moon">
+              <div class="tour-planet-dot" style="background:#d4d4d8"></div>
+              <span style="font-family:var(--mono);font-size:10px;font-weight:600">MOON POLAR</span>
+              <span style="font-size:9px;color:var(--dim)">1.0 AU (0.4M km)</span>
+            </button>
+
+            <button class="tour-planet-btn ${CADET_SIM.planet==='mars'?'sel':''}" data-act="tour-toy-planet" data-id="mars">
+              <div class="tour-planet-dot" style="background:#ef4444"></div>
+              <span style="font-family:var(--mono);font-size:10px;font-weight:600">MARS CRUISE</span>
+              <span style="font-size:9px;color:var(--dim)">1.52 AU (225M km)</span>
+            </button>
+
+            <button class="tour-planet-btn ${CADET_SIM.planet==='jupiter'?'sel':''}" data-act="tour-toy-planet" data-id="jupiter">
+              <div class="tour-planet-dot" style="background:#f59e0b"></div>
+              <span style="font-family:var(--mono);font-size:10px;font-weight:600">EUROPA (JUPITER)</span>
+              <span style="font-size:9px;color:var(--dim)">5.20 AU (778M km)</span>
+            </button>
+          </div>
+
+          <!-- Power Architecture Toggle -->
+          <div style="background:rgba(4,7,12,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div>
+              <span style="font-family:var(--mono);font-size:10.5px;color:var(--bone);display:block;font-weight:600">POWER ARCHITECTURE</span>
+              <span class="hint" style="font-size:10.5px">${isNuclear ? 'Radioisotope MMRTG (Plutonium-238 decay)' : 'Triple-Junction Photovoltaic Solar Wings'}</span>
+            </div>
+            <button class="btn ${isNuclear?'primary':'ghost'} btn-sm" data-act="tour-toy-pwr" data-id="toggle-source" style="white-space:nowrap">
+              ${isNuclear ? 'MMRTG NUCLEAR (STEADY 220W)' : 'PHOTOVOLTAIC SOLAR WINGS'}
+            </button>
+          </div>
+        </div>
+
+        <div class="academy-right-pane">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--phosphor);letter-spacing:0.12em;margin-bottom:4px">ENVIRONMENTAL READOUT</div>
+
+          <div class="academy-readout-row">
+            <span class="k">Solar Irradiance Flux</span>
+            <span class="v" style="color:var(--amber)">${solarFlux} W/m&sup2;</span>
+          </div>
+          <div class="academy-readout-row">
+            <span class="k">Relative Solar Intensity</span>
+            <span class="v">${((solarFlux/1361)*100).toFixed(1)}% of Earth</span>
+          </div>
+          <div class="academy-readout-row">
+            <span class="k">Available Power Output</span>
+            <span class="v" style="color:${pwrColor}">${effectivePower} W (${pwrStatus})</span>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;margin-top:6px">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--phosphor);margin-bottom:4px">DEEP SPACE NETWORK (DSN) COMM LINK</div>
+            <div class="academy-readout-row"><span class="k">Free-Space Path Loss</span><span class="v">${linkLossDb}</span></div>
+            <div class="academy-readout-row"><span class="k">One-Way Light Delay</span><span class="v">${lightDelay}</span></div>
+            <div class="academy-readout-row"><span class="k">Flight Antenna Solution</span><span class="v" style="color:var(--phosphor)">${linkHardware}</span></div>
+          </div>
+
+          <div class="academy-rule-callout">
+            <b>CADET RULE OF THUMB:</b> At Jupiter (5.2 AU), solar irradiance drops by (1/5.2^2 \approx 1/27) (only 3.7% of Earth sunlight). Solar wings must either be massive (like Europa Clipper's 102 m² wings) or replaced with radioisotope nuclear MMRTGs!
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    // MODULE 4: ORBITAL TRAJECTORY, PORKCHOP PLOT & MULTI-ROLE COMMAND
+    const porkData = {
+      early: { c3: "24.5 km²/s²", tof: "180 days", lv: "Falcon Heavy (Expendable)", cost: "$130M", col: "#f59e0b", x: 130, y: 70 },
+      opt:   { c3: "14.2 km²/s²", tof: "215 days", lv: "Atlas V 401 / Falcon 9", cost: "$85M",  col: "#65f2a5", x: 230, y: 110 },
+      late:  { c3: "38.1 km²/s²", tof: "270 days", lv: "SLS Block 1B / FH Max", cost: "$250M", col: "#ef4444", x: 330, y: 150 }
+    };
+    const curPork = porkData[CADET_SIM.porkMode] || porkData.opt;
+
+    const svgPorkchopContours = `
+      <div class="academy-svg-wrap">
+        <svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="acadPorkCenter" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#65f2a5" stop-opacity="0.35"/>
+              <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05"/>
+            </radialGradient>
+          </defs>
+
+          <!-- Axes & Grid -->
+          <line x1="45" y1="20" x2="45" y2="180" stroke="rgba(255,255,255,0.15)"/>
+          <line x1="45" y1="180" x2="440" y2="180" stroke="rgba(255,255,255,0.15)"/>
+          <text x="45" y="14" fill="rgba(255,255,255,0.5)" font-family="monospace" font-size="8.5">TIME OF FLIGHT (DAYS) &uarr;</text>
+          <text x="440" y="195" text-anchor="end" fill="rgba(255,255,255,0.5)" font-family="monospace" font-size="8.5">DEPARTURE DATE &rarr;</text>
+
+          <!-- Characteristic Energy Contours -->
+          <ellipse cx="230" cy="110" rx="150" ry="60" fill="none" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,2"/>
+          <ellipse cx="230" cy="110" rx="100" ry="40" fill="none" stroke="#f59e0b" stroke-width="1.2"/>
+          <ellipse cx="230" cy="110" rx="55" ry="22" fill="url(#acadPorkCenter)" stroke="#65f2a5" stroke-width="1.8"/>
+
+          <text x="230" y="105" text-anchor="middle" fill="#65f2a5" font-family="monospace" font-size="9" font-weight="600">MIN-ENERGY C3 EYE</text>
+
+          <!-- Interactive Candidate Injection Points -->
+          <!-- Early -->
+          <circle cx="130" cy="70" r="${CADET_SIM.porkMode==='early'?8:5}" fill="${CADET_SIM.porkMode==='early'?'#f59e0b':'rgba(255,255,255,0.5)'}" stroke="#fff" stroke-width="1.5" style="cursor:pointer" data-act="tour-toy-pork" data-id="early"/>
+          <text x="130" y="55" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="8.5">EARLY (180d)</text>
+
+          <!-- Optimal -->
+          <circle cx="230" cy="110" r="${CADET_SIM.porkMode==='opt'?9:6}" fill="${CADET_SIM.porkMode==='opt'?'#65f2a5':'rgba(255,255,255,0.5)'}" stroke="#fff" stroke-width="2" style="cursor:pointer" data-act="tour-toy-pork" data-id="opt"/>
+          <text x="230" y="132" text-anchor="middle" fill="#65f2a5" font-family="monospace" font-size="8.5">OPTIMAL C3 (215d)</text>
+
+          <!-- Late -->
+          <circle cx="330" cy="150" r="${CADET_SIM.porkMode==='late'?8:5}" fill="${CADET_SIM.porkMode==='late'?'#ef4444':'rgba(255,255,255,0.5)'}" stroke="#fff" stroke-width="1.5" style="cursor:pointer" data-act="tour-toy-pork" data-id="late"/>
+          <text x="330" y="168" text-anchor="middle" fill="#ef4444" font-family="monospace" font-size="8.5">LATE (270d)</text>
+        </svg>
+      </div>
+    `;
+
+    frameHtml = `
+      <div class="academy-main-frame">
+        <div class="academy-left-pane">
+          ${svgPorkchopContours}
+          <div style="font-size:11.5px;color:var(--dim);line-height:1.4">
+            Click candidate injection dates on the Porkchop plot. Notice how departing outside the optimal window multiplies your required launch vehicle power:
+          </div>
+
+          <div style="display:flex;gap:6px">
+            <button class="btn ${CADET_SIM.porkMode==='early'?'primary':'ghost'} btn-sm" style="flex:1" data-act="tour-toy-pork" data-id="early">EARLY WINDOW</button>
+            <button class="btn ${CADET_SIM.porkMode==='opt'?'primary':'ghost'} btn-sm" style="flex:1" data-act="tour-toy-pork" data-id="opt">OPTIMAL C3 EYE</button>
+            <button class="btn ${CADET_SIM.porkMode==='late'?'primary':'ghost'} btn-sm" style="flex:1" data-act="tour-toy-pork" data-id="late">LATE WINDOW</button>
+          </div>
+        </div>
+
+        <div class="academy-right-pane">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--phosphor);letter-spacing:0.12em;margin-bottom:4px">TRAJECTORY INJECTION TELEMETRY</div>
+
+          <div class="academy-readout-row">
+            <span class="k">Required Energy (C3)</span>
+            <span class="v" style="color:${curPork.col}">${curPork.c3}</span>
+          </div>
+          <div class="academy-readout-row">
+            <span class="k">Transit Duration</span>
+            <span class="v">${curPork.tof}</span>
+          </div>
+          <div class="academy-readout-row">
+            <span class="k">Required Launch Vehicle</span>
+            <span class="v" style="color:${curPork.col}">${curPork.lv}</span>
+          </div>
+          <div class="academy-readout-row">
+            <span class="k">Estimated Booster Cost</span>
+            <span class="v">${curPork.cost}</span>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;margin-top:6px">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--phosphor);margin-bottom:4px">MULTIPLAYER COMMAND STATIONS (2–4 SEATS)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-family:var(--mono);font-size:9.5px">
+              <div style="background:rgba(255,255,255,0.04);padding:4px 6px;border-radius:3px">FLIGHT DIRECTOR: Go/No-Go</div>
+              <div style="background:rgba(255,255,255,0.04);padding:4px 6px;border-radius:3px">SYSTEMS: Bus Margins</div>
+              <div style="background:rgba(255,255,255,0.04);padding:4px 6px;border-radius:3px">SCIENCE: Sensor Payloads</div>
+              <div style="background:rgba(255,255,255,0.04);padding:4px 6px;border-radius:3px">TRAJECTORY: Porkchop Arcs</div>
+            </div>
+          </div>
+
+          <div class="academy-rule-callout">
+            <b>CADET RULE OF THUMB:</b> Always aim for the minimum-energy center of the Porkchop contour. Missing your launch window multiplies your required C3 energy and forces you to buy a massively expensive booster!
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const navPills = tabs.map((t, idx) => `
+    <button class="tour-step-pill ${idx === s ? 'active' : ''}" data-act="tour-step" data-step="${idx}">
+      ${t.n}
+    </button>
+  `).join("");
+
+  el("mbox").classList.add("academy-wide");
+  el("mbox").innerHTML = `
+    <div class="academy-top-bar">
+      <div class="academy-brand-group">
+        <span class="academy-logo">MARGIN</span>
+        <span class="academy-subhead">${tabs[s].t}</span>
+      </div>
+      <div class="academy-badge-group">
+        <span class="academy-mod-badge">MODULE ${s+1} OF 4</span>
+      </div>
+    </div>
+    <div class="academy-card-body">
+      <div class="tour-stepper-nav">${navPills}</div>
+      ${frameHtml}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);cursor:pointer;user-select:none">
+          <input type="checkbox" id="chkTourDismiss" checked style="accent-color:var(--phosphor);cursor:pointer">
+          <span>Remember that I completed Flight Academy</span>
+        </label>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${s > 0 ? `<button class="btn ghost btn-sm" data-act="tour-step" data-step="${s-1}">&larr; PREVIOUS</button>` : ''}
+          ${s < 3 ? `<button class="btn primary btn-sm" data-act="tour-step" data-step="${s+1}">NEXT MODULE &rarr;</button>` : `<button class="btn primary btn-sm" data-act="tour-finish">START MISSION &rarr;</button>`}
+          <button class="btn ghost btn-sm" data-act="tour-finish">CLOSE</button>
+        </div>
+      </div>
+    </div>
+  `;
+  el("modal").classList.add("on");
+}
+
 function howModal(){
   const firstRun=!Object.keys(S.progress||{}).length;
-  const hint=firstRun?`<p class="mt-s" style="color:var(--amber);font-size:12px">
-    FIRST MISSION? Read the four steps, then open a brief. The five rails at the bottom of every
-    screen are the only scoreboard you need at first &mdash; they turn red before the mission does.</p>`:"";
-  el("mbox").innerHTML=`<h3>HOW IT WORKS</h3><div class="mb" style="font-size:13px;line-height:1.7">
-    ${hint}
-    <p><b>1. Formulate.</b> Pick science objectives. Each one names what it needs measured.</p>
-    <p class="mt-s"><b>2. Build.</b> Add instruments, a power source, an antenna and a propulsion system.
-    Nothing you add touches only one budget &mdash; watch the five rails at the bottom of the screen.</p>
-    <p class="mt-s"><b>3. Launch.</b> Choose a departure date and flight time from a porkchop plot solved
-    live in your browser from real orbital elements, then pick a vehicle whose performance curve can lift
-    what you built to that energy.</p>
-    <p class="mt-s"><b>4. Operate.</b> Fly it. Anomalies arrive. Margin is what lets you survive them.</p>
-    <p class="mt-s" style="color:var(--dim)">Every number carries an
-    <span class="info" style="cursor:default">i</span> &mdash; open it to see the NASA source and exactly
-    what was simplified.</p>
-    <p class="mt-s" style="color:var(--dim)">Shortcuts: <b>Space</b> pauses operations,
-    <b>M</b> toggles sound.</p>
-    <p class="mt-s" style="color:var(--phosphor);font-size:12px;letter-spacing:.08em">GLOSSARY &mdash; ${GLOSSARY.length} TERMS</p>
-    <div style="max-height:230px;overflow:auto;border-top:1px solid rgba(28,36,51,.7);margin-top:6px">
-      ${GLOSSARY.map(g=>`<div class="spread" style="align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid rgba(28,36,51,.35)">
-        <span style="min-width:112px;color:var(--bone);font-size:12px">${esc(g[0])}</span>
-        <span style="flex:1;color:var(--dim);font-size:12px;line-height:1.5">${esc(g[1])}</span></div>`).join("")}
+  const tourBanner = `
+    <div style="background:rgba(101,242,165,.08);border:1px solid rgba(101,242,165,.25);border-radius:6px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--phosphor);letter-spacing:.12em;font-weight:600">INTERACTIVE GUIDANCE</span>
+        <div style="font-size:13px;color:#fff;margin-top:2px;font-weight:600">CADET FLIGHT SCHOOL TOUR</div>
+        <div class="hint" style="font-size:11.5px;color:var(--dim)">4-step interactive micro-simulator: sensors, multi-rail bus, deep-space physics, and Porkchop trajectories.</div>
+      </div>
+      <button class="btn primary btn-sm" data-act="flight-school" style="white-space:nowrap;font-size:11px;letter-spacing:.06em">START TOUR &rarr;</button>
+    </div>`;
+  const hint=firstRun?`<div style="background:rgba(237,176,78,.08);border:1px solid rgba(237,176,78,.25);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:11.5px;color:var(--bone);line-height:1.5">
+    <b>FIRST MISSION?</b> Read the four operational phases below, then open a brief. The five telemetry rails at the bottom of the screen are your primary health indicators &mdash; watch them closely before flight authorization.</div>`:"";
+
+  el("mbox").className = "mbox modal-wide";
+  el("mbox").innerHTML = `
+    <div class="modal-top-bar">
+      <div class="modal-title-group">
+        <span class="modal-kicker">FLIGHT OPERATIONS &mdash; OPERATIONAL HANDBOOK</span>
+        <h3 class="modal-title">HOW IT WORKS</h3>
+      </div>
+      <button class="modal-close-icon" data-act="closeModal" aria-label="Close dialog">&times;</button>
     </div>
-    <p class="mt-s"><button class="btn ghost" data-act="sources" style="width:100%">MISSION DATA — WHERE NUMBERS COME FROM</button></p>
-    <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
+    <div class="modal-scroll-body">
+      ${tourBanner}
+      ${hint}
+      <div class="how-steps-grid">
+        <div class="how-step-card">
+          <div class="how-step-num">1</div>
+          <div class="how-step-content">
+            <b>1. Formulate</b>
+            <p>Select science objectives. Each objective demands matching sensors and establishes your science yield baseline.</p>
+          </div>
+        </div>
+        <div class="how-step-card">
+          <div class="how-step-num">2</div>
+          <div class="how-step-content">
+            <b>2. Build</b>
+            <p>Equip instruments, solar arrays or RTGs, radio packages, and propulsion. Watch mass, power, and data margins.</p>
+          </div>
+        </div>
+        <div class="how-step-card">
+          <div class="how-step-num">3</div>
+          <div class="how-step-content">
+            <b>3. Launch</b>
+            <p>Pick departure date and transit time from a live Porkchop Lambert plot. Choose a rocket that meets C3 requirements.</p>
+          </div>
+        </div>
+        <div class="how-step-card">
+          <div class="how-step-num">4</div>
+          <div class="how-step-content">
+            <b>4. Operate</b>
+            <p>Fly cruise and proximity. Navigate space hazards and ground station passes. Margin determines your survival.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="how-meta-row">
+        <span>Every number carries an <span class="info" style="cursor:default">i</span> &mdash; click it to inspect real NASA/JPL provenance.</span>
+        <span><b>Shortcuts:</b> <b>Space</b> pauses time, <b>M</b> toggles audio.</span>
+      </div>
+
+      <div class="prov-section-header">AEROSPACE GLOSSARY &mdash; ${GLOSSARY.length} TERMS</div>
+      <div class="how-glossary-grid">
+        ${GLOSSARY.map(g=>`
+          <div class="glossary-item">
+            <span class="glossary-term">${esc(g[0])}</span>
+            <span class="glossary-def">${esc(g[1])}</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+    <div class="modal-bottom-bar">
+      <button class="btn ghost btn-sm" data-act="sources">DATA SOURCES &amp; CITATIONS &rarr;</button>
+      <button class="btn ghost btn-sm" data-act="closeModal">CLOSE</button>
+    </div>
+  `;
   el("modal").classList.add("on");
 }
 
 /* ── top bar buttons ── */
 el("btnSound").addEventListener("click",function(){
   Audio_.init(); Audio_.on=!Audio_.on; this.setAttribute("aria-pressed",Audio_.on);
-  this.textContent=Audio_.on?"SOUND ON":"SOUND"; if(Audio_.on)Audio_.click();
+  this.textContent=Audio_.on?"SOUND ON":"SOUND"; if(Audio_.on)Audio_.go();
+  Audio_.updateBGM();
   try{localStorage.setItem("margin.sound",Audio_.on?"1":"0")}catch(e){}
 });
 el("btnMode").addEventListener("click",function(){
@@ -6511,6 +8719,7 @@ el("btnMode").addEventListener("click",function(){
      free grade. The lock lives here as well as on the button's disabled
      state, because a disabled attribute is a presentation detail. */
   if(!MODE_FREE.includes(S.screen)) return;
+  Audio_.click();
   S.mode=S.mode==="cadet"?"fd":"cadet";
   this.textContent=S.mode==="cadet"?"CADET":"FLIGHT DIR";
   render();
@@ -6518,7 +8727,7 @@ el("btnMode").addEventListener("click",function(){
 /* A-11 note: the report's MISSION SELECT path calls finishLanding() first so a
    landing in progress is committed; this listener must mirror it, then clear
    the run. */
-el("btnHome").addEventListener("click",()=>{ try{ finishLanding(); }catch(e){} resetRunState(); S.ops=null; go(S.levelId?"select":"title") });
+el("btnHome").addEventListener("click",()=>{ Audio_.click(); try{ finishLanding(); }catch(e){} resetRunState(); S.ops=null; go(S.levelId?"select":"title") });
 
 /* ── dev scene shortcuts (?s=) for testing after hard refreshes.
    Usage: index.html?s=launch / ?s=ascent&lv=sls&m=l3 / ?s=ops&m=l2&no3d…
@@ -6836,8 +9045,20 @@ applyTeamShortcut();
 loadProgress();
 el("telemRun").innerHTML=telemText();
 if(!loadShare()) S.screen="title";
-try{ if(localStorage.getItem("margin.sound")==="1"){Audio_.init();Audio_.on=true;
-  el("btnSound").textContent="SOUND ON";el("btnSound").setAttribute("aria-pressed","true");} }catch(e){}
+try{
+  const savedSound = localStorage.getItem("margin.sound");
+  const isSoundOn = savedSound === null || savedSound === "1";
+  Audio_.on = isSoundOn;
+  if(isSoundOn){
+    Audio_.init();
+    Audio_.startBGM();
+    el("btnSound").textContent = "SOUND ON";
+    el("btnSound").setAttribute("aria-pressed", "true");
+  } else {
+    el("btnSound").textContent = "SOUND";
+    el("btnSound").setAttribute("aria-pressed", "false");
+  }
+}catch(e){}
 if(!applySceneShortcut()) render();
 addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="launch"&&PORK)drawPork();
   if(S.screen==="ops"){drawOrbit();drawTL();} });

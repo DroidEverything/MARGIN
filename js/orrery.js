@@ -34,7 +34,7 @@ import { AU_KM, J2000_JD, R_SUN_KM, BODIES, OBLIQUITY_DEG, MOONS, RINGS_KM, sani
 
 function AZ(){ try{ const A=globalThis.Astronomy; if(A&&typeof A.getHeliocentricState==='function') return A; }catch(e){} return null; }
 // J2000 anchor owned by js/constants.js (re-exported via solar-system-accuracy.js) — DERIVED.
-export const DPR_CAP=1.5;
+export const DPR_CAP=2.0;
 export const WORLD_PER_AU=1.35;
 export { AU_KM };
 export const UNITS_PER_KM=WORLD_PER_AU/AU_KM;
@@ -128,9 +128,9 @@ export const ORRERY_SETTINGS = {
 };
 
 export const BODY_STYLE = {
-  earth:   { tex:'earth',   tint:0xa8b8cc, spin:0.10,   tilt:0.4084, dist:1.35 },
-  moon:    { tex:'moon',    tint:0xffffff, spin:0.05,   dist:0.50 },
-  mars:    { tex:'mars',    tint:0xb8a89c, spin:0.0972, tilt:0.4398, dist:0.80 },
+  earth:   { tex:'earth',   tint:0xa8b8cc, spin:0.10,   tilt:0.4084, dist:2.08 },
+  moon:    { tex:'moon',    tint:0xffffff, spin:0.05,   dist:0.78 },
+  mars:    { tex:'mars',    tint:0xb8a89c, spin:0.0972, tilt:0.4398, dist:1.24 },
   bennu:   { spin:0.25,     dist:0.40 },
   jupiter: { tex:'jupiter', tint:0xcbb894, spin:0.2411, tilt:0.0541, dist:0 },
   europa:  { tex:'europa',  tint:0xf2ede4, spin:0.05,   tilt:-0.05, dist:0.45 },
@@ -163,9 +163,9 @@ export const BODY_STYLE = {
    - earthSpecularSSS is kept for provenance/verification only (see ASSET_SOURCES).
    Data maps must stay linear: loaded through dataTex(), never tex(). */
 export const BODY_TEX = {
-  earth:           'assets/textures/earth_day_sss.jpg',
-  earthNight:      'assets/textures/earth_night_sss.jpg',
-  earthClouds:     'assets/textures/earth_clouds_sss.png',
+  earth:           'models/8K_textures/earth/8k_earth_daymap.jpg',
+  earthNight:      'models/8K_textures/earth/8k_earth_nightmap.jpg',
+  earthClouds:     'models/8K_textures/earth/8k_earth_clouds.png',
   earthRough:      'assets/textures/earth_roughness_sss.jpg',
   moon:            'assets/textures/moon_8k.jpg',
   mars:            'models/8K_textures/8k_mars.jpg',
@@ -269,7 +269,7 @@ export function tex(key){
       try{ console.warn('[orrery] texture failed:', BODY_TEX[key]); }catch(e){}
     });
     TEX_CACHE[key].colorSpace=THREE.SRGBColorSpace;
-    TEX_CACHE[key].anisotropy=8; // grazing-angle sharpness (free with mipmaps; max useful ~16)
+    TEX_CACHE[key].anisotropy=16; // grazing-angle sharpness (max 16x anisotropic filtering)
   }
   return TEX_CACHE[key];
 }
@@ -285,7 +285,7 @@ export function dataTex(key){
       try{ console.warn('[orrery] data texture failed:', BODY_TEX[key]); }catch(e){}
     });
     t.colorSpace=THREE.NoColorSpace;
-    t.anisotropy=8;
+    t.anisotropy=16;
     DATA_CACHE[key]=t;
   }
   return DATA_CACHE[key];
@@ -674,15 +674,15 @@ export function createEarthMaterial(sunPosVec){
       .replace('#include <map_fragment>', `#include <map_fragment>
   float earthNdl = dot(normalize(vWNormal), normalize(sunPos - vWPos));
   float earthDayMix = smoothstep(-0.06, 0.12, earthNdl);
-  /* Display grading: rich ocean blue and land contrast */
+  /* Display grading: rich ocean blue, radiant daylight and land contrast */
   float earthLum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-  diffuseColor.rgb = mix(vec3(earthLum), diffuseColor.rgb, 1.12);
+  diffuseColor.rgb = mix(vec3(earthLum), diffuseColor.rgb, 1.15);
   // Soft ground shadow beneath dense clouds on the daylit side
   float earthCloud = texture2D(cloudTex, vMapUv).a;
-  diffuseColor.rgb *= (1.0 - earthCloud * 0.28 * earthDayMix);
+  diffuseColor.rgb *= (1.0 - earthCloud * 0.18 * earthDayMix);
   // Sunlit-iris trim (uniform is 1.0 everywhere except the ops view — see
   // userData.dayMeter). Day side only; the night hemisphere is untouched.
-  diffuseColor.rgb *= mix(1.0, uDayMeter, earthDayMix);
+  diffuseColor.rgb *= mix(1.0, uDayMeter * 1.18, earthDayMix);
   // On the night side, retain the natural Earth surface map at ~70% albedo so ambient starlight
   // gently reveals continents and oceans without artificial flat emissive blowout
   diffuseColor.rgb = mix(diffuseColor.rgb * 0.70, diffuseColor.rgb, earthDayMix);`)
@@ -738,9 +738,12 @@ export function sphereMesh(key,opts){
     });
   }
 
+  const isFocusPlanet = (key === 'earth' || key === 'mars' || key === 'moon' || key === 'venus' || key === 'jupiter' || key === 'mercury' || key === 'saturn');
   const geom = key === 'deimos'
     ? new THREE.SphereGeometry(Math.max(1e-9,r), 72, 48)
-    : new THREE.SphereGeometry(Math.max(1e-9,r), 56, 40);
+    : (isFocusPlanet
+      ? new THREE.SphereGeometry(Math.max(1e-9,r), 128, 96)
+      : new THREE.SphereGeometry(Math.max(1e-9,r), 56, 40));
   if (key === 'deimos') {
     /* Deimos is a smoother, distinctly non-spherical small body. This
        deterministic visual proxy preserves the mean-radius authority while
@@ -860,17 +863,19 @@ function ringMesh(innerR, outerR, kind){
    the Sun shades it like the surface (bright by day, dark by night). */
 export function createClouds(r){
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(r*1.012, 56, 40),
+    new THREE.SphereGeometry(r*1.008, 128, 96),
     new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: tex('earthClouds'),
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.90,
       roughness: 1.0,
       metalness: 0.0,
-      depthWrite: false
+      depthWrite: false,
+      depthTest: true
     })
   );
+  mesh.renderOrder = 2; // Renders strictly on top of opaque Earth ground
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   mesh.userData.noShadow = true; // clouds never join the shadow rig
@@ -884,7 +889,7 @@ export function createClouds(r){
    uniform per frame via applySunPosition(), so no view is ever hardwired. */
 function fresnelShell(r){
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(r*1.004,56,40),
+    new THREE.SphereGeometry(r*1.012, 64, 48),
     new THREE.ShaderMaterial({
       uniforms:{k:{value:0.7}, sunPos:{value:new THREE.Vector3(0,0,0)}},
       vertexShader:`
@@ -918,6 +923,7 @@ function fresnelShell(r){
       transparent:true, blending:THREE.AdditiveBlending, depthWrite:false
     })
   );
+  mesh.renderOrder = 3; // Renders on top of cloud layer
   mesh.material.userData.sunPos = mesh.material.uniforms.sunPos;
   mesh.userData.noShadow = true; // additive glow shell: never casts/receives
   return mesh;

@@ -58,8 +58,8 @@ function frameOffsets(dist, bodyRadius) {
   const hh = Math.max(1e-9, dist * t), hw = Math.max(1e-9, hh * V.camera.aspect);
   const r = (bodyRadius > 0 && isFinite(bodyRadius)) ? bodyRadius : 0;
   return [
-    Math.min(0.62, Math.max(0.12, 0.88 - r / hw)),
-    Math.min(0.55, Math.max(0.08, 0.88 - r / hh))
+    Math.min(0.58, Math.max(0.10, 0.84 - r / hw)),
+    Math.min(0.16, Math.max(-0.10, 0.45 - r / hh))
   ];
 }
 /* Rotate the camera AFTER lookAt(planet) so the planet lands at the requested
@@ -85,9 +85,9 @@ function vistaRadius(key) {
 }
 function vistaDist(key) {
   const r = vistaRadius(key);
-  if (isPhysicalMode()) return Math.max(frameDist(key), r * 6);
+  if (isPhysicalMode()) return Math.max(frameDist(key), r * 3.6);
   const style = Math.max(0.45, ((BODY_STYLE[key] || {}).dist || 1));
-  return r > 0 ? Math.min(style, r * 6) : style;
+  return r > 0 ? Math.min(style * 0.62, r * 3.6) : style * 0.62;
 }
 /* Camera placed on the same sun/terminator-aware approach direction that
    frameOf() chose, but at the VISTA distance — the target must own the frame,
@@ -182,6 +182,7 @@ function frame(now) {
       V.camera.near = nn; V.camera.far = ff; V.camera.updateProjectionMatrix();
     }
   }
+  updateBriefSunlightUI();
   if (V.renderer && V.scene) V.renderer.render(V.scene, V.camera);
 }
 
@@ -313,3 +314,87 @@ function debug() {
   return out;
 }
 try { sync(); } catch (e) {}
+
+
+const _uiSunPos = new THREE.Vector3();
+const _uiSunScr = new THREE.Vector3();
+let _briefSunCache = null;
+let _briefSunLastCollect = 0;
+
+function refreshBriefSunElements() {
+  const now = performance.now();
+  if (_briefSunCache && now - _briefSunLastCollect < 600) return _briefSunCache;
+  _briefSunLastCollect = now;
+  const list = [];
+  const targets = document.querySelectorAll('.briefwrap .obj, .orbit-card > div > div > div');
+  for (let i = 0; i < targets.length; i++) {
+    const el = targets[i];
+    const r = el.getBoundingClientRect();
+    if (r.width > 0) {
+      list.push({ el, cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+    }
+  }
+  _briefSunCache = list;
+  return list;
+}
+
+function updateBriefSunlightUI() {
+  if (!V.camera || !V.canvas) return;
+  const w = V.W || window.innerWidth;
+  const h = V.H || window.innerHeight;
+
+  if (V.bodies && V.bodies.sun) {
+    V.bodies.sun.getWorldPosition(_uiSunPos);
+  } else if (V.sunLight) {
+    _uiSunPos.copy(V.sunLight.position);
+  } else {
+    _uiSunPos.set(-100, 100, 50);
+  }
+
+  _uiSunScr.copy(_uiSunPos).project(V.camera);
+  const isFront = _uiSunScr.z <= 1.0;
+  let sunPx, sunPy;
+  if (isFront) {
+    sunPx = (_uiSunScr.x * 0.5 + 0.5) * w;
+    sunPy = (-_uiSunScr.y * 0.5 + 0.5) * h;
+  } else {
+    sunPx = (-_uiSunScr.x * 0.5 + 0.5) * w;
+    sunPy = (_uiSunScr.y * 0.5 + 0.5) * h;
+  }
+
+  const items = refreshBriefSunElements();
+  let firstPosX = 80, firstPosY = 20, firstNdx = -0.707, firstNdy = 0.707;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const dx = sunPx - item.cx;
+    const dy = sunPy - item.cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const ndx = dx / dist;
+    const ndy = dy / dist;
+
+    const posX = 50 + ndx * 55;
+    const posY = 50 + ndy * 55;
+
+    if (i === 0) {
+      firstPosX = posX; firstPosY = posY;
+      firstNdx = ndx; firstNdy = ndy;
+    }
+
+    if (item.lastPosX === undefined || Math.abs(posX - item.lastPosX) > 0.4 || Math.abs(posY - item.lastPosY) > 0.4) {
+      item.lastPosX = posX;
+      item.lastPosY = posY;
+      item.el.style.setProperty('--sun-pos-x', posX.toFixed(1) + '%');
+      item.el.style.setProperty('--sun-pos-y', posY.toFixed(1) + '%');
+      item.el.style.setProperty('--sun-dx', ndx.toFixed(3));
+      item.el.style.setProperty('--sun-dy', (-ndy).toFixed(3));
+      item.el.style.setProperty('--sun-intensity', '0.45');
+    }
+  }
+
+  const root = document.documentElement;
+  root.style.setProperty('--sun-pos-x', firstPosX.toFixed(1) + '%');
+  root.style.setProperty('--sun-pos-y', firstPosY.toFixed(1) + '%');
+  root.style.setProperty('--sun-dx', firstNdx.toFixed(3));
+  root.style.setProperty('--sun-dy', (-firstNdy).toFixed(3));
+  root.style.setProperty('--sun-intensity', '0.45');
+}

@@ -139,6 +139,7 @@ function frame() {
         M3D.controls.target.distanceTo(M3D.targetGoal) < 0.02) M3D.targetGoal = null;
   }
   M3D.controls.update();
+  updateBuildSunlightUI();
   M3D.renderer.render(M3D.scene, M3D.camera);
 }
 function stop() {
@@ -476,3 +477,79 @@ function describeSelection() {
 
 window.M3D = { sync, get ok() { return M3D.ok; }, describeSelection };
 init();
+
+
+const _v3SunPos = new THREE.Vector3(3, 4, 2);
+const _v3SunScr = new THREE.Vector3();
+let _v3ElementsCache = null;
+let _v3ElementsLastCollect = 0;
+
+function refreshBuildSunElements() {
+  const now = performance.now();
+  if (_v3ElementsCache && now - _v3ElementsLastCollect < 600) return _v3ElementsCache;
+  _v3ElementsLastCollect = now;
+  const list = [];
+  const targets = document.querySelectorAll('.bay-col .panel, .bay-payload .part, .bay-systems .part, .cat .part, .accordion-item');
+  for (let i = 0; i < targets.length; i++) {
+    const el = targets[i];
+    const r = el.getBoundingClientRect();
+    if (r.width > 0) {
+      list.push({ el, cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+    }
+  }
+  _v3ElementsCache = list;
+  return list;
+}
+
+function updateBuildSunlightUI() {
+  if (!M3D.camera || !M3D.canvas) return;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  _v3SunScr.copy(_v3SunPos).project(M3D.camera);
+  const isFront = _v3SunScr.z <= 1.0;
+  let sunPx, sunPy;
+  if (isFront) {
+    sunPx = (_v3SunScr.x * 0.5 + 0.5) * w;
+    sunPy = (-_v3SunScr.y * 0.5 + 0.5) * h;
+  } else {
+    sunPx = (-_v3SunScr.x * 0.5 + 0.5) * w;
+    sunPy = (_v3SunScr.y * 0.5 + 0.5) * h;
+  }
+
+  const items = refreshBuildSunElements();
+  let firstPosX = 75, firstPosY = 25, firstNdx = -0.707, firstNdy = 0.707;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const dx = sunPx - item.cx;
+    const dy = sunPy - item.cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const ndx = dx / dist;
+    const ndy = dy / dist;
+
+    const posX = 50 + ndx * 55;
+    const posY = 50 + ndy * 55;
+
+    if (i === 0) {
+      firstPosX = posX; firstPosY = posY;
+      firstNdx = ndx; firstNdy = ndy;
+    }
+
+    if (item.lastPosX === undefined || Math.abs(posX - item.lastPosX) > 0.4 || Math.abs(posY - item.lastPosY) > 0.4) {
+      item.lastPosX = posX;
+      item.lastPosY = posY;
+      item.el.style.setProperty('--sun-pos-x', posX.toFixed(1) + '%');
+      item.el.style.setProperty('--sun-pos-y', posY.toFixed(1) + '%');
+      item.el.style.setProperty('--sun-dx', ndx.toFixed(3));
+      item.el.style.setProperty('--sun-dy', (-ndy).toFixed(3));
+      item.el.style.setProperty('--sun-intensity', '0.8');
+    }
+  }
+
+  const root = document.documentElement;
+  root.style.setProperty('--sun-pos-x', firstPosX.toFixed(1) + '%');
+  root.style.setProperty('--sun-pos-y', firstPosY.toFixed(1) + '%');
+  root.style.setProperty('--sun-dx', firstNdx.toFixed(3));
+  root.style.setProperty('--sun-dy', (-firstNdy).toFixed(3));
+  root.style.setProperty('--sun-intensity', '0.8');
+}

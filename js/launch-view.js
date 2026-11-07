@@ -23,6 +23,14 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/DRACOLoader.js';
 import { LAUNCH_ANIM } from './launch-anim-data.js';
+import {
+  NASA_LAUNCH_ROAR_B64,
+  NASA_STAGING_BOOSTER_B64,
+  NASA_STAGING_STAGE1_B64,
+  NASA_STAGING_FAIRING_B64,
+  NASA_STAGING_PAYLOAD_B64,
+  NASA_STAGING_THUMP_B64
+} from './launch-audio-data.js?v=20261107_v3';
 import { STAR_VEC, STAR_MAG, STAR_BV } from './stars-data.js'; // HYG v4.0 (leaf module, zero deps)
 import { helioKm, bvColor } from './orrery.js'; // P3: common astronomy authority (body states + B-V bins)
 import { J2000_JD } from './solar-system-accuracy.js'; // P3: single-owner epoch anchor (leaf module, zero deps)
@@ -166,6 +174,8 @@ const _hLA = new THREE.Vector3(), _hLB = new THREE.Vector3();
 /* Shared Draco setup (same pattern as js/kit-assembly.js — the pad GLBs are
    Draco-compressed and fail without it). */
 let _envDraco = null;
+const _GLTF_CACHE = new Map();
+
 function envGltfLoader() {
   const l = new GLTFLoader();
   try {
@@ -175,6 +185,33 @@ function envGltfLoader() {
     }
     l.setDRACOLoader(_envDraco);
   } catch (e) {}
+
+  // In-memory caching wrapper: parses once, returns cloned scenes on subsequent loads
+  const rawLoad = l.load.bind(l);
+  l.load = function(url, onLoad, onProgress, onError) {
+    if (_GLTF_CACHE.has(url)) {
+      const cached = _GLTF_CACHE.get(url);
+      const cloned = {
+        ...cached,
+        scene: cached.scene ? cached.scene.clone(true) : null,
+        scenes: cached.scenes ? cached.scenes.map(s => s.clone(true)) : []
+      };
+      // Deliver cached clone immediately so models render synchronously without delay or flash
+      if (onLoad) onLoad(cloned);
+      return;
+    }
+    rawLoad(url, (gltf) => {
+      try {
+        _GLTF_CACHE.set(url, {
+          ...gltf,
+          scene: gltf.scene ? gltf.scene.clone(true) : null,
+          scenes: gltf.scenes ? gltf.scenes.map(s => s.clone(true)) : []
+        });
+      } catch (err) {}
+      if (onLoad) onLoad(gltf);
+    }, onProgress, onError);
+  };
+
   return l;
 }
 
@@ -523,12 +560,12 @@ function bakeEnvProbe() {
     skyGeo.setAttribute('color', new THREE.BufferAttribute(cc, 3));
     probe.add(new THREE.Mesh(skyGeo, skyMat));
     const panelMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    panelMat.color.setRGB(6, 5.2, 4.2);
+    panelMat.color.setRGB(2.5, 2.7, 3.0); // Neutral balanced daylight / sky fill
     const p1 = new THREE.Mesh(new THREE.PlaneGeometry(20, 10), panelMat);
     p1.position.set(18, 22, 8); p1.lookAt(0, 0, 0);
     probe.add(p1);
     const panelMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    panelMat2.color.setRGB(1.2, 1.6, 2.2);
+    panelMat2.color.setRGB(1.2, 1.4, 1.8); // Cool atmospheric fill
     const p2 = new THREE.Mesh(new THREE.PlaneGeometry(24, 8), panelMat2);
     p2.position.set(-20, 10, -14); p2.lookAt(0, 0, 0);
     probe.add(p2);
@@ -546,16 +583,18 @@ function bakeEnvProbe() {
 }
 /* Hard dot sprite (lamp/facility points): round soft dot — PointsMaterial
    without a map rasterizes as squares (the floating-tablet artifact). */
-/* Phase A step 2: PBR paint table. roughness = scalar (tile mean 0.88 brings
-   the product to the target mean). env intensity lerps night→day. */
+/* Phase A step 2: PBR paint table. Real painted rocket tanks are dielectrics
+   (m = 0.0), with sleek aerospace gloss/semi-gloss polyurethane clearcoat (r = 0.26-0.30).
+   Metalness = 0 ensures crisp, clean specular highlights and clearcoat reflections
+   without artificial colored metallic/plastic tinting. */
 const PAINT = {
-  core: { m: 0, r: 0.48, env: [0.5, 1.0], ns: 0.25 },
-  fairing: { m: 0, r: 0.43, env: [0.5, 1.0], ns: 0.25 },
-  interstage: { m: 0.15, r: 0.80, env: [0.5, 0.8], ns: 0.35 },
-  srb: { m: 0, r: 0.57, env: [0.5, 1.0], ns: 0.20 },
-  steel: { m: 0.7, r: 0.62, env: [0.6, 1.0], ns: 0 },
-  darkMetal: { m: 0.8, r: 0.51, env: [0.6, 1.0], ns: 0 },
-  nozzle: { m: 0.9, r: 0.40, env: [0.6, 1.0], ns: 0 },
+  core: { m: 0.0, r: 0.28, env: [0.45, 0.90], ns: 0.35 },
+  fairing: { m: 0.0, r: 0.26, env: [0.45, 0.90], ns: 0.30 },
+  interstage: { m: 0.05, r: 0.82, env: [0.20, 0.50], ns: 0.40 },
+  srb: { m: 0.0, r: 0.38, env: [0.35, 0.80], ns: 0.25 },
+  steel: { m: 0.7, r: 0.55, env: [0.5, 0.9], ns: 0 },
+  darkMetal: { m: 0.8, r: 0.48, env: [0.5, 0.9], ns: 0 },
+  nozzle: { m: 0.9, r: 0.35, env: [0.5, 0.9], ns: 0 },
   gold: { m: 0.9, r: 0.32, env: [0.6, 1.0], ns: 0.6 }
 };
 function applyPaintPBR(mat, kind, normalTex) {
@@ -577,39 +616,83 @@ function applyPaintPBR(mat, kind, normalTex) {
   } catch (e) {}
   return mat;
 }
-/* 128×256 normal map derived from the same seam layout as the diffuse skin,
-   so grooves align. Groove = -X tilt at vertical seams + -Y at weld rings. */
+/* Tangent-space Sobel normal map derived from structure height canvas,
+   providing authentic friction-stir welds, stringers, and rivet relief. */
 const _paintNormals = {};
 function paintNormalTex(kind) {
   try {
     if (_paintNormals[kind]) return _paintNormals[kind];
-    const W = 128, H = 256;
+    const W = 256, H = 512;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const ctx = c.getContext('2d');
-    const img = ctx.createImageData(W, H);
-    const strength = kind === 'interstage' ? 3.0 : kind === 'gold' ? 5.0 : 2.0;
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, W, H);
+
+    if (kind === 'interstage') {
+      // Carbon-fiber composite waffle / grid weave pattern
+      ctx.fillStyle = '#929292';
+      for (let x = 0; x < W; x += 12) ctx.fillRect(x, 0, 2, H);
+      for (let y = 0; y < H; y += 12) ctx.fillRect(0, y, W, 2);
+    } else if (kind === 'gold') {
+      // MLI insulation crinkle
+      const img = ctx.createImageData(W, H);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const v = 128 + Math.round((hash2(x * 0.7, y * 0.9) - 0.5) * 80);
+          const i = (y * W + x) * 4;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+          img.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+    } else {
+      // Longitudinal stringer corrugation (32 ribs)
+      const stringers = 32;
+      ctx.fillStyle = '#949494';
+      for (let i = 0; i < stringers; i++) {
+        ctx.fillRect(Math.floor((i / stringers) * W), 0, 2, H);
+      }
+      // Circumferential friction-stir weld seams (6 barrel joints)
+      const welds = [0.12, 0.26, 0.42, 0.58, 0.74, 0.90];
+      for (const wy of welds) {
+        const y = Math.floor(wy * H);
+        ctx.fillStyle = '#666666'; ctx.fillRect(0, y - 1, W, 3); // groove
+        ctx.fillStyle = '#a6a6a6'; ctx.fillRect(0, y, W, 1);     // weld bead crown
+        // Fasteners / rivet rows
+        ctx.fillStyle = '#b4b4b4';
+        for (let x = 4; x < W; x += 14) {
+          ctx.fillRect(x, y - 4, 1.5, 1.5);
+          ctx.fillRect(x, y + 4, 1.5, 1.5);
+        }
+      }
+      // Cable raceway channel relief step at x ≈ W * 0.25
+      const rx = Math.floor(W * 0.25);
+      ctx.fillStyle = '#9e9e9e'; ctx.fillRect(rx - 4, 0, 8, H);
+      ctx.fillStyle = '#626262'; ctx.fillRect(rx - 5, 0, 1, H); ctx.fillRect(rx + 4, 0, 1, H);
+    }
+
+    // Sobel height -> tangent-space normal map
+    const sd = ctx.getImageData(0, 0, W, H).data;
+    const out = document.createElement('canvas'); out.width = W; out.height = H;
+    const og = out.getContext('2d'); const od = og.createImageData(W, H);
+    const strength = kind === 'interstage' ? 2.5 : kind === 'gold' ? 3.5 : 1.8;
+    const getH = (x, y) => sd[(((y + H) % H) * W + ((x + W) % W)) * 4] / 255;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        let dx = 0, dy = 0;
-        const sx = x % 32, sy = (y + 24) % 64;
-        if (sx < 2) dx = -(2 - sx) * strength;
-        else if (sx > 29) dx = (sx - 29) * strength;
-        if (sy < 2) dy = -(2 - sy) * strength;
-        if (kind === 'gold') {
-          dx += (hash2(x * 0.7, y * 0.9) - 0.5) * 4;
-          dy += (hash2(x * 1.3, y * 0.4) - 0.5) * 4;
-        }
-        const nx = Math.max(-1, Math.min(1, dx / 8));
-        const ny = Math.max(-1, Math.min(1, dy / 8));
+        const dx = (getH(x + 1, y) - getH(x - 1, y)) * strength;
+        const dy = (getH(x, y + 1) - getH(x, y - 1)) * strength;
+        const l = Math.hypot(dx, dy, 1.0);
         const i = (y * W + x) * 4;
-        img.data[i] = Math.round((nx * 0.5 + 0.5) * 255);
-        img.data[i + 1] = Math.round((ny * 0.5 + 0.5) * 255);
-        img.data[i + 2] = 255; img.data[i + 3] = 255;
+        od.data[i]     = Math.round((-dx / l * 0.5 + 0.5) * 255);
+        od.data[i + 1] = Math.round((dy / l * 0.5 + 0.5) * 255);
+        od.data[i + 2] = Math.round((1.0 / l * 0.5 + 0.5) * 255);
+        od.data[i + 3] = 255;
       }
     }
-    ctx.putImageData(img, 0, 0);
-    const t = new THREE.CanvasTexture(c);
+    og.putImageData(od, 0, 0);
+    const t = new THREE.CanvasTexture(out);
+    t.colorSpace = THREE.NoColorSpace;
     t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
     t.needsUpdate = true;
     _paintNormals[kind] = t;
@@ -638,21 +721,29 @@ function applyGlbEnv(root) {
    Annulus under the GLB (overlap 1.5u, y groundY-0.03) — never coplanar, so no
    z-fight and no polygonOffset needed on the base. GLB-fail fallback is a full
    disc (rIn=0) with a concrete apron tint r<6. +X=East/+Z=North site frame. */
-function buildSiteGround(Rglb, groundY, glbOk) {
+function buildSiteGround(Rglb, groundY, glbOk, ctx) {
+  /* ctx (optional) = { scene, sun, envTex, env, siteGround }: lets the
+     launch-screen preview reuse this exact site assembly. Omitted → the
+     cinematic's V state, pixel-identical to before. */
+  const scene = ctx ? ctx.scene : V.scene;
+  const sun = ctx ? ctx.sun : V.sun;
+  const envTex = ctx ? ctx.envTex : V._envTex;
+  const envList = ctx ? ctx.env : V.env;
+  const prevGround = ctx ? ctx.siteGround : V._siteGround;
   try {
-    if (V._siteGround) {
-      if (V._siteGround.parent) V._siteGround.parent.remove(V._siteGround);
-      V._siteGround.traverse(o => {
+    if (prevGround) {
+      if (prevGround.parent) prevGround.parent.remove(prevGround);
+      prevGround.traverse(o => {
         if (o.isMesh) {
           if (o.geometry) o.geometry.dispose();
           if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
         }
       });
-      V._siteGround = null;
+      if (ctx) ctx.siteGround = null; else V._siteGround = null;
     }
     const grp = new THREE.Group();
     grp.name = 'site_ground';
-    const dayF = (V.sun && isFinite(V.sun.dayF)) ? V.sun.dayF : 0;
+    const dayF = (sun && isFinite(sun.dayF)) ? sun.dayF : 0;
     const dimK = dayF > 0.001 ? 1 : 0.8;
     const grain = makeGroundGrain();
     const rIn = glbOk ? Math.max(0.5, Rglb - 1.5) : 0;
@@ -678,19 +769,36 @@ function buildSiteGround(Rglb, groundY, glbOk) {
     }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: grain, roughness: 0.95, metalness: 0 });
-    if (V._envTex) { m.envMap = V._envTex; m.envMapIntensity = dayF > 0.001 ? 0.35 : 0.2; }
+    if (envTex) { m.envMap = envTex; m.envMapIntensity = dayF > 0.001 ? 0.35 : 0.2; }
     const mesh = new THREE.Mesh(g, m);
     mesh.position.y = groundY - 0.03;
     mesh.receiveShadow = true;
     grp.add(mesh);
     // Concrete apron skirt (refs: beige pad + crawlerway fan extends well past
-    // the deck). Band from the GLB overlap out +28 u, above the grass ring.
+    // the deck). Faded outer boundary so the concrete apron blends smoothly into
+    // the marsh terrain without a sharp circular spotlight disk artifact.
     try {
       const skIn = glbOk ? Math.max(0.5, Rglb - 1.5) : 5;
-      const skg = new THREE.RingGeometry(skIn, skIn + 28, 64, 1);
+      const skRMax = skIn + 32;
+      const skg = new THREE.RingGeometry(skIn, skRMax, 64, 8);
       skg.rotateX(-Math.PI / 2);
-      const skm = new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 0.95, metalness: 0 });
-      if (V._envTex) { skm.envMap = V._envTex; skm.envMapIntensity = dayF > 0.001 ? 0.35 : 0.2; }
+      const skPos = skg.attributes.position;
+      const skCol = new Float32Array(skPos.count * 3);
+      const cConc = new THREE.Color(0x9a968c);
+      const cGrass = new THREE.Color(0x557d3a);
+      const cV = new THREE.Color();
+      for (let i = 0; i < skPos.count; i++) {
+        const x = skPos.getX(i), z = skPos.getZ(i);
+        const r = Math.hypot(x, z);
+        // Soft radial blend from concrete to grass between skIn+14 and skRMax
+        const fade = THREE.MathUtils.smoothstep(r, skIn + 14, skRMax);
+        cV.copy(cConc).lerp(cGrass, fade * 0.88);
+        cV.multiplyScalar(dimK);
+        skCol[i * 3] = cV.r; skCol[i * 3 + 1] = cV.g; skCol[i * 3 + 2] = cV.b;
+      }
+      skg.setAttribute('color', new THREE.BufferAttribute(skCol, 3));
+      const skm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+      if (envTex) { skm.envMap = envTex; skm.envMapIntensity = dayF > 0.001 ? 0.35 : 0.2; }
       const sk = new THREE.Mesh(skg, skm);
       sk.position.y = groundY - 0.02;
       sk.receiveShadow = true;
@@ -702,7 +810,7 @@ function buildSiteGround(Rglb, groundY, glbOk) {
     try {
       const wm = new THREE.MeshStandardMaterial({
         color: dayF > 0.001 ? 0x2e4a52 : 0x0a1418, roughness: 0.12, metalness: 0 });
-      if (V._envTex) { wm.envMap = V._envTex; wm.envMapIntensity = dayF > 0.001 ? 0.8 : 0.2; }
+      if (envTex) { wm.envMap = envTex; wm.envMapIntensity = dayF > 0.001 ? 0.8 : 0.2; }
       for (let bi = 0; bi < 12; bi++) {
         let bearing = (hash2(bi * 3.1, 7.7) * 360 + 360) % 360;
         if (bearing > 15 && bearing < 165) bearing += 180; // out of the ocean sector
@@ -728,7 +836,7 @@ function buildSiteGround(Rglb, groundY, glbOk) {
       const om = new THREE.MeshStandardMaterial({
         color: dayF > 0.001 ? 0x1d4a68 : 0x02060c, roughness: 0.15, metalness: 0
       });
-      if (V._envTex) { om.envMap = V._envTex; om.envMapIntensity = dayF > 0.001 ? 1.0 : 0.2; }
+      if (envTex) { om.envMap = envTex; om.envMapIntensity = dayF > 0.001 ? 1.0 : 0.2; }
       const ocean = new THREE.Mesh(og, om);
       ocean.position.y = groundY - 0.1;
       ocean.receiveShadow = true;
@@ -795,10 +903,9 @@ function buildSiteGround(Rglb, groundY, glbOk) {
         grp.add(mk);
       }
     } catch (e) {}
-    V.scene.add(grp);
-    V.env.push(grp);
-    V._siteGround = grp;
-    V._siteGroundY = groundY;
+    scene.add(grp);
+    envList.push(grp);
+    if (ctx) ctx.siteGround = grp; else { V._siteGround = grp; V._siteGroundY = groundY; }
   } catch (e) {}
 }
 /* Measure the GLB ground (env_concrete) → {R, groundY}. Falls back to plan
@@ -820,13 +927,18 @@ function measureGlbGround(g) {
 }
 /* Phase A step 4: lamp housings at LAMP_HEADS. Dark metal body + lip + emissive
    4×3-cell lens facing the matching spot target. Spots themselves unchanged. */
-function buildLampHousings() {
-  if (V._lampHousings || !V.scene) return V._lampHousings;
+function buildLampHousings(ctx) {
+  /* ctx (optional) = { scene, envTex, env, lampHousings, get } — preview reuse. */
+  const scene = ctx ? ctx.scene : V.scene;
+  const envTex = ctx ? ctx.envTex : V._envTex;
+  const envList = ctx ? ctx.env : V.env;
+  const prev = ctx ? ctx.lampHousings : V._lampHousings;
+  if (prev || !scene) return prev;
   try {
     const G = new THREE.Group();
     G.name = 'lamp_housings';
     const metal = new THREE.MeshStandardMaterial({ color: 0x1a1f27, metalness: 0.8, roughness: 0.45 });
-    if (V._envTex) { metal.envMap = V._envTex; metal.envMapIntensity = 0.6; }
+    if (envTex) { metal.envMap = envTex; metal.envMapIntensity = 0.6; }
     const bodyG = new THREE.BoxGeometry(0.22, 0.14, 0.10);
     const lipG = new THREE.BoxGeometry(0.235, 0.155, 0.018);
     const lensG = new THREE.PlaneGeometry(0.19, 0.11);
@@ -850,13 +962,24 @@ function buildLampHousings() {
       const le = new THREE.Mesh(lensG, lensMat);
       le.position.z = 0.0515;
       h.add(b); h.add(l); h.add(le);
+      // The floodlight beam is visible without a readable source. Add a
+      // camera-facing source bloom at the lens so the fixture reads as lit,
+      // not merely as an invisible volumetric emitter.
+      const bloomMat = new THREE.SpriteMaterial({color: d.col, map: getDotTex(),
+        transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending,
+        depthWrite: false, depthTest: true, fog: true});
+      const bloom = new THREE.Sprite(bloomMat);
+      bloom.position.z = 0.062;
+      bloom.scale.set(0.46, 0.46, 1);
+      bloom.renderOrder = 4;
+      h.add(bloom);
       tv.set(d.tgt[0], d.tgt[1], d.tgt[2]);
       h.lookAt(tv); // lens +Z faces the target
       G.add(h);
     }
-    V.scene.add(G);
-    V.env.push(G);
-    V._lampHousings = G;
+    scene.add(G);
+    envList.push(G);
+    if (ctx) ctx.lampHousings = G; else V._lampHousings = G;
     return G;
   } catch (e) { return null; }
 }
@@ -875,61 +998,160 @@ function getDotTex() {
   return V._dotTex;
 }
 
-function createRocketSkinTexture(type = 'core') {
+function createRocketSkinTexture(type = 'core', lvId = null) {
+  const id = lvId || (typeof V !== 'undefined' && V.lvId) || 'f9';
+  const isFalcon = id === 'f9' || id === 'fhr' || id === 'fhe';
+  const isSLS = id === 'sls';
+  const isSaturn = id === 'saturn5';
+
+  const W = 512, H = 1024;
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 512;
+  c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  // Base off-white aerospace thermal tile / paint
-  ctx.fillStyle = type === 'interstage' ? '#2c333d' : '#e7ecf2';
-  ctx.fillRect(0, 0, 256, 512);
 
-  // Vertical panel seams
-  ctx.strokeStyle = type === 'interstage' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < 256; x += 32) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
-  }
-
-  // Horizontal weld rings and stage bands
-  for (let y = 40; y < 512; y += 64) {
-    ctx.strokeStyle = type === 'interstage' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.12)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke();
-  }
-
-  if (type === 'core') {
-    // Black & white roll pattern band near top of stage
-    ctx.fillStyle = '#1c222a';
-    ctx.fillRect(0, 80, 128, 28);
-    ctx.fillRect(128, 108, 128, 28);
-    // American Flag / NASA Worm accent bar
-    ctx.fillStyle = '#b92a2a';
-    ctx.fillRect(70, 200, 116, 6);
-    ctx.fillStyle = '#1e3c72';
-    ctx.fillRect(70, 208, 116, 6);
-  } else if (type === 'interstage') {
-    // Interstage grid stiffeners / ventilation ports
-    ctx.fillStyle = '#14181f';
-    for (let x = 8; x < 256; x += 24) {
-      for (let y = 16; y < 496; y += 32) {
-        ctx.fillRect(x, y, 12, 18);
-      }
+  if (type === 'interstage') {
+    // Interstage: dark unpainted carbon-fiber composite with fine weave pattern
+    ctx.fillStyle = '#181b20';
+    ctx.fillRect(0, 0, W, H);
+    // Carbon weave grid
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 8) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 8) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // Structural separation collar bands
+    ctx.fillStyle = '#101216';
+    ctx.fillRect(0, 0, W, 24);
+    ctx.fillRect(0, H - 24, W, 24);
+    // Staging pneumatic separation pushers and brackets
+    ctx.fillStyle = '#2c323b';
+    for (let x = 32; x < W; x += 64) {
+      ctx.fillRect(x, 36, 18, 30);
     }
   } else if (type === 'fairing') {
-    // Fairing split line (subtle vertical seam)
-    ctx.strokeStyle = 'rgba(180, 50, 40, 0.4)';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(128, 0); ctx.lineTo(128, 512); ctx.stroke();
-    // Payload Acoustic tile pattern
-    ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+    // Fairing: satin white thermal barrier coating
+    ctx.fillStyle = '#f4f6f9';
+    ctx.fillRect(0, 0, W, H);
+    // Vertical split-line seams (half shells)
+    ctx.strokeStyle = 'rgba(180, 40, 30, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(W * 0.25, 0); ctx.lineTo(W * 0.25, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W * 0.75, 0); ctx.lineTo(W * 0.75, H); ctx.stroke();
+    // Acoustic blanket grid inside
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.03)';
     ctx.lineWidth = 1;
-    for (let y = 0; y < 512; y += 16) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke();
+    for (let y = 0; y < H; y += 32) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // Fairing logo accent
+    ctx.fillStyle = '#1e3c72';
+    ctx.fillRect(W * 0.5 - 24, H * 0.45, 48, 8);
+    ctx.fillStyle = '#b92a2a';
+    ctx.fillRect(W * 0.5 - 24, H * 0.45 + 10, 48, 4);
+  } else {
+    // Stage 1 / Core Stage:
+    if (isSLS) {
+      // SLS SOFI spray-on foam insulation: warm orange-ochre with textured cells
+      ctx.fillStyle = '#c76126';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(170, 75, 25, 0.25)';
+      for (let y = 0; y < H; y += 6) {
+        if (Math.sin(y * 0.1) > 0) ctx.fillRect(0, y, W, 3);
+      }
+      ctx.fillStyle = 'rgba(215, 115, 45, 0.15)';
+      for (let x = 0; x < W; x += 16) ctx.fillRect(x, 0, 4, H);
+      // Circumferential barrel weld bands
+      for (const wy of [0.2, 0.4, 0.6, 0.8]) {
+        ctx.fillStyle = 'rgba(90, 40, 15, 0.35)';
+        ctx.fillRect(0, Math.floor(wy * H), W, 4);
+      }
+    } else if (isSaturn) {
+      // Saturn V authentic Apollo black-and-white roll pattern
+      ctx.fillStyle = '#f2f4f7';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#1c2026';
+      ctx.fillRect(0, 0, W * 0.5, H * 0.28);
+      ctx.fillRect(W * 0.5, H * 0.28, W * 0.5, H * 0.28);
+      ctx.fillRect(0, H * 0.72, W * 0.5, H * 0.14);
+      ctx.fillRect(W * 0.5, H * 0.86, W * 0.5, H * 0.14);
+      // UNITED STATES lettering
+      ctx.fillStyle = '#1c2026';
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText('UNITED STATES', W * 0.08, H * 0.60);
+    } else {
+      // Falcon 9 / Falcon Heavy: Clean aerospace satin white
+      ctx.fillStyle = '#f4f6f9';
+      ctx.fillRect(0, 0, W, H);
+
+      // Fine longitudinal stringer corrugation
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.03)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 16) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+
+      // Horizontal friction-stir weld seams (6 barrel sections)
+      const welds = [0.12, 0.26, 0.42, 0.58, 0.74, 0.90];
+      for (const wy of welds) {
+        const y = Math.floor(wy * H);
+        ctx.fillStyle = 'rgba(235, 238, 244, 0.75)';
+        ctx.fillRect(0, y - 3, W, 6); // heat-affected zone
+        ctx.strokeStyle = 'rgba(30, 40, 55, 0.16)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+
+      // Dark cable raceway conduit channel (iconic Falcon side conduit)
+      const rx = Math.floor(W * 0.25);
+      ctx.fillStyle = '#1a1d22';
+      ctx.fillRect(rx - 6, 0, 12, H);
+      ctx.fillStyle = '#282d36';
+      ctx.fillRect(rx - 4, 0, 8, H);
+      // Aerodynamic raceway fairing cap at top
+      ctx.fillStyle = '#1a1d22';
+      ctx.beginPath();
+      ctx.moveTo(rx - 6, 30); ctx.lineTo(rx, 8); ctx.lineTo(rx + 6, 30); ctx.fill();
+
+      // Aft engine boattail / thermal blanket heatshield band at base
+      ctx.fillStyle = '#16191f';
+      ctx.fillRect(0, H - 32, W, 32);
+      ctx.fillStyle = '#343a46';
+      ctx.fillRect(0, H - 34, W, 2);
+
+      // Authentic aerospace stencils:
+      // American Flag stencil near upper section
+      const fx = W * 0.5 - 24, fy = H * 0.22, fw = 48, fh = 26;
+      for (let s = 0; s < 7; s++) {
+        ctx.fillStyle = s % 2 === 0 ? '#b22234' : '#ffffff';
+        ctx.fillRect(fx, fy + (s * fh) / 7, fw, fh / 7);
+      }
+      ctx.fillStyle = '#1e3c72';
+      ctx.fillRect(fx, fy, fw * 0.45, (fh * 4) / 7);
+
+      // NASA / FALCON insignia text
+      ctx.fillStyle = '#1c2026';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(id.startsWith('fh') ? 'FALCON HEAVY' : 'FALCON 9', W * 0.5 - 46, H * 0.28);
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText('UNITED STATES', W * 0.5 - 44, H * 0.31);
+
+      // Technical stencils & hazard placards
+      ctx.fillStyle = 'rgba(200, 80, 20, 0.85)';
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText('LOX VENT', W * 0.72, H * 0.16);
+      ctx.fillText('RP-1 FILL', W * 0.72, H * 0.65);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.fillText('RESCUE -->', W * 0.72, H * 0.20);
     }
   }
 
   const t = new THREE.CanvasTexture(c);
   tagSRGB(t);
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
 }
 
@@ -951,8 +1173,16 @@ function createFairingInsideTexture() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   PROCEDURAL SOUND SYNTHESIS (Zero audio assets, Web Audio API)
+   AUTHENTIC NASA LAUNCH ACOUSTICS & STAGING SFX (Web Audio API)
    ══════════════════════════════════════════════════════════════ */
+function base64ToArrayBuffer(b64) {
+  const bin = atob(b64);
+  const len = bin.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
 function initLaunchAudio() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -963,79 +1193,138 @@ function initLaunchAudio() {
       window.addEventListener('click', resume);
     }
     V.audio.ctx = ctx;
+    V.audio.active = true;
 
-    // 1. Low frequency engine rumble oscillator
-    const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(42, ctx.currentTime);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(140, ctx.currentTime);
+    // Master launch acoustic bus
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(1.0, ctx.currentTime);
+    masterGain.connect((window.Audio_ && window.Audio_.master) || ctx.destination);
+    V.audio.masterGain = masterGain;
 
-    const rumbleGain = ctx.createGain();
-    rumbleGain.gain.setValueAtTime(0.0001, ctx.currentTime);
-
-    osc.connect(filter);
-    filter.connect(rumbleGain);
-    rumbleGain.connect(ctx.destination);
-    osc.start();
-    V.audio.rumbleOsc = osc;
-    V.audio.rumbleGain = rumbleGain;
-
-    // 2. Filtered pink noise roar generator for engine exhaust
-    const bufferSize = ctx.sampleRate * 2;
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      b3 = 0.86650 * b3 + white * 0.3104856;
-      b4 = 0.55000 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.0168980;
-      output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
-      b6 = white * 0.115926;
-    }
-    const noiseSource = ctx.createBufferSource();
-    noiseSource.buffer = noiseBuffer;
-    noiseSource.loop = true;
-
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.setValueAtTime(450, ctx.currentTime);
+    // Dynamic atmospheric extinction filter: sweeps down as atmosphere thins
+    const atmoFilter = ctx.createBiquadFilter();
+    atmoFilter.type = 'lowpass';
+    atmoFilter.frequency.setValueAtTime(750, ctx.currentTime);
 
     const roarGain = ctx.createGain();
     roarGain.gain.setValueAtTime(0.0001, ctx.currentTime);
 
-    noiseSource.connect(noiseFilter);
-    noiseFilter.connect(roarGain);
-    roarGain.connect(ctx.destination);
-    noiseSource.start();
+    atmoFilter.connect(roarGain);
+    roarGain.connect(masterGain);
 
+    V.audio.atmoFilter = atmoFilter;
     V.audio.roarGain = roarGain;
+    V.audio._padAmbianceStopped = false;
+
+    // 100% Authentic NASA Saturn V Liftoff Acoustic Roar (launch_roar_loop.wav)
+    // Pure acoustic recording — zero programmatic oscillators, zero synthetic noise
+    const startRealRoar = (decoded) => {
+      V.audio.realLaunchBuffer = decoded;
+      if (!V.audio.realSource && V.audio.atmoFilter) {
+        const src = ctx.createBufferSource();
+        src.buffer = decoded;
+        src.loop = true;
+        src.connect(V.audio.atmoFilter);
+        src.start();
+        V.audio.realSource = src;
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.NASA_LAUNCH_ROAR_BUF) {
+      startRealRoar(window.NASA_LAUNCH_ROAR_BUF);
+    } else if (NASA_LAUNCH_ROAR_B64) {
+      try {
+        const rawBuf = base64ToArrayBuffer(NASA_LAUNCH_ROAR_B64);
+        ctx.decodeAudioData(rawBuf, (decoded) => {
+          if (typeof window !== 'undefined') window.NASA_LAUNCH_ROAR_BUF = decoded;
+          startRealRoar(decoded);
+        }, () => {});
+      } catch (e) {}
+    }
+
+    // Authentic aerospace separation audio buffers (distinct structural profile per event)
+    V.audio.stagingBuffers = (typeof window !== 'undefined' && window.NASA_STAGING_BUFFERS) ? window.NASA_STAGING_BUFFERS : {};
+
+    const decodeStagingB64 = (b64Key, targetKey) => {
+      if (V.audio.stagingBuffers[targetKey]) return;
+      try {
+        const raw = base64ToArrayBuffer(b64Key);
+        ctx.decodeAudioData(raw, (decoded) => {
+          V.audio.stagingBuffers[targetKey] = decoded;
+          if (typeof window !== 'undefined') {
+            window.NASA_STAGING_BUFFERS = window.NASA_STAGING_BUFFERS || {};
+            window.NASA_STAGING_BUFFERS[targetKey] = decoded;
+          }
+          if (targetKey === 'booster') V.audio.realStagingBuffer = decoded;
+        }, () => {});
+      } catch (e) {}
+    };
+
+    if (typeof NASA_STAGING_BOOSTER_B64 !== 'undefined') decodeStagingB64(NASA_STAGING_BOOSTER_B64, 'booster');
+    if (typeof NASA_STAGING_STAGE1_B64 !== 'undefined') decodeStagingB64(NASA_STAGING_STAGE1_B64, 'stage1');
+    if (typeof NASA_STAGING_FAIRING_B64 !== 'undefined') decodeStagingB64(NASA_STAGING_FAIRING_B64, 'fairing');
+    if (typeof NASA_STAGING_PAYLOAD_B64 !== 'undefined') decodeStagingB64(NASA_STAGING_PAYLOAD_B64, 'payload');
+
     V.audio.active = true;
   } catch (e) {
     V.audio.active = false;
   }
 }
 
-function playStagingSound(pitch = 180) {
+function playStagingSound(type = 'booster') {
   try {
     if (!V.audio.ctx || !V.audio.active) return;
     const ctx = V.audio.ctx;
-    const osc = ctx.createOscillator();
+    const isMuted = (window.Audio_ && window.Audio_.on === false);
+    if (isMuted) return;
+
+    // Physical altitude gating & vacuum extinction:
+    // Sound waves require atmospheric density to propagate acoustically.
+    // Above 75 km (mesosphere/thermosphere space boundary), molecular density is
+    // negligible, so outer-atmosphere separation events (such as payload fairing
+    // jettison at ~115 km and orbital spacecraft release at 200+ km) are completely silent.
+    const prof = V.flightProfile;
+    const f = (V._lastF != null && isFinite(V._lastF)) ? V._lastF : 0;
+    const altKm = (prof && isFinite(prof.alt)) ? prof.alt : (f * 215);
+
+    if (altKm >= 75) {
+      // Complete vacuum silence: sound cannot propagate in space
+      return;
+    }
+
+    // Atmospheric acoustic transmission attenuation (H ≈ 12 km scale height)
+    const atmoTransmission = Math.max(0, Math.min(1, Math.exp(-altKm / 12.0)));
+    if (atmoTransmission <= 0.005) return;
+
+    // Distinct physical separation profiles per stage
+    const bufs = V.audio.stagingBuffers || (typeof window !== 'undefined' && window.NASA_STAGING_BUFFERS) || {};
+    let buf = bufs[type] || bufs.booster || V.audio.realStagingBuffer || (typeof window !== 'undefined' && window.NASA_STAGING_THUMP_BUF);
+    if (!buf) return;
+
+    // Base gain scaled by acoustic transmission
+    let baseGain = 0.65;
+    if (type === 'booster') {
+      baseGain = 0.70;
+    } else if (type === 'stage1') {
+      baseGain = 0.62;
+    } else if (type === 'fairing') {
+      baseGain = 0.35;
+    } else if (type === 'las') {
+      baseGain = 0.45;
+    } else if (type === 'payload') {
+      baseGain = 0.26;
+    }
+
+    const gainVal = baseGain * atmoTransmission;
+    if (gainVal <= 0.002) return;
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
     const g = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(pitch, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.35);
-    g.gain.setValueAtTime(0.25, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.38);
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
+    g.gain.setValueAtTime(gainVal, ctx.currentTime);
+    src.connect(g);
+    g.connect(V.audio.masterGain || ctx.destination);
+    src.start();
   } catch (e) {}
 }
 
@@ -1045,7 +1334,6 @@ function updateAudio(f) {
     const ctx = V.audio.ctx;
     const isMuted = (window.Audio_ && window.Audio_.on === false);
     if (isMuted) {
-      if (V.audio.rumbleGain) V.audio.rumbleGain.gain.setValueAtTime(0, ctx.currentTime);
       if (V.audio.roarGain) V.audio.roarGain.gain.setValueAtTime(0, ctx.currentTime);
       return;
     }
@@ -1055,27 +1343,52 @@ function updateAudio(f) {
     const metA = f * PA.endMet;
     const mecoA0 = PA.meco ? PA.meco[0] : PA.endMet * 0.6;
     const mecoA1 = PA.meco ? PA.meco[1] : PA.endMet * 0.62;
-    if (metA < 5) {
-      throttle = (metA / 5) * 0.7; // Ignition buildup
-    } else if (metA < mecoA0) {
-      throttle = 1.0; // Stage 1 / Boosters roar
+    // Seamless audio continuity from pad ignition into liftoff & ascent:
+    // Engines are already at 100% thrust at liftoff release (built up during countdown T-2s).
+    if (metA < mecoA0) {
+      throttle = 1.0; // Stage 1 / Boosters full burn at liftoff and through first stage flight
     } else if (metA < mecoA1 + 15) {
-      throttle = 0.05; // MECO coast
+      throttle = 0.08; // MECO coast
     } else if (metA < PA.endMet - 8) {
-      throttle = 0.45; // Upper stage burn (muffled vacuum)
+      throttle = 0.50; // Upper stage burn
     } else {
       throttle = 0.0; // SECO / Orbit insertion silence
     }
 
-    // High altitude vacuum muffles sound
-    const airDensity = Math.max(0.08, 1 - f * 1.1);
-    const targetVolume = throttle * 0.22 * airDensity;
-
-    if (V.audio.rumbleGain) {
-      V.audio.rumbleGain.gain.setTargetAtTime(targetVolume * 0.8, ctx.currentTime, 0.1);
-      if (V.audio.rumbleOsc) {
-        V.audio.rumbleOsc.frequency.setValueAtTime(38 + throttle * 24, ctx.currentTime);
+    // Ensure real Saturn V acoustic roar source is attached
+    if (!V.audio.realSource && V.audio.atmoFilter) {
+      const buf = V.audio.realLaunchBuffer || (typeof window !== 'undefined' && window.NASA_LAUNCH_ROAR_BUF);
+      if (buf) {
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        src.connect(V.audio.atmoFilter);
+        src.start();
+        V.audio.realSource = src;
       }
+    }
+
+    // Physical Atmospheric Acoustic Extinction:
+    // Sound requires atmospheric air molecules to propagate. As the vehicle exits
+    // Earth's atmosphere, acoustic transmission decays exponentially (H ≈ 12 km scale height).
+    // Above 75 km (mesosphere/thermosphere space boundary), transmission reaches absolute 0.
+    const prof = V.flightProfile;
+    const altKm = (prof && isFinite(prof.alt)) ? prof.alt : (f * 215);
+
+    let atmoTransmission = 0;
+    if (altKm < 75) {
+      atmoTransmission = Math.max(0, Math.min(1, Math.exp(-altKm / 12.0)));
+    } else {
+      atmoTransmission = 0.0; // Absolute vacuum silence in space
+    }
+
+    // Air absorption spectrum: thinning air absorbs high frequencies much faster,
+    // rolling off from full combustion presence down to sub-bass thud before complete silence.
+    const cutoff = Math.max(25, 750 * Math.exp(-altKm / 16.0));
+    const targetVolume = throttle * 0.85 * atmoTransmission;
+
+    if (V.audio.atmoFilter) {
+      V.audio.atmoFilter.frequency.setTargetAtTime(cutoff, ctx.currentTime, 0.1);
     }
     if (V.audio.roarGain) {
       V.audio.roarGain.gain.setTargetAtTime(targetVolume, ctx.currentTime, 0.1);
@@ -1089,31 +1402,56 @@ function updateCountdownAudio(tMinus, ignK) {
     const ctx = V.audio.ctx;
     const isMuted = (window.Audio_ && window.Audio_.on === false);
     if (isMuted) {
-      if (V.audio.rumbleGain) V.audio.rumbleGain.gain.setValueAtTime(0, ctx.currentTime);
       if (V.audio.roarGain) V.audio.roarGain.gain.setValueAtTime(0, ctx.currentTime);
       return;
     }
-    // Near-silent pad until the engine-start beat; wall ignition ramp (V._ignK)
-    // leads the compressed T-6 s callout so the roar matches the visible flame.
-    const wallK = (isFinite(ignK) ? ignK : 0) * 0.5;
-    const throttle = Math.max(tMinus <= 6 ? (6 - tMinus) / 6 * 0.5 : (tMinus < 15 ? 0.12 : 0), wallK);
-    const targetVolume = throttle * 0.22;
-    if (V.audio.rumbleGain) {
-      V.audio.rumbleGain.gain.setTargetAtTime(targetVolume * 0.8, ctx.currentTime, 0.1);
-      if (V.audio.rumbleOsc) V.audio.rumbleOsc.frequency.setValueAtTime(38 + throttle * 24, ctx.currentTime);
+
+    // Authentic timeline: Pad texture audio plays through countdown cuts until rocket ignition begins.
+    // When ignition starts (ignK > 0, T-2s before T-0), pad texture crossfades to silence
+    // and rocket flame noise swells up to dominate.
+    if (ignK > 0) {
+      if (!V.audio.realSource && V.audio.atmoFilter) {
+        const buf = V.audio.realLaunchBuffer || (typeof window !== 'undefined' && window.NASA_LAUNCH_ROAR_BUF);
+        if (buf) {
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.loop = true;
+          src.connect(V.audio.atmoFilter);
+          src.start();
+          V.audio.realSource = src;
+        }
+      }
+      if (!V.audio._padAmbianceStopped) {
+        V.audio._padAmbianceStopped = true;
+        if (window.Audio_ && window.Audio_.stopPadAmbiance) {
+          window.Audio_.stopPadAmbiance();
+        }
+      }
+      const targetVolume = Math.min(0.85, ignK * 0.85);
+      if (V.audio.atmoFilter) {
+        V.audio.atmoFilter.frequency.setTargetAtTime(800, ctx.currentTime, 0.08);
+      }
+      if (V.audio.roarGain) {
+        V.audio.roarGain.gain.setTargetAtTime(targetVolume, ctx.currentTime, 0.08);
+      }
+    } else {
+      // Prior to ignition: zero flame roar, allowing pad texture to play cleanly
+      if (V.audio.roarGain) {
+        V.audio.roarGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      }
     }
-    if (V.audio.roarGain) V.audio.roarGain.gain.setTargetAtTime(targetVolume, ctx.currentTime, 0.1);
   } catch (e) {}
 }
 
 function stopAudio() {
   try {
-    if (V.audio.rumbleGain && V.audio.ctx) {
-      V.audio.rumbleGain.gain.setValueAtTime(0, V.audio.ctx.currentTime);
-    }
     if (V.audio.roarGain && V.audio.ctx) {
       V.audio.roarGain.gain.setValueAtTime(0, V.audio.ctx.currentTime);
     }
+    if (V.audio.realSource) {
+      try { V.audio.realSource.stop(); V.audio.realSource = null; } catch (e) {}
+    }
+    V.audio._padAmbianceStopped = false;
     V.audio.active = false;
   } catch (e) {}
 }
@@ -1205,8 +1543,16 @@ function countdownClock(tEl) {
       holding = true;
     } else {
       const postS = countS - preS - holdS;
-      const k = postS > 0 ? (tEl - preS - holdS) / postS : 1;
-      tMinus = HOLD_T_S * (1 - k);
+      // Decelerate terminal count into authentic countdown cadence in final seconds:
+      // Fast compression from T-04:00 down to T-00:08, then smooth 1:1 cadence through
+      // ENGINE START COMMAND (T-00:03) down to T-00:00 LIFTOFF.
+      const remainWall = Math.max(0, countS - tEl);
+      if (remainWall <= 2.2) {
+        tMinus = (remainWall / 2.2) * 3.5;
+      } else {
+        const kPre = (tEl - preS - holdS) / Math.max(0.001, postS - 2.2);
+        tMinus = 3.5 + (HOLD_T_S - 3.5) * Math.pow(Math.max(0, 1 - Math.min(1, kPre)), 1.8);
+      }
     }
     // L- leads T- by the hold value still pending; runs continuously.
     const holdPending = tMinus > HOLD_T_S - 0.5 && tEl < preS + holdS
@@ -1242,6 +1588,148 @@ function fmtClock(totalS, prefix) {
 /* ══════════════════════════════════════════════════════════════
    SCENE BUILDER: ENVIRONMENT, TOWER, PAD, SKY & CELESTIAL
    ══════════════════════════════════════════════════════════════ */
+/* Distant facility lights: disabled to avoid ungrounded point-sprite dots.
+   Real pad lighting comes from the modeled floodlight fixtures and light shafts. */
+function buildFieldLights(scene) {
+  const grp = new THREE.Group();
+  grp.visible = false;
+  scene.add(grp);
+  return grp;
+}
+
+/* Derives the ML tower dimensions and crown anchor for TOWER-TOP-DOWN camera.
+   Point-sprite light dots are omitted. */
+function buildTowerLampsFromML(mlArg, sceneArg) {
+  try {
+    const ml = mlArg || V.nasaML;
+    const scene = sceneArg || V.scene;
+    if (!ml || !scene) return null;
+    if (!mlArg && V.towerLamps) return V.towerLamps;
+    ml.updateMatrixWorld(true);
+    const wp = new THREE.Vector3();
+    let minY = 1e9, maxY = -1e9;
+    ml.traverse(o => {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes) return;
+      const p = o.geometry.attributes.position;
+      if (!p) return;
+      for (let i = 0; i < p.count; i++) {
+        wp.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+        if (wp.y < minY) minY = wp.y;
+        if (wp.y > maxY) maxY = wp.y;
+      }
+    });
+    if (!(maxY > minY + 3)) return null;
+    const lo = minY + (maxY - minY) * 0.45, hi = minY + (maxY - minY) * 0.95;
+    const bb = new THREE.Box3();
+    let any = false;
+    ml.traverse(o => {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes) return;
+      const p = o.geometry.attributes.position;
+      if (!p) return;
+      for (let i = 0; i < p.count; i++) {
+        wp.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+        if (wp.y >= lo && wp.y <= hi) { bb.expandByPoint(wp); any = true; }
+      }
+    });
+    if (!any) return null;
+    const ix0 = bb.min.x + 0.05, ix1 = bb.max.x - 0.05;
+    const iz0 = bb.min.z + 0.05, iz1 = bb.max.z - 0.05;
+    const cx = (ix0 + ix1) / 2, cz = (iz0 + iz1) / 2;
+
+    const grp = new THREE.Group();
+    grp.visible = false;
+    scene.add(grp);
+    if (!mlArg) {
+      V.towerLamps = grp;
+      V._towerTop = { x: cx, y: hi, z: cz }; // crown anchor for TOWER-TOP-DOWN
+    }
+    return grp;
+  } catch (e) { return null; }
+}
+
+/* Volumetric shafts: one open cone per floodlight head, apex at the lamp,
+   opening onto the matching SpotLight target with the matching cone angle.
+   Shared by the ascent cinematic (V.shafts) and the launch-screen preview.
+   The cone opacity is driven per-frame by updateShafts() in the cinematic; the
+   preview leaves the static build-time opacity (it has no day/night ramp). */
+function buildLightShafts(scene) {
+  const out = [];
+  try {
+    const defs = [
+      { head: 0, tgt: [0, 6.0, 0], ang: Math.PI / 6, col: 0xfff1dc, boost: 0.45 },
+      { head: 2, tgt: [0, 6.0, 0], ang: Math.PI / 6, col: 0xfff1dc, boost: 0.32 },
+      { head: 1, tgt: [0, 2.5, 0], ang: Math.PI / 5, col: 0xffe8c4, boost: 0.32 },
+      { head: 3, tgt: [0, 2.5, 0], ang: Math.PI / 5, col: 0xd8e6ff, boost: 0.24 }
+    ];
+    const DOWN = new THREE.Vector3(0, -1, 0); // build-time only (no per-frame alloc)
+    // Shared head-flare material (one opacity for all four).
+    if (!V._flareTex) {
+      const fc = document.createElement('canvas');
+      fc.width = 128; fc.height = 128;
+      const fx = fc.getContext('2d');
+      const fg = fx.createRadialGradient(64, 64, 1, 64, 64, 64);
+      fg.addColorStop(0, 'rgba(255,244,225,1)');
+      fg.addColorStop(0.25, 'rgba(255,236,205,0.55)');
+      fg.addColorStop(0.6, 'rgba(255,220,170,0.16)');
+      fg.addColorStop(1, 'rgba(255,210,150,0)');
+      fx.fillStyle = fg;
+      fx.fillRect(0, 0, 128, 128);
+      V._flareTex = new THREE.CanvasTexture(fc);
+      tagSRGB(V._flareTex);
+    }
+    if (!V._flareMat) {
+      V._flareMat = new THREE.SpriteMaterial({
+        map: V._flareTex, color: 0xfff0d8, blending: THREE.AdditiveBlending,
+        transparent: true, opacity: 0.35, depthWrite: false
+      });
+    }
+    for (let i = 0; i < defs.length; i++) {
+      const d = defs[i], hp = LAMP_HEADS[d.head];
+      _pp0.set(d.tgt[0] - hp[0], d.tgt[1] - hp[1], d.tgt[2] - hp[2]);
+      const len = Math.max(0.5, _pp0.length());
+      _pp0.divideScalar(len);
+      const m = makeShaftMesh(len, Math.tan(d.ang) * len * 0.9, d.col, d.boost, i * 1.7);
+      m.position.set(hp[0], hp[1], hp[2]);
+      m.quaternion.setFromUnitVectors(DOWN, _pp0);
+      const flare = new THREE.Sprite(V._flareMat); // apex child: position only
+      flare.scale.set(1.0, 1.0, 1);
+      m.add(flare);
+      scene.add(m);
+      out.push(m);
+    }
+  } catch (e) {}
+  return out;
+}
+
+/* Pad floodlight rig: four measured heads raking the stack and the deck.
+   Shared by the ascent cinematic (V.padLights) and the launch-screen preview.
+   Night baseline only — the day hook in applySolarRig owns the daylight wash. */
+function buildPadSpotLights(scene, sun) {
+  const lights = [];
+  const mkSpot = (color, intensity, dist, angle, pen, px, tgt) => {
+    const s = new THREE.SpotLight(color, intensity, dist, angle, pen);
+    s.position.set(px[0], px[1], px[2]);
+    s.target.position.set(tgt[0], tgt[1], tgt[2]);
+    scene.add(s); scene.add(s.target);
+    lights.push(s);
+    return s;
+  };
+  // Key (camera-side NE head → stack). Wider penumbra so the pool feathers
+  // out instead of ending in a hard edge. Aim lower so SLS (~12u) and
+  // F9 (~7.5u) stacks both sit inside the cone.
+  mkSpot(0xfff1dc, 95, 32, Math.PI / 6, 0.60, LAMP_HEADS[0], [0, 6.0, 0]);
+  // Mirror key (NW head → stack), dimmer to keep key direction from the east.
+  mkSpot(0xfff1dc, 55, 32, Math.PI / 6, 0.60, LAMP_HEADS[2], [0, 6.0, 0]);
+  // Deck crosses: lower and hotter, so the base and ML read as bright pools
+  // (reference: floodlit deck edge, black beyond).
+  mkSpot(0xffe8c4, 55, 20, Math.PI / 5, 0.65, LAMP_HEADS[1], [0, 2.5, 0]);
+  mkSpot(0xd8e6ff, 38, 20, Math.PI / 5, 0.65, LAMP_HEADS[3], [0, 2.5, 0]);
+  try {
+    const dayK = (sun && isFinite(sun.dayF)) ? sun.dayF : 0;
+    if (dayK > 0.001) lights.forEach(s => { s.intensity = 0; });
+  } catch (e) {}
+  return lights;
+}
 function buildScene() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x010204); // dome covers all pixels; this is fallback only
@@ -1388,85 +1876,16 @@ function buildScene() {
   }
 
   // Pad floodlights (night only): seated AT the 4 measured env_lamps heads
-  // (LAMP_HEADS — actual sources, not set-dressing). Highs rake the stack,
-  // lows pool on the deck/ML — reference bottom-edge floodlight row. Reuses
-  // V.padLights. No shadows (sun owns the one shadow map). Day-gated below
-  // so the daytime pass starts clean.
-  V.padLights = [];
-  {
-    const mkSpot = (color, intensity, dist, angle, pen, px, tgt) => {
-      const s = new THREE.SpotLight(color, intensity, dist, angle, pen);
-      s.position.set(px[0], px[1], px[2]);
-      s.target.position.set(tgt[0], tgt[1], tgt[2]);
-      scene.add(s); scene.add(s.target);
-      V.padLights.push(s);
-      return s;
-    };
-    // Key (camera-side NE head → stack). Wider penumbra so the pool feathers
-    // out instead of ending in a hard edge. Aim lower so SLS (~12u) and
-    // F9 (~7.5u) stacks both sit inside the cone.
-    mkSpot(0xfff1dc, 95, 32, Math.PI / 6, 0.60, LAMP_HEADS[0], [0, 6.0, 0]);
-    // Mirror key (NW head → stack), dimmer to keep key direction from the east.
-    mkSpot(0xfff1dc, 55, 32, Math.PI / 6, 0.60, LAMP_HEADS[2], [0, 6.0, 0]);
-    // Deck crosses: lower and hotter, so the base and ML read as bright pools
-    // (reference: floodlit deck edge, black beyond).
-    mkSpot(0xffe8c4, 55, 20, Math.PI / 5, 0.65, LAMP_HEADS[1], [0, 2.5, 0]);
-    mkSpot(0xd8e6ff, 38, 20, Math.PI / 5, 0.65, LAMP_HEADS[3], [0, 2.5, 0]);
-    try {
-      const dayK = (V.sun && isFinite(V.sun.dayF)) ? V.sun.dayF : 0;
-      if (dayK > 0.001) V.padLights.forEach(s => { s.intensity = 0; });
-    } catch (e) {}
-  }
+  // (LAMP_HEADS — actual sources, not set-dressing). Shared with the
+  // launch-screen preview so both scenes use the same sources and tuning.
+  V.padLights = buildPadSpotLights(scene, V.sun);
 
   // Volumetric shafts: one open cone per floodlight head, apex at the lamp,
   // opening onto the matching SpotLight target with the matching cone angle.
-  // Chapman "good-enough volumetrics" pattern (via threex.volumetricspotlight,
-  // MIT — J. Etienne 2013) rewritten for modules + soft edges + smoke drift.
-  V.shafts = [];
-  {
-    const defs = [
-      { head: 0, tgt: [0, 6.0, 0], ang: Math.PI / 6, col: 0xfff1dc, boost: 0.45 },
-      { head: 2, tgt: [0, 6.0, 0], ang: Math.PI / 6, col: 0xfff1dc, boost: 0.32 },
-      { head: 1, tgt: [0, 2.5, 0], ang: Math.PI / 5, col: 0xffe8c4, boost: 0.32 },
-      { head: 3, tgt: [0, 2.5, 0], ang: Math.PI / 5, col: 0xd8e6ff, boost: 0.24 }
-    ];
-    const DOWN = new THREE.Vector3(0, -1, 0); // build-time only (no per-frame alloc)
-    // Shared head-flare material (one opacity for all four; driven in updateShafts).
-    if (!V._flareTex) {
-      const fc = document.createElement('canvas');
-      fc.width = 128; fc.height = 128;
-      const fx = fc.getContext('2d');
-      const fg = fx.createRadialGradient(64, 64, 1, 64, 64, 64);
-      fg.addColorStop(0, 'rgba(255,244,225,1)');
-      fg.addColorStop(0.25, 'rgba(255,236,205,0.55)');
-      fg.addColorStop(0.6, 'rgba(255,220,170,0.16)');
-      fg.addColorStop(1, 'rgba(255,210,150,0)');
-      fx.fillStyle = fg;
-      fx.fillRect(0, 0, 128, 128);
-      V._flareTex = new THREE.CanvasTexture(fc);
-      tagSRGB(V._flareTex);
-    }
-    if (!V._flareMat) {
-      V._flareMat = new THREE.SpriteMaterial({
-        map: V._flareTex, color: 0xfff0d8, blending: THREE.AdditiveBlending,
-        transparent: true, opacity: 0.35, depthWrite: false
-      });
-    }
-    for (let i = 0; i < defs.length; i++) {
-      const d = defs[i], hp = LAMP_HEADS[d.head];
-      _pp0.set(d.tgt[0] - hp[0], d.tgt[1] - hp[1], d.tgt[2] - hp[2]);
-      const len = Math.max(0.5, _pp0.length());
-      _pp0.divideScalar(len);
-      const m = makeShaftMesh(len, Math.tan(d.ang) * len * 0.9, d.col, d.boost, i * 1.7);
-      m.position.set(hp[0], hp[1], hp[2]);
-      m.quaternion.setFromUnitVectors(DOWN, _pp0);
-      const flare = new THREE.Sprite(V._flareMat); // apex child: position only
-      flare.scale.set(1.0, 1.0, 1);
-      m.add(flare);
-      scene.add(m);
-      V.shafts.push(m);
-    }
-  }
+  // (Chapman "good-enough volumetrics" pattern — threex.volumetricspotlight,
+  // MIT — rewritten for modules + soft edges.) Shared with the launch-screen
+  // preview so the beams exist in both scenes.
+  V.shafts = buildLightShafts(scene);
 
   // Tower lamp dots: steady warm points up the ML tower faces (reference:
   // towers carry lamps along their full height — this fixes the dark crown).
@@ -1474,95 +1893,9 @@ function buildScene() {
   // to hang lamps on. Gated on night in blinkBeacons. Placeholder stays null.
   V.towerLamps = null;
 
-/* Derive the ML tower faces from the loaded geometry (one-time, build-time
-   cost only): the tower is the slender tall part, so box the vertices above
-   45% of ML height. 7 levels × 4 inset faces → 28 dots. */
-function buildTowerLampsFromML() {
-  try {
-    if (V.towerLamps || !V.nasaML || !V.scene) return;
-    V.nasaML.updateMatrixWorld(true);
-    const wp = new THREE.Vector3(); // build-time scratch (never per-frame)
-    let minY = 1e9, maxY = -1e9;
-    V.nasaML.traverse(o => {
-      if (!o.isMesh || !o.geometry || !o.geometry.attributes) return;
-      const p = o.geometry.attributes.position;
-      if (!p) return;
-      for (let i = 0; i < p.count; i++) {
-        wp.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
-        if (wp.y < minY) minY = wp.y;
-        if (wp.y > maxY) maxY = wp.y;
-      }
-    });
-    if (!(maxY > minY + 3)) return;
-    const lo = minY + (maxY - minY) * 0.45, hi = minY + (maxY - minY) * 0.95;
-    const bb = new THREE.Box3();
-    let any = false;
-    V.nasaML.traverse(o => {
-      if (!o.isMesh || !o.geometry || !o.geometry.attributes) return;
-      const p = o.geometry.attributes.position;
-      if (!p) return;
-      for (let i = 0; i < p.count; i++) {
-        wp.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
-        if (wp.y >= lo && wp.y <= hi) { bb.expandByPoint(wp); any = true; }
-      }
-    });
-    if (!any) return;
-    const ix0 = bb.min.x + 0.05, ix1 = bb.max.x - 0.05;
-    const iz0 = bb.min.z + 0.05, iz1 = bb.max.z - 0.05;
-    const cx = (ix0 + ix1) / 2, cz = (iz0 + iz1) / 2;
-    const pts = [];
-    for (let li = 0; li < 7; li++) {
-      const y = lo + (hi - lo) * (li / 6);
-      pts.push(ix0, y, cz, ix1, y, cz, cx, y, iz0, cx, y, iz1);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
-    const mt = new THREE.PointsMaterial({
-      color: 0xffc98a, size: 0.22, sizeAttenuation: true, map: getDotTex(),
-      transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const lamps = new THREE.Points(g, mt);
-    lamps.frustumCulled = false;
-    lamps.renderOrder = 3;
-    lamps.visible = false; // blinkBeacons enables at night once ML verifies
-    V.scene.add(lamps);
-    V.towerLamps = lamps;
-    V._towerTop = { x: cx, y: hi, z: cz }; // crown anchor for TOWER-TOP-DOWN
-  } catch (e) {}
-  }
-
   // Distant facility lights: a sparse ring of warm/cool dots (pad buildings,
   // roads, far pads) so the night ground reads as a complex, not a void.
-  // 1 draw call, night-only, always on once built.
-  {
-    const N = 44, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
-    const warm = [1.0, 0.78, 0.52], cool = [0.62, 0.74, 0.95];
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2 + (i % 5) * 0.22;
-      const r = 10 + (i % 7) * 5.2;
-      pos[i * 3] = Math.cos(a) * r;
-      pos[i * 3 + 1] = 0.15 + (i % 3) * 0.2;
-      pos[i * 3 + 2] = Math.sin(a) * r;
-      const c = (i % 4 === 3) ? cool : warm;
-      const b = 0.5 + (i % 3) * 0.25;
-      col[i * 3] = c[0] * b; col[i * 3 + 1] = c[1] * b; col[i * 3 + 2] = c[2] * b;
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const m = new THREE.PointsMaterial({
-      size: 0.35, sizeAttenuation: true, vertexColors: true, map: getDotTex(),
-      transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const pts = new THREE.Points(g, m);
-    pts.frustumCulled = false;
-    pts.renderOrder = 2;
-    pts.visible = false; // blinkBeacons enables at night
-    scene.add(pts);
-    V.fieldLights = pts;
-  }
+  V.fieldLights = buildFieldLights(scene);
 
   padGroup.add(towerGroup);
   scene.add(padGroup);
@@ -1640,6 +1973,91 @@ function buildTowerLampsFromML() {
    vapor cone read as a fake sonic boom. OFF — build stays (cheap, keeps
    userData sizing guards valid), update gate below keeps it hidden. */
 const COLLAR_ON = false;
+
+// ── A1 + A2: ROFI sparklers (hydrogen vehicles only) ────────
+const HYDROGEN_ROFI = new Set(['sls']);
+
+function makeSparkTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0.0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.25, 'rgba(255,200,110,0.9)');
+  grad.addColorStop(1.0, 'rgba(255,120,20,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function buildRofi(V, parent) {
+  const N = 48;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.PointsMaterial({
+    map: makeSparkTexture(),
+    size: 0.04,
+    sizeAttenuation: true,
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  pts.visible = false;
+  pts.renderOrder = 5;
+  parent.add(pts);
+  V.rofi = { pts, N, pos, col, vel: new Float32Array(N * 3), life: new Float32Array(N), acc: 0 };
+}
+
+const ROFI_RATE = 90; // particles / second
+function updateRofi(V, dt, active, baseR, baseY) {
+  const R = V.rofi;
+  if (!R || !R.pts) return;
+  R.acc += (active ? ROFI_RATE : 0) * dt;
+  let alive = 0;
+  for (let i = 0; i < R.N; i++) {
+    if (R.life[i] <= 0 && R.acc >= 1) {
+      R.acc -= 1;
+      const a = Math.random() * Math.PI * 2;
+      const sp = 0.9 + Math.random() * 0.5; // ~9-14 m/s
+      R.pos[i * 3] = Math.cos(a) * baseR;
+      R.pos[i * 3 + 1] = baseY;
+      R.pos[i * 3 + 2] = Math.sin(a) * baseR;
+      R.vel[i * 3] = Math.cos(a) * sp;
+      R.vel[i * 3 + 1] = -0.35 - Math.random() * 0.4;
+      R.vel[i * 3 + 2] = Math.sin(a) * sp;
+      R.life[i] = 0.5 + Math.random() * 0.4;
+    }
+    if (R.life[i] > 0) {
+      R.life[i] -= dt;
+      alive++;
+      const k = Math.exp(-1.6 * dt); // drag
+      for (let j = 0; j < 3; j++) {
+        R.vel[i * 3 + j] *= k;
+        R.pos[i * 3 + j] += R.vel[i * 3 + j] * dt;
+      }
+      const f = Math.max(R.life[i], 0) / 0.9;
+      const b = f * f; // smooth quadratic fade, no violent sine strobe
+      R.col[i * 3] = 1.0 * b;
+      R.col[i * 3 + 1] = 0.62 * b;
+      R.col[i * 3 + 2] = 0.22 * b;
+    } else {
+      R.col[i * 3] = 0;
+      R.col[i * 3 + 1] = 0;
+      R.col[i * 3 + 2] = 0;
+    }
+  }
+  R.pts.visible = alive > 0;
+  R.pts.geometry.attributes.position.needsUpdate = true;
+  R.pts.geometry.attributes.color.needsUpdate = true;
+}
+
 function buildSmokeSystems(scene) {
   const smokeTex = createSmokeTexture();
 
@@ -1724,18 +2142,8 @@ function buildSmokeSystems(scene) {
     V.deluge.push(s);
   }
 
-  // 5. ROFI sparklers (Workstream B): hydrogen burn-off shower under the bells.
-  V.rofi = [];
-  for (let i = 0; i < 26; i++) {
-    const mat = new THREE.SpriteMaterial({
-      map: smokeTex, color: 0xffb03a, blending: THREE.AdditiveBlending,
-      transparent: true, opacity: 0, depthWrite: false
-    });
-    const s = new THREE.Sprite(mat);
-    s.userData = { active: false, life: 0, seed: (i * 0.523) % 1 };
-    scene.add(s);
-    V.rofi.push(s);
-  }
+  // 5. ROFI sparklers (A1/A2): hydrogen burn-off shower under the bells (SLS only).
+  buildRofi(V, scene);
 
   // 6. Cryo venting wisps (Workstream B): vehicle vents during the count.
   V.vent = [];
@@ -2343,11 +2751,10 @@ function blinkBeacons(now) {
     const ph = (b.userData && b.userData.phase) || 0;
     b.visible = ((now * 0.001 + ph) % 2) < 1.3;
   }
-  // Tower lamps: steady, ML-frame only, night only. Field lights: night only.
+  // Tower lamps & field dot particles remain disabled in favor of modeled pad fixtures.
   try {
-    const nightK = !V.sun || !(V.sun.dayF > 0.001);
-    if (V.towerLamps) V.towerLamps.visible = !!V.nasaMLOn && nightK;
-    if (V.fieldLights) V.fieldLights.visible = nightK;
+    if (V.towerLamps) V.towerLamps.visible = false;
+    if (V.fieldLights) V.fieldLights.visible = false;
   } catch (e) {}
 }
 function updatePadFx(clk, f, sdt) {
@@ -2411,26 +2818,12 @@ function updatePadFx(clk, f, sdt) {
     }
   }
 
-  // ROFI sparklers: hydrogen burn-off shower, T-12 s to T-0 (plus wall ignition).
-  const rofiOn = counting && (tMinus < 12 || (V._ignK || 0) > 0);
-  for (let i = 0; i < V.rofi.length; i++) {
-    const s = V.rofi[i];
-    if (!s.userData.active) {
-      if (rofiOn && Math.random() < 0.6) {
-        s.userData.active = true;
-        s.userData.life = 1.0;
-        const a = Math.random() * Math.PI * 2;
-        const r = Math.random() * 1.6;
-        s.position.set(Math.cos(a) * r, 0.9 + Math.random() * 0.5, Math.sin(a) * r);
-        const sc = 0.4 + Math.random() * 0.5;
-        s.scale.set(sc, sc, 1);
-      } else { s.material.opacity = 0; continue; }
-    }
-    s.userData.life -= dt * 3.0;
-    if (s.userData.life <= 0) { s.userData.active = false; s.material.opacity = 0; continue; }
-    s.position.y -= dt * 1.5;
-    s.material.opacity = 0.9 * s.userData.life * (0.6 + 0.4 * Math.sin(s.userData.life * 40 + s.userData.seed * 9));
-  }
+  // ROFI sparklers (A1/A2): hydrogen burn-off shower, T-10 s to T-0 (SLS only).
+  const rofiOn = HYDROGEN_ROFI.has(V.lvId) && counting && tMinus < 10 && tMinus > 0;
+  const baseR = (V.rocket && V.rocket.userData && V.rocket.userData.cfg && V.rocket.userData.cfg.d)
+    ? (V.rocket.userData.cfg.d * 0.5 * (V.rocket.scale.x || SITE_VK)) : 0.45;
+  const baseY = (V.rocket && V.rocket.userData && V.rocket.userData.baseY) || SITE_DECK_Y;
+  updateRofi(V, dt, rofiOn, baseR, baseY + 0.1);
 
   // Cryo venting: slow wisps off the vehicle while the count runs high.
   const ventOn = counting && tMinus > 20;
@@ -2467,6 +2860,68 @@ function updatePadFx(clk, f, sdt) {
   }
 }
 
+function getThroatGlowTexture() {
+  if (V._throatGlowTex) return V._throatGlowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)'); // white-hot throat core
+  grad.addColorStop(0.25, 'rgba(255, 235, 160, 0.95)'); // incandescent yellow
+  grad.addColorStop(0.55, 'rgba(255, 140, 40, 0.7)');   // hot combustion flame
+  grad.addColorStop(0.85, 'rgba(180, 50, 10, 0.25)');  // deep ember
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');         // soft feathered boundary
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  V._throatGlowTex = t;
+  return t;
+}
+
+/* 3D Surface Relief: Grid Fins & Cable Raceways (Solution B1) */
+function makeLatticeAlpha() {
+  if (V._gridFinAlpha) return V._gridFinAlpha;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 128, 128);
+  g.strokeStyle = '#fff'; g.lineWidth = 4;
+  for (let i = 0; i <= 8; i++) {
+    g.beginPath(); g.moveTo(i * 16, 0); g.lineTo(i * 16, 128);
+    g.moveTo(0, i * 16); g.lineTo(128, i * 16); g.stroke();
+  }
+  g.strokeRect(2, 2, 124, 124);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  V._gridFinAlpha = t;
+  return t;
+}
+
+function addGridFins(parent, { r, y, fold = true }) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x8a9098, metalness: 0.85, roughness: 0.45,
+    alphaMap: makeLatticeAlpha(), alphaTest: 0.4, side: THREE.DoubleSide
+  });
+  const finW = Math.max(0.28, r * 0.42);
+  const finH = Math.max(0.38, r * 0.60);
+  for (let k = 0; k < 4; k++) {
+    const fin = new THREE.Mesh(new THREE.PlaneGeometry(finW, finH), mat);
+    const a = k * Math.PI / 2 + Math.PI / 4;
+    fin.position.set(Math.cos(a) * (r + 0.02), y, Math.sin(a) * (r + 0.02));
+    fin.rotation.y = -a + Math.PI / 2;
+    if (fold) fin.rotateX(Math.PI / 2 - 0.14); // folded flat against body during ascent
+    parent.add(fin);
+  }
+}
+
+function addRaceway(parent, { r, h, az = 0, mat }) {
+  const w = Math.max(0.06, r * 0.065);
+  const d = Math.max(0.035, r * 0.04);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(Math.cos(az) * (r + d * 0.5), h / 2, Math.sin(az) * (r + d * 0.5));
+  m.rotation.y = -az;
+  parent.add(m);
+}
+
 /* ══════════════════════════════════════════════════════════════
    HIGH-FIDELITY MODULAR ROCKET STACK BUILDER
    Anchored dimensionally to NASA/manufacturer published figures.
@@ -2478,24 +2933,32 @@ function buildModularStack(lvId, payloadCraft) {
   root.name = 'rocket_' + lvId;
 
   const coreMat = new THREE.MeshStandardMaterial({
-    map: createRocketSkinTexture('core'),
-    roughness: 0.42, metalness: 0.28
+    map: createRocketSkinTexture('core', lvId),
+    roughness: 0.28, metalness: 0.0
   });
   applyPaintPBR(coreMat, 'core', paintNormalTex('core'));
   const interstageMat = new THREE.MeshStandardMaterial({
-    map: createRocketSkinTexture('interstage'),
-    roughness: 0.65, metalness: 0.45
+    map: createRocketSkinTexture('interstage', lvId),
+    roughness: 0.82, metalness: 0.05
   });
   applyPaintPBR(interstageMat, 'interstage', paintNormalTex('interstage'));
-  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x1f242c, roughness: 0.5, metalness: 0.7 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x1f242c, roughness: 0.48, metalness: 0.8 });
   applyPaintPBR(darkMetal, 'darkMetal', null);
-  const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x2b3038, roughness: 0.35, metalness: 0.85 });
+  const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x2b3038, roughness: 0.35, metalness: 0.9 });
   applyPaintPBR(nozzleMat, 'nozzle', null);
   V.nozzleMat = nozzleMat; // driven hot while burning (bells must not silhouette)
-  const nozzleInnerMat = new THREE.MeshBasicMaterial({ color: 0xffaa44 }); // Glowing throat
+  const nozzleInnerMat = new THREE.MeshBasicMaterial({
+    map: getThroatGlowTexture(),
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.95,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
   const fairingExtMat = new THREE.MeshStandardMaterial({
-    map: createRocketSkinTexture('fairing'),
-    roughness: 0.38, metalness: 0.22, side: THREE.FrontSide
+    map: createRocketSkinTexture('fairing', lvId),
+    roughness: 0.26, metalness: 0.0, side: THREE.FrontSide
   });
   applyPaintPBR(fairingExtMat, 'fairing', paintNormalTex('fairing'));
   const fairingIntMat = new THREE.MeshStandardMaterial({
@@ -2573,6 +3036,12 @@ function buildModularStack(lvId, payloadCraft) {
   interstage.position.y = cfg.s1 + interstageH / 2;
   s1Group.add(interstage);
 
+  // Surface relief: Grid fins & cable raceway on Falcon cores
+  if (cfg.triple || lvId === 'f9') {
+    addGridFins(s1Group, { r: cfg.coreD / 2, y: cfg.s1 - 0.6, fold: true });
+    addRaceway(s1Group, { r: cfg.coreD / 2, h: cfg.s1 * 0.94, az: Math.PI * 0.5, mat: darkMetal });
+  }
+
   stages.coreGroup.add(s1Group);
   curY = cfg.s1 + interstageH;
 
@@ -2585,6 +3054,10 @@ function buildModularStack(lvId, payloadCraft) {
       const bCore = new THREE.Mesh(new THREE.CylinderGeometry(cfg.coreD / 2, cfg.coreD / 2, cfg.s1, 32), coreMat);
       bCore.position.y = cfg.s1 / 2;
       bGroup.add(bCore);
+
+      // Booster surface relief: 4 Titanium grid fins & cable raceway
+      addGridFins(bGroup, { r: cfg.coreD / 2, y: cfg.s1 - 0.6, fold: true });
+      addRaceway(bGroup, { r: cfg.coreD / 2, h: cfg.s1 * 0.94, az: sx > 0 ? Math.PI * 0.5 : -Math.PI * 0.5, mat: darkMetal });
 
       // Falcon Heavy aerodynamic titanium booster nosecone
       const nose = new THREE.Mesh(new THREE.CylinderGeometry(cfg.coreD * 0.04, cfg.coreD / 2, cfg.coreD * 1.5, 32), coreMat);
@@ -2601,18 +3074,28 @@ function buildModularStack(lvId, payloadCraft) {
       sepThruster.rotation.z = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
       bGroup.add(sepThruster);
 
-      // Booster engines
+      // Booster aft heat shield boattail
+      const bBoattail = new THREE.Mesh(new THREE.CylinderGeometry(cfg.coreD / 2, cfg.coreD * 0.46, Math.min(2.0, cfg.s1 * 0.06), 32), darkMetal);
+      bBoattail.position.y = Math.min(1.0, cfg.s1 * 0.03);
+      bGroup.add(bBoattail);
+
+      // Booster engines: 9-engine Octaweb cluster with glowing throat disks
       for (let k = 0; k < 9; k++) {
-        // Unrotated apex-up bells (see core engines above — flipping makes spikes).
+        const beGroup = new THREE.Group();
         const be = new THREE.Mesh(new THREE.ConeGeometry(cfg.coreD * 0.10, cfg.coreD * 0.22, 16, 1, true), nozzleMat);
-        const a = (k / 8) * Math.PI * 2;
+        beGroup.add(be);
+        const bThroat = new THREE.Mesh(new THREE.CircleGeometry(cfg.coreD * 0.055, 16), nozzleInnerMat);
+        bThroat.rotation.x = Math.PI / 2;
+        bThroat.position.y = cfg.coreD * 0.07;
+        beGroup.add(bThroat);
+        const a = (k === 0) ? 0 : ((k - 1) / 8) * Math.PI * 2;
         const r = (k === 0) ? 0 : engR;
-        be.position.set(k === 0 ? 0 : Math.cos(a) * r, -cfg.coreD * 0.11, k === 0 ? 0 : Math.sin(a) * r);
-        bGroup.add(be);
+        beGroup.position.set(Math.cos(a) * r, -cfg.coreD * 0.11, Math.sin(a) * r);
+        bGroup.add(beGroup);
       }
       bGroup.position.set(sx, 0, 0);
       bGroup.userData = { initPos: bGroup.position.clone(), dirX: sx > 0 ? 1 : -1, dirZ: 0,
-        exitY: -0.22 * cfg.coreD }; // side-core bell mouth (local metres, pre-scale)
+        exitY: -0.15 * cfg.coreD }; // side-core bell mouth (tucked inside nozzles for gap-free connection)
       stages.coreGroup.add(bGroup);
       stages.boosters.push(bGroup);
     }
@@ -2813,8 +3296,10 @@ function buildModularStack(lvId, payloadCraft) {
   root.userData.baseY = root.position.y;
   V.stages = stages;
 
-  // Build high-realism exhaust plumes
-  buildExhaustPlumes(root, stages, cfg);
+  // Build high-realism exhaust plumes. They belong to the LIVE launch scene
+  // (buildExhaustPlumes parents into V.scene); the launch-screen 3D vehicle
+  // preview builds this same stack with no scene, so it must not require them.
+  if (V.scene) buildExhaustPlumes(root, stages, cfg);
 
   return root;
 }
@@ -3005,7 +3490,7 @@ function makePlumeMesh(o) {
     transparent: true, depthWrite: false, depthTest: true
   };
   if (v2) {
-    params.side = THREE.FrontSide;
+    params.side = THREE.DoubleSide; // DoubleSide ensures cone is never culled when viewed looking down inside from lookback camera
     params.blending = THREE.CustomBlending;
     params.blendEquation = THREE.MaxEquation; // factors are ignored by GL MAX
     params.blendSrc = THREE.OneFactor;
@@ -3086,7 +3571,7 @@ const AXIAL_FRAG = [
   '}'
 ].join('\n');
 function makeAxialCore(topR, len) {
-  const geo = new THREE.CylinderGeometry(topR * 0.5, topR * 1.1, len * 0.45, 20, 8, false);
+  const geo = new THREE.CylinderGeometry(topR * 0.5, topR * 1.1, len * 0.45, 36, 8, false);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 }, uThrottle: { value: 1 }, uExpand: { value: 1 },
@@ -3105,15 +3590,20 @@ function makeAxialCore(topR, len) {
   return m;
 }
 function makeNozzleDisc(radius) {
-  const geo = new THREE.CircleGeometry(radius, 28);
+  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
   geo.rotateX(Math.PI / 2); // normal +Z -> -Y (faces down the plume)
   const mat = new THREE.MeshBasicMaterial({
-    color: 0xfff1dc, transparent: true, opacity: 0.7,
-    blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    depthWrite: false, depthTest: true, toneMapped: false
+    map: getThroatGlowTexture(),
+    color: 0xfff1dc,
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    depthTest: true
   });
   const m = new THREE.Mesh(geo, mat);
-  m.position.y = -radius * 0.04; // just below the cap, no z-fight
+  m.position.y = 0.0; // sits directly at the bell exit plane
   m.frustumCulled = false;
   m.renderOrder = 1;
   m.userData.disc = true;
@@ -3361,66 +3851,64 @@ function buildExhaustPlumes(rocket, stages, cfg) {
     ? rocket.scale.x : SITE_VK;
   const dispR = (d) => Math.max(0.08, (d * 0.5) * k); // metres diameter -> display radius
   const coreR = dispR(cfg.coreD);
-  // v2 shaders  on multi-motor stacks only: Falcon 9 / Atlas
-  // 401 / New Glenn / Saturn V keep the validated legacy path (multi=false).
-  // To A/B the new look on F9, set multi = true locally.
   const multi = !!(stages.boosters && stages.boosters.length > 0);
+  const isTriple = !!cfg.triple;
   const vis = multi ? 0.85 : 1.0; // v2 halo length: ends where flame dissolves
 
   // 1. Core Stage 1 plume: steep cone pinned at the nozzle exit plane.
   const corePlumeGroup = new THREE.Group();
   corePlumeGroup.name = 'core_plume';
-  // v8 reference match (multi only — F9 keeps 65·k/legacy look): the real plume
-  // runs well past 2× the stack. Glow/smoke/uLen follow userData.len.
   const coreLen = (multi ? 100 : 65) * k;
   corePlumeGroup.userData.len = coreLen; // flame length for smoke-at-tip spawn
-  // Bell mouth in stage1-local metres (engine groups at −0.12·coreD, bell half
-  // height 0.12·coreD): the flame must start AT the exit, never at a magic
-  // offset (the old −0.2 left a dark nozzle gap — the reported detachment).
-  corePlumeGroup.userData.exitY = -0.24 * cfg.coreD;
+  corePlumeGroup.userData.exitY = -0.15 * cfg.coreD; // tucked inside bells for zero-gap connection
+
+  const coreTopR = isTriple ? coreR * 1.35 : (coreR * 1.4);
+  const coreBotR = isTriple ? coreR * 2.8 : (coreR * (multi ? 3.0 : 2.0));
+  const plumeCoreCol = (isTriple || multi) ? 0xfff5e8 : tint.core;
+  const plumeMidCol = (isTriple || multi) ? 0xff9c4a : tint.mid;
+
   const coreMesh = makePlumeMesh({
-    // Root meets the body: topR 1.4× (expert handoff: +12% shroud so dark
-    // mouths stop silhouetting — anchor untouched, coverage only).
-    topR: coreR * 1.4, botR: coreR * (multi ? 3.0 : 2.0), len: coreLen,
-    // v8 (multi): near-white column, crisp lumpy edge. F9 keeps its tuned look.
-    core: multi ? 0xe4f1ff : tint.core, mid: tint.mid,
+    topR: coreTopR, botR: coreBotR, len: coreLen,
+    core: plumeCoreCol, mid: plumeMidCol,
     exposure: multi ? 7.0 : 2.8, wobble: 0.22, flow: 1.0,
-    soft: multi ? 0.6 : 1.6, // widened edge ramp: the 0.04 edge drew a hard ball rim that read as detached
+    soft: multi ? 0.6 : 1.6,
     decay: 0.7, sat: 0.35,
     v2: multi
   });
   corePlumeGroup.add(coreMesh);
-  corePlumeGroup.add(makeNozzleDisc(coreR * 1.05)); // exit-plane handover, widened with the shroud (v8)
-  // Throat sprite: axis-independent hot root. The hollow shell (ndv→0), the
-  // down-facing disc (culled) and the axis-falloff glow all vanish looking
-  // straight down the plume — a camera-facing sprite always rasterizes, so
-  // near-axis views keep a bright throat instead of nothing. Own material
-  // (shared flare texture); drivePlume skips it (no uniforms); stop() frees
-  // the material, never the shared texture. Inherits group visibility (MECO).
+  corePlumeGroup.add(makeNozzleDisc(coreR * 1.25)); // exit-plane handover
+
+  // Shared throat sprite material: axis-independent camera-facing hot root
+  const throatTex = V._flareTex || getDotTex();
+  const throatMat = new THREE.SpriteMaterial({ map: throatTex, color: 0xffd9a0,
+    blending: THREE.AdditiveBlending, transparent: true, opacity: 0.90,
+    depthWrite: false, depthTest: true, toneMapped: false });
+  const ts = Math.max(0.35, coreR * 7.5);
+
   try {
-    const throatTex = V._flareTex || getDotTex();
-    const throatMat = new THREE.SpriteMaterial({ map: throatTex, color: 0xffd9a0,
-      blending: THREE.AdditiveBlending, transparent: true, opacity: 0.85,
-      depthWrite: false, depthTest: true, toneMapped: false });
     const throat = new THREE.Sprite(throatMat);
-    const ts = Math.max(0.3, coreR * 6);
     throat.scale.set(ts, ts, 1);
-    throat.position.y = -coreR * 0.3; // hug the exit plane
+    throat.position.y = -coreR * 0.1; // hug the exit plane
     throat.renderOrder = 2;
     throat.userData.throat = true;
     corePlumeGroup.add(throat);
   } catch (e) {}
-  corePlumeGroup.add(makeAxialCore(coreR * 1.4, coreLen)); // spine bells→halo, all angles
+
+  // NOTE: Only add makeAxialCore on single-core stacks (legacy F9/Saturn). On multi-motor /
+  // triple-core Falcon Heavy, makeAxialCore created a truncated stubby cylinder that cut off
+  // midway down the column, creating an awkward visual disconnect with the side boosters.
+  if (!multi) {
+    corePlumeGroup.add(makeAxialCore(coreR * 1.4, coreLen));
+  }
   V.fireMeshes.push(coreMesh);
+
   // Procedural capsule glow in the same group (nozzle origin).
   const coreGlow = makeGlowMesh(coreLen, coreR * 0.95, 0xff7a45, vis);
   coreGlow.material.uniforms.uTint.value.copy(_C_GLOW_WARM);
-  // v9 pink near-field band (multi only — reference halo hugs peach-pink).
   if (multi) coreGlow.material.uniforms.uNear.value.setRGB(1.0, 0.76, 0.70);
   corePlumeGroup.add(coreGlow);
   corePlumeGroup.userData.glow = coreGlow;
-  // v8 wide lit-air halo (+ v9 retune): neutral gray-green, stronger, wider.
-  // Tune ONLY uGlow (0.25–0.8). Excluded from applyGlowBudget (single quad).
+
   const airGlow = makeGlowMesh(coreLen, coreR * 0.95, 0xffffff, vis);
   airGlow.material.uniforms.uTint.value.setRGB(0.42, 0.45, 0.44);
   airGlow.material.uniforms.uReach.value = coreLen * 4.0;
@@ -3435,14 +3923,9 @@ function buildExhaustPlumes(rocket, stages, cfg) {
   vacPlumeGroup.name = 'vacuum_plume';
   const vacR = dispR(cfg.upD || cfg.coreD);
   const vacLen = 48 * k;
-  vacPlumeGroup.userData.len = vacLen; // flame length for glow uLen correction
-  // Bell mouth in stage2-local metres (vacBell center −0.32·upD, half-height
-  // 0.325·upD): the plume origin belongs HERE, not at −0.4 (which buried the
-  // cone top around the bell so flame overlapped nozzle metal — owner shot).
+  vacPlumeGroup.userData.len = vacLen;
   vacPlumeGroup.userData.mouthY = -(0.645 * (cfg.upD || cfg.coreD));
   const vacMesh = makePlumeMesh({
-    // topR matches the bell mouth (visible edge ≈ mouth): flame starts AT the
-    // exit plane instead of swallowing the nozzle (was 0.85 → 20% too wide).
     topR: vacR * 0.7, botR: vacR * 2.0, len: vacLen,
     core: 0xdce8ff, mid: 0x7fa0ff, exposure: 3.0, wobble: 0.15, flow: 0.5, vac: true, v2: multi
   });
@@ -3450,59 +3933,53 @@ function buildExhaustPlumes(rocket, stages, cfg) {
   V.fireMeshes.push(vacMesh);
   const vacGlow = makeGlowMesh(48 * k, vacR * 0.85, 0x8fa8ff, vis);
   vacPlumeGroup.add(vacGlow);
-  // Tight short halo: the long vac flame's 0.45·len above-fade otherwise washes
-  // forward over the whole upper stage (owner F9 SECO shot). Dress the column.
-  // R0 1.5× (was 3.0×): halo core must not exceed the bell it exits.
   vacGlow.material.uniforms.uReach.value = vacLen * 0.5;
   vacGlow.material.uniforms.uR0.value = vacR * 0.85 * 1.5;
   vacPlumeGroup.userData.glow = vacGlow;
   V.vacPlume = vacPlumeGroup;
   V.scene.add(vacPlumeGroup);
 
-  // 3. Booster plumes: one steep cone each, sized off the SRB nozzle
-  // (or the side-core cluster for triple-core heavies).
+  // 3. Booster plumes: one steep cone each, matching vehicle stack geometry.
   V.boosterPlumes = [];
   if (multi) {
+    // For Falcon Heavy (triple), side cores have the EXACT same diameter as the center core.
     const srbR = (cfg.srb && cfg.srb[0] > 0)
       ? dispR(cfg.srb[2])
-      : dispR(cfg.coreD) * 0.8;
+      : coreR;
     for (let i = 0; i < stages.boosters.length; i++) {
-      // Booster cones OVERLAP the core cone: adjacent plumes must merge into
-      // one level luminous base — edge-faded cones that merely touch leave
-      // dark seams reading as staggered stubs (owner shot).
-      // NOTE: the cone mesh itself carries a -len/2 child offset (see
-      // makePlumeMesh), so it must live inside a Group positioned at the
-      // nozzle — positioning the cone mesh directly overwrites that offset
-      // and lifts half the flame (len/2, ~15 m on SLS) above the bell mouth.
-      // PROPORTION (owner: booster burn reads chubby vs the slender majestic
-      // core-only flame): 3 additive cones + 3 full-size glow billboards
-      // stack to ~4x halo brightness, swallowing the column into a ball.
-      // So boosters are SLIM (top 1.0x/bot 1.8x srbR — inner edges still
-      // overlap the core top radius, so no seams), dimmer per-source
-      // (exposure 3.2, glow base 0.55/narrow reach) so the SUM reads as one
-      // slender column slightly wider/brighter than single-engine, and LONG
-      // (60 m vs 65 m core) so tips near-align instead of stubbing.
-      const bLen = 100 * k;
+      const bLen = isTriple ? coreLen : (100 * k);
       const bGroup = new THREE.Group();
       bGroup.name = 'booster_plume_' + i;
       bGroup.userData.len = bLen;
+
+      const bTopR = isTriple ? coreTopR : (srbR * 1.25);
+      const bBotR = isTriple ? coreBotR : (srbR * 2.6);
+      const bCoreCol = isTriple ? plumeCoreCol : 0xfff2dc;
+      const bMidCol = isTriple ? plumeMidCol : 0xff9961;
+
       const bMesh = makePlumeMesh({
-        topR: srbR * 1.0, botR: srbR * 2.6, len: bLen,
-        // v8: exposure restored (MAX removes pile-up) + reference-matched decay.
-        core: 0xfff2dc, mid: 0xff9961, exposure: 7.0, wobble: 0.22, flow: 1.15,
+        topR: bTopR, botR: bBotR, len: bLen,
+        core: bCoreCol, mid: bMidCol, exposure: 7.0, wobble: 0.22, flow: 1.15,
         soft: 0.8, decay: 0.7, sat: 0.35, v2: true
       });
-      bGroup.add(bMesh); // child offset (-len/2) puts the cone top at the nozzle
-      bGroup.add(makeNozzleDisc(srbR * 0.95)); // exit-plane handover (v8)
+      bGroup.add(bMesh);
+      bGroup.add(makeNozzleDisc(srbR * 1.25)); // exit-plane handover
+
+      // Throat sprite on side boosters: bridges nozzles directly to the flame in lookback camera
+      try {
+        const bThroat = new THREE.Sprite(throatMat);
+        bThroat.scale.set(ts, ts, 1);
+        bThroat.position.y = -srbR * 0.1;
+        bThroat.renderOrder = 2;
+        bThroat.userData.throat = true;
+        bGroup.add(bThroat);
+      } catch (e) {}
       const bGlow = makeGlowMesh(bLen, srbR * 1.0, 0xff7a45, vis);
       bGlow.material.uniforms.uTint.value.copy(_C_GLOW_WARM);
-      // v9 pink near-field (multi-only path — boosters exist only there).
       bGlow.material.uniforms.uNear.value.setRGB(1.0, 0.76, 0.70);
-      // Narrow/dim per-source halo: the core glow stays master; stacked
-      // booster halos must dress their own column, not outshine the merge.
       bGlow.material.uniforms.uReach.value = bLen * 0.55;
       bGlow.material.uniforms.uR0.value = srbR * 1.0 * 3.0;
-      bGroup.add(bGlow); // sibling glow, same Group pattern as core/vacuum
+      bGroup.add(bGlow);
       bGroup.userData.glow = bGlow;
       V.scene.add(bGroup);
       V.boosterPlumes.push(bGroup);
@@ -3536,7 +4013,7 @@ function updateStaging(f, now) {
     } else {
       const B = ST.booster, dur = Math.max(1e-4, W[1] - W[0]);
       if (!S.boosterSoundPlayed && met >= W[2] && met < W[2] + 4) {
-        playStagingSound(160);
+        playStagingSound('booster');
         S.boosterSoundPlayed = true;
       }
       S.boosters.forEach((b, bi) => {
@@ -3564,14 +4041,19 @@ function updateStaging(f, now) {
           b.position.set(px, py, pz);
           b.quaternion.setFromAxisAngle(_bAxis, tilt);
         } else {
-          // Ballistic coast in the parent-local frame (pure in f).
-          vehicleVel(f1, _vv);
-          const dv = B.ballistic.dv;
-          const dtau = debrisBallistic({ x: px, y: py, z: pz }, _vv,
-            [dx / on * dv[0], dv[1], dz / on * dv[0] + dv[2]], B.ballistic.g, f1, f);
-          b.position.set(_db.x, _db.y, _db.z);
-          // Majestic, stable separation: holds the realistic ~28 deg peel with a gentle drift
-          // (zero unwanted axial spin, clean broadcast staging separation).
+          // Continuous C1 separation trajectory in parent-local frame:
+          // Matches the exit velocity of the peel phase exactly at f1, continuously
+          // accelerating downward away from the powered core without hesitation or freeze.
+          const dtau = (f - f1) * WALL;
+          const vSep = (1.4 * B.out) / (dur * WALL);
+          const vPy = -(1.8 * 18.0) / (dur * WALL);
+          const aDrop = 6.5;
+          const outDrift = B.out + vSep * dtau * (1 / (1 + 0.15 * dtau));
+          const bx = b.userData.initPos.x + dx * outDrift;
+          const bz = b.userData.initPos.z + dz * outDrift;
+          const by = (b.userData.initPos.y - 18.0) + vPy * dtau - 0.5 * aDrop * dtau * dtau;
+          b.position.set(bx, by, bz);
+          // Majestic, stable separation: holds the realistic ~28 deg peel with gentle outward drift
           const postTilt = tilt + 0.04 * Math.min(dtau, 15);
           b.quaternion.setFromAxisAngle(_bAxis, postTilt);
         }
@@ -3586,7 +4068,7 @@ function updateStaging(f, now) {
     else {
       const B = ST.stage1, dur = Math.max(1e-4, W[1] - W[0]);
       if (!S.s1SoundPlayed && met >= W[2] && met < W[2] + 4) {
-        playStagingSound(130);
+        playStagingSound('stage1');
         S.s1SoundPlayed = true;
       }
       if (f < W[0]) { S.stage1.position.set(0, 0, 0); S.stage1.rotation.set(0, 0, 0); }
@@ -3597,10 +4079,13 @@ function updateStaging(f, now) {
           S.stage1.position.set(px, py, 0);
           S.stage1.rotation.set(0, 0, frac * 0.35);
         } else {
-          vehicleVel(W[1], _vv);
-          const dv = B.ballistic.dv;
-          const dtau = debrisBallistic({ x: px, y: py, z: 0 }, _vv, [dv[0], dv[1], dv[2]], B.ballistic.g, W[1], f);
-          S.stage1.position.set(_db.x, _db.y, _db.z);
+          const dtau = (f - W[1]) * WALL;
+          const vPx = (1.5 * B.side) / (dur * WALL);
+          const vPy = -(1.8 * B.drop) / (dur * WALL);
+          const aDrop = 5.5;
+          const bx = B.side + vPx * dtau * (1 / (1 + 0.15 * dtau));
+          const by = -B.drop + vPy * dtau - 0.5 * aDrop * dtau * dtau;
+          S.stage1.position.set(bx, by, 0);
           S.stage1.rotation.set(0, 0, frac * 0.35 + 0.05 * Math.min(dtau, 15));
         }
       }
@@ -3616,7 +4101,7 @@ function updateStaging(f, now) {
       const f0 = byF[0] / P2.endMet, f1 = byF[1] / P2.endMet;
       const B = ST.fairing, dur = Math.max(1e-4, f1 - f0);
       if (!S.fairingSoundPlayed && met >= byF[0] && met < byF[0] + 4) {
-        playStagingSound(240);
+        playStagingSound('fairing');
         S.fairingSoundPlayed = true;
       }
       if (f < f0) {
@@ -3634,12 +4119,14 @@ function updateStaging(f, now) {
             half.position.set(sx * fSep, dy, 0);
             half.rotation.z = sx > 0 ? -fAngle : fAngle;
           } else {
-            vehicleVel(f1, _vv);
-            const dv = B.ballistic.dv;
-            const dtau = debrisBallistic({ x: sx * fSep, y: dy, z: 0 }, _vv,
-              [sx * dv[0], dv[1], dv[2]], B.ballistic.g, f1, f);
-            half.position.set(_db.x, _db.y, _db.z);
-            half.rotation.z = (sx > 0 ? -fAngle : fAngle) + B.ballistic.spin * dtau * sx;
+            const dtau = (f - f1) * WALL;
+            const vSep = (1.4 * B.out) / (dur * WALL);
+            const vPy = -(2.0 * B.drop) / (dur * WALL);
+            const aDrop = 4.5;
+            const outDrift = B.out + vSep * dtau * (1 / (1 + 0.15 * dtau));
+            const by = -B.drop + vPy * dtau - 0.5 * aDrop * dtau * dtau;
+            half.position.set(sx * outDrift, by, 0);
+            half.rotation.z = (sx > 0 ? -fAngle : fAngle) + (sx > 0 ? -1 : 1) * 0.04 * Math.min(dtau, 15);
           }
         };
         placeHalf(S.fairingPort, -1);
@@ -3663,7 +4150,7 @@ function updateStaging(f, now) {
       const f0 = byL[0] / P2.endMet, f1 = byL[1] / P2.endMet;
       const B = ST.las, dur = Math.max(1e-4, f1 - f0);
       if (!S.lasSoundPlayed && met >= byL[0] && met < byL[0] + 4) {
-        playStagingSound(300);
+        playStagingSound('las');
         S.lasSoundPlayed = true;
       }
       if (f < f0) { S.las.position.y = initY; S.las.rotation.set(0, 0, 0); }
@@ -3674,11 +4161,11 @@ function updateStaging(f, now) {
           S.las.position.y = py;
           S.las.rotation.z = frac * 0.35;
         } else {
-          vehicleVel(f1, _vv);
-          const dv = B.ballistic.dv;
-          const dtau = debrisBallistic({ x: 0, y: py, z: 0 }, _vv, [0, dv[1], dv[0]], B.ballistic.g, f1, f);
-          S.las.position.set(_db.x, _db.y, _db.z);
-          S.las.rotation.z = frac * 0.35 + B.ballistic.spin * dtau;
+          const dtau = (f - f1) * WALL;
+          const vPy = (1.5 * B.up) / (dur * WALL);
+          const by = initY + B.up + vPy * dtau * (1 / (1 + 0.2 * dtau));
+          S.las.position.set(0, by, 0);
+          S.las.rotation.z = frac * 0.35 + 0.05 * Math.min(dtau, 15);
         }
       }
     }
@@ -3695,7 +4182,7 @@ function updateStaging(f, now) {
     } else {
       const k = Math.min(1, (f - pw.window[0]) / Math.max(1e-4, pw.window[1] - pw.window[0]));
       if (!S.payloadSoundPlayed && k < 0.25) {
-        playStagingSound(480);
+        playStagingSound('payload');
         S.payloadSoundPlayed = true;
       }
       S.payload.position.y = baseY + k * pw.away;
@@ -3733,7 +4220,7 @@ function updatePlumes(f, now, prof, dt) {
     const mecoF = F(P.meco[0]);
     if (f < mecoF) {
       V.corePlume.visible = true;
-      const throttle = (met < 5 ? Math.max(met / 5, 0.55) : (f > mecoF - 0.02 ? (mecoF - f) / 0.02 : 1.0)) * bucketDip;
+      const throttle = (f > mecoF - 0.02 ? (mecoF - f) / 0.02 : 1.0) * bucketDip;
       // Low-passed throttle (geometry must not twitch per-frame) + per-plume
       // ignition clock (uTime starts at ignition, not page load).
       const gd = V.corePlume.userData;
@@ -3764,7 +4251,10 @@ function updatePlumes(f, now, prof, dt) {
       V.corePlume.quaternion.copy(_bq);
 
       // Throttle SHORTENS/densifies (not tint-only): y shrinks, xz blossoms.
-      V.corePlume.scale.set(1, (0.55 + 0.45 * thrS) * (1.0 + f * 1.2), 1);
+      // Smoothly expands from pad clearance scale (0.50 at release) to full flight column over the first 2.5s.
+      const padClear = Math.min(1, Math.max(0, met / 2.5));
+      const plumeScaleY = (0.50 + 0.50 * padClear) * (0.55 + 0.45 * thrS) * (1.0 + f * 1.2);
+      V.corePlume.scale.set(1, plumeScaleY, 1);
 
       // Custom drive: time scroll + throttle uniform (edge tightness + exposure)
       // + early-phase exposure lift so the bell cluster blows out into the
@@ -3807,11 +4297,9 @@ function updatePlumes(f, now, prof, dt) {
       }
 
       // Dynamic fire lighting — trench→plume handoff over the expert window.
-      // Expert refinement (position only — intensity/colour frozen): nudge the
-      // source up and toward the camera so it rakes the vehicle's
-      // camera-facing sides. An on-axis light below the stack only grazes the
-      // cylinder (the dark-rocket artifact). Revert if tower/plume-base look
-      // worse in browser A/B. Scalar math only, no allocation.
+      // During ascent, keep the light source below the engine heatshield (especially
+      // in the lookback camera looking down) so the tanks are not artificially washed in
+      // 380 cd amber light, which reads as toy plastic specular reflections.
       if (V.fireLight) {
         const hb = LAUNCH_ANIM.fx.fireLight.trenchToPlume;
         const hk = Math.max(0, Math.min(1, (f - hb[0]) / Math.max(1e-4, hb[1] - hb[0])));
@@ -3819,13 +4307,24 @@ function updatePlumes(f, now, prof, dt) {
         let lx = anchor.x + (_pp0.x - anchor.x) * hk;
         let ly = anchor.y + (_pp0.y - anchor.y) * hk;
         let lz = anchor.z + (_pp0.z - anchor.z) * hk;
+        const isCamAbove = V.camera && V.camera.position.y > _pp0.y;
         if (V.camera) {
-          let ox = V.camera.position.x - lx, oz = V.camera.position.z - lz;
-          const om = Math.sqrt(ox * ox + oz * oz) || 1;
-          lx += (ox / om) * 3.0; lz += (oz / om) * 3.0; ly += 2.0;
+          if (!isCamAbove) {
+            // Ground/pad camera looking up: subtle rake toward camera to illuminate the launch-facing side
+            let ox = V.camera.position.x - lx, oz = V.camera.position.z - lz;
+            const om = Math.sqrt(ox * ox + oz * oz) || 1;
+            lx += (ox / om) * 2.0; lz += (oz / om) * 2.0;
+            ly = Math.min(ly + 1.0, _pp0.y);
+          } else {
+            // Lookback camera looking down: exhaust flame light belongs strictly AT or BELOW the engine bells!
+            // Never elevate flame light up onto the upper tanks (which creates intense brass/plastic specular reflections).
+            ly = Math.min(ly, _pp0.y - 0.5);
+          }
         }
         V.fireLight.position.set(lx, ly, lz);
-        V.fireLight.intensity = (met < 20 ? 650 : 380) * throttle * flick * fireProxK();
+        // Lookback camera close-up: tame intensity so specular highlights do not blow out into plastic glare
+        const baseIntensity = isCamAbove ? 140 : (met < 20 ? 550 : 340);
+        V.fireLight.intensity = baseIntensity * throttle * flick * fireProxK();
         // Expert handoff: continuous ignition-orange → main-amber over
         // MET 11.2–14.4 (preallocated colors, no one-frame jump). The intro
         // hold to MET 12 is inside this window, not a branch.
@@ -3986,6 +4485,9 @@ function updateSmokeParticles(f, now, dt, prof) {
   const met = f * P0.endMet;
   const trenchActive = met < 50;
   const TY = (V.trenchPos && isFinite(V.trenchPos.y)) ? V.trenchPos.y : -0.6;
+  // A3: Smooth pre-release ignition factor
+  const ik = V._ignK || 0;
+  V._ignKs = THREE.MathUtils.damp(V._ignKs ?? 0, ik, 4.0, (isFinite(dt) && dt > 0 ? dt : 0.016));
   // Expert night-smoke pass: horizontal distance from the trench fakes the
   // plume's illumination on unlit sprites (cream near flame → dark brown out).
   // nightK restores legacy colour by day (opacities/sizes still apply).
@@ -4005,31 +4507,36 @@ function updateSmokeParticles(f, now, dt, prof) {
 
     const sd = s.userData.seed;
     const side = s.userData.side;
-    // Expert bankAge (nominal-wall domain; MET fallback if pad params missing).
-    // Ignition floor fades over the stagger span after release — it bridges
-    // T+0 but never masks the rise (expert open item, implemented).
     let age = -1, tTloc = 8;
-    try {
-      if (typeof globalThis !== 'undefined' && typeof globalThis.padParams === 'function') {
-        const _PP = globalThis.padParams(V.lvId);
-        tTloc = _PP.hold + _PP.tauTower;
-        const _tw = (typeof V._tw === 'number' && isFinite(V._tw)) ? V._tw : -1;
-        age = bankAge(_tw, i, tTloc);
-      } else {
-        age = (f - s.userData.delay) / (25 / P0.endMet);
+    if (f <= 0.001) {
+      // A3: Countdown pre-release ignition phase with smooth soft activation and dt integration
+      const curIk = V._ignKs || 0;
+      if (curIk <= 0.001) {
+        s.material.opacity = 0;
+        continue;
       }
-    } catch (e) { age = (f - s.userData.delay) / (25 / P0.endMet); }
-    if ((V._ignK || 0) > 0) {
-      const _tw2 = (typeof V._tw === 'number' && isFinite(V._tw)) ? V._tw : 0;
-      const _fade = _tw2 <= 0 ? 1 : Math.max(0, 1 - _tw2 / Math.max(2, 0.4 * tTloc));
-      age = Math.max(age, _fade * (V._ignK * 0.22 - s.userData.delay * 4));
-    }
-    // Ignition density control: only a ramp fraction of banks participates
-    // pre-release (thin first wisps → ~35% banks at full ramp; ascent takes
-    // all 64 via bankAge). Cut twice against the whiteout shot.
-    if (f <= 0.001 && (V._ignK || 0) > 0 && (i / nPad) > (V._ignK * 0.35)) {
-      s.material.opacity = 0;
-      continue;
+      const onAt = (i / nPad) * 0.45;
+      const vis = smooth01(curIk, onAt, onAt + 0.25);
+      if (vis <= 0.001) {
+        s.material.opacity = 0;
+        continue;
+      }
+      s.userData.ignAge = (s.userData.ignAge || 0) + (isFinite(dt) && dt > 0 ? dt : 0.016) * (0.08 + 0.35 * curIk) * vis;
+      if (s.userData.ignAge > 1.0) s.userData.ignAge = 0;
+      age = s.userData.ignAge * 0.32; // floor-hugging billow
+      s.userData.ignVis = vis;
+    } else {
+      s.userData.ignVis = 1.0;
+      try {
+        if (typeof globalThis !== 'undefined' && typeof globalThis.padParams === 'function') {
+          const _PP = globalThis.padParams(V.lvId);
+          tTloc = _PP.hold + _PP.tauTower;
+          const _tw = (typeof V._tw === 'number' && isFinite(V._tw)) ? V._tw : -1;
+          age = bankAge(_tw, i, tTloc);
+        } else {
+          age = (f - s.userData.delay) / (25 / P0.endMet);
+        }
+      } catch (e) { age = (f - s.userData.delay) / (25 / P0.endMet); }
     }
 
     if (age < 0 || age > 2) {
@@ -4088,8 +4595,9 @@ function updateSmokeParticles(f, now, dt, prof) {
                              : Math.cos((age - 0.35) / 1.65 * Math.PI / 2);
     const envA = (f <= 0.001) ? Math.min(envA0, 0.5) : envA0;
     // Slight per-sprite shimmer (±8%, ~6 s period, seed-scattered) — same
-    // de-repetition as the breathing above.
-    s.material.opacity = (met < 25 ? 0.62 : 0.45) * envA * heightFade * (0.92 + 0.08 * Math.sin(now * 0.0011 + sd * 39));  // was 0.72 / 0.55
+    // de-repetition as the breathing above. Scaled by ignVis for smooth pre-release fade-in.
+    const baseOp = (met < 25 ? 0.62 : 0.45) * envA * heightFade * (0.92 + 0.08 * Math.sin(now * 0.0011 + sd * 39));
+    s.material.opacity = baseOp * (s.userData.ignVis != null ? s.userData.ignVis : 1.0);
   }
 
   // Atmospheric flight only: alt < ~80 km (no contrail in vacuum, whatever f says)
@@ -4150,7 +4658,7 @@ function updateSmokeParticles(f, now, dt, prof) {
   // Expert fireballK: holds the countdown level to tower-clear, then decays
   // (was fk = met/5, peaking mid-climb with a handoff pop).
   if (V.padFireball) {
-    if (met <= 0 && (V._ignK || 0) <= 0) {
+    if (met <= 0 || f <= 0.001) {
       V.padFireball.material.opacity = 0;
     } else {
       let fbK = -1;
@@ -4169,25 +4677,20 @@ function updateSmokeParticles(f, now, dt, prof) {
       // blend has begun. Opacity only; no endpoint snap.
       fbK *= 1 - smooth01(met, 10.2, 13.0);
       const anchor = V.trenchPos || _trenchFallback;
-      V.padFireball.position.set(anchor.x, anchor.y + 1.2, anchor.z);
-      const fsc = (9 + fbK * 7) * hsS;
-      V.padFireball.scale.set(fsc * 1.25, fsc * 0.85, 1);
-      V.padFireball.material.opacity = 0.40 * fbK;
-      V.padFireball.material.color.setHex(met < 6 ? 0xfff3d8 : 0xff9a40);
+      V.padFireball.position.set(anchor.x, anchor.y + 0.2, anchor.z);
+      const fsc = (6 + fbK * 5) * hsS;
+      V.padFireball.scale.set(fsc * 1.1, fsc * 0.7, 1);
+      V.padFireball.material.opacity = 0.25 * fbK;
+      V.padFireball.material.color.setHex(0xff8830);
     }
   }
 
-  // 1b. Under-flame smoke bed: fire-lit vapor churning BELOW the flame tip
-  // (ref: glowing smoke under the column, never around the nozzle/top).
-  // Spawns at the live flame TIP through the low-altitude burn; additive so
-  // it reads as lit vapor, color set once at spawn (no per-frame cost).
-  // Expert smoke method: continuous from T+0 (was MET 4–60 — a gap while the
-  // vehicle already lifted after the shorter hold); ignition beat included.
-  const ignBeat = (V._ignK || 0) > 0 && f <= 0.001;
-  const flameOn = V.corePlume && V.corePlume.visible && (ignBeat || met < 60);
+  // 1b. Under-flame smoke bed: fire-lit vapor churning BELOW the flame tip.
+  // Spawns only during flight when the rocket has lifted off the pad (met >= 1.0, f > 0.002).
+  // Zero fake spark spraying while on the pad.
+  const flameOn = V.corePlume && V.corePlume.visible && met >= 1.0 && met < 60;
   V._fsmokeTick++;
-  // Ignition density: sparse early spawns, ~50% bed by release.
-  const bedRate = (f <= 0.001 && (V._ignK || 0) < 1) ? Math.max(0.08, (V._ignK || 0) * 0.5) : 1;
+  const bedRate = (met < 5) ? 0.3 : 1;
   if (flameOn && V._fsmokeTick % 2 === 0 && V.flameSmoke && Math.random() < bedRate) {
     for (let i = 0; i < V.flameSmoke.length; i++) {
       const s = V.flameSmoke[i];
@@ -4552,88 +5055,64 @@ function updateIgnition(tEl, now) {
   }
   const tSec = now * 0.001;
   V.rocket.updateMatrixWorld(true);
-  // Core plume at the bell mouth (same anchor as ascent).
-  _pp0.set(0, (V.corePlume.userData.exitY != null) ? V.corePlume.userData.exitY : -0.2, 0);
-  S.stage1.localToWorld(_pp0);
-  V.corePlume.position.copy(_pp0);
-  S.stage1.getWorldQuaternion(_bq);
-  V.corePlume.quaternion.copy(_bq);
-  V.corePlume.visible = true;
-  V.corePlume.scale.set(1, 0.55 + 0.45 * ignK, 1);
-  const gd = V.corePlume.userData;
-  gd.thrS = ignK;
-  if (!gd.wasOn) { gd.t0 = tSec; gd.wasOn = true; }
-  const tPlume = tSec - (gd.t0 != null ? gd.t0 : tSec);
-  const ch = V.corePlume.children;
-  for (let ci = 0; ci < ch.length; ci++) {
-    drivePlume(ch[ci], tPlume, Math.max(0.001, ignK), 1);
-    const cm = ch[ci];
-    if (cm && cm.material && cm.material.uniforms && cm.material.uniforms.uExposure) {
-      if (cm.userData.expo0 == null) cm.userData.expo0 = cm.material.uniforms.uExposure.value;
-      cm.material.uniforms.uExposure.value = cm.userData.expo0 * (1 + 0.8 * ignK);
-    }
+  // On the launch pad before liftoff (countdown phase):
+  // Engines ignite into the mobile launcher deck opening directly into the flame trench.
+  // The supersonic flight plume cone is hidden — exhaust discharges into the trench.
+  // The flight plume cone emerges into the open air only upon pad release / liftoff (ascent phase).
+  if (V.corePlume) {
+    V.corePlume.visible = false;
+    const gd = V.corePlume.userData;
+    gd.thrS = 1.0;
+    if (!gd.wasOn) { gd.t0 = tSec; gd.wasOn = true; }
   }
-  if (V.nozzleMat) V.nozzleMat.emissive.setRGB(1.6 * ignK, 0.62 * ignK, 0.16 * ignK);
-  const cGlow = V.corePlume.userData.glow;
-  if (cGlow && cGlow.material && cGlow.material.uniforms) {
-    const gu = cGlow.material.uniforms;
-    gu.uGlow.value = 1.1 * (0.35 + 0.9 * ignK);
-    const air = V.corePlume.userData.air;
-    if (air && air.material && air.material.uniforms) {
-      air.material.uniforms.uGlow.value = 0.5 * (0.35 + 0.9 * ignK);
-      if (air.material.uniforms.uLen && gu.uLen) air.material.uniforms.uLen.value = gu.uLen.value;
-    }
-    if (gu.uLen && V.corePlume.userData.len) gu.uLen.value = V.corePlume.userData.len * V.corePlume.scale.y;
-    if (gu.uTint) gu.uTint.value.copy(_C_GLOW_WARM);
-    V._skyLiftS = 0.05 * ignK;
-  }
-  // Booster plumes at their bell mouths (same anchors as ascent; i*1.7 keeps
-  // the staggered-light feel). Ascent headK takes over seamlessly at MET 4+.
-  if (V.boosterPlumes && S.boosters) {
-    for (let i = 0; i < S.boosters.length; i++) {
-      const bp = V.boosterPlumes[i], bMesh = S.boosters[i];
-      if (!bp || !bMesh) continue;
-      _pp1.set(0, (bMesh.userData && isFinite(bMesh.userData.exitY)) ? bMesh.userData.exitY : -0.1, 0);
-      bMesh.localToWorld(_pp1);
-      bp.position.copy(_pp1);
-      bMesh.getWorldQuaternion(_bq);
-      bp.quaternion.copy(_bq);
-      bp.visible = true;
-      bp.scale.set(1, 0.55 + 0.45 * ignK, 1);
-      if (!bp.userData.wasOn) { bp.userData.t0 = tSec; bp.userData.wasOn = true; }
-      const tB = (tSec - (bp.userData.t0 != null ? bp.userData.t0 : tSec)) + i * 1.7;
-      const bch = bp.children;
-      for (let ci = 0; ci < bch.length; ci++) drivePlume(bch[ci], tB, Math.max(0.001, ignK), 1);
-      const bGlow = bp.userData.glow;
-      if (bGlow && bGlow.material && bGlow.material.uniforms) {
-        bGlow.material.uniforms.uGlow.value = 0.55 * (0.35 + 0.9 * ignK);
-        if (bp.userData.len) bGlow.material.uniforms.uLen.value = bp.userData.len * (bp.scale.y || 1);
+  if (V.boosterPlumes) {
+    for (let i = 0; i < V.boosterPlumes.length; i++) {
+      const bp = V.boosterPlumes[i];
+      if (bp) {
+        bp.visible = false;
+        if (!bp.userData.wasOn) { bp.userData.t0 = tSec; bp.userData.wasOn = true; }
       }
     }
   }
   if (V.vacPlume) V.vacPlume.visible = false;
-  // Trench-anchored fire light + fireball ramp (ascent curve hands off at T+0).
+
+  // Hot bells: engine bells glow incandescent cherry-orange from combustion
+  // B5: Falcon 9 TEA-TEB emerald green flash beat at ignition start
+  const isKerolox = V.lvId === 'f9' || V.lvId === 'fhr' || V.lvId === 'fhe';
+  const sSinceIgn = tEl - (countS - 2);
+  let teaK = 0;
+  if (isKerolox && sSinceIgn >= 0 && sSinceIgn < 0.14) {
+    teaK = sSinceIgn < 0.03 ? sSinceIgn / 0.03 : 1 - (sSinceIgn - 0.03) / 0.11;
+  }
+  teaK = Math.max(0, Math.min(1, teaK));
+
+  if (V.nozzleMat) {
+    if (teaK > 0) {
+      const r = THREE.MathUtils.lerp(1.6 * ignK, 0.06, teaK);
+      const g = THREE.MathUtils.lerp(0.62 * ignK, 2.0, teaK);
+      const b = THREE.MathUtils.lerp(0.16 * ignK, 0.4, teaK);
+      V.nozzleMat.emissive.setRGB(r, g, b);
+    } else {
+      V.nozzleMat.emissive.setRGB(1.6 * ignK, 0.62 * ignK, 0.16 * ignK);
+    }
+  }
+
+  // A4: Trench-anchored fire light: stay down inside the trench cavity during countdown hold-down
   if (V.fireLight) {
     const anchor = V.trenchPos || _trenchFallback;
-    let lx = anchor.x, ly = anchor.y, lz = anchor.z;
-    if (V.camera) {
-      const ox = V.camera.position.x - lx, oz = V.camera.position.z - lz;
-      const om = Math.sqrt(ox * ox + oz * oz) || 1;
-      lx += (ox / om) * 3.0; lz += (oz / om) * 3.0; ly += 2.0;
+    const ty = (anchor.y != null && isFinite(anchor.y)) ? anchor.y - 0.4 : -1.0;
+    V.fireLight.position.set(anchor.x, ty, anchor.z);
+    const flick = 1 + 0.06 * Math.sin(now * 0.0173) + 0.04 * Math.sin(now * 0.0317 + 1.3);
+    V.fireLight.intensity = 420 * ignK * flick * fireProxK();
+    if (teaK > 0) {
+      V.fireLight.color.setHex(0x18ee58);
+    } else {
+      V.fireLight.color.setHex(0xff7a18);
     }
-    V.fireLight.position.set(lx, ly, lz);
-    V.fireLight.intensity = 650 * ignK * fireProxK();
-    V.fireLight.color.setHex(0xff6a10);
   }
   if (V.padFireball) {
-    const anchor = V.trenchPos || _trenchFallback;
-    V.padFireball.position.set(anchor.x, anchor.y + 1.2, anchor.z);
-    const vkS = (V.rocket && V.rocket.scale && isFinite(V.rocket.scale.x) && V.rocket.scale.x > 0)
-      ? V.rocket.scale.x : SITE_VK;
-    const fsc = (9 + ignK * 7) * (vkS / (12 / 71.6));
-    V.padFireball.scale.set(fsc * 1.25, fsc * 0.85, 1);
-    V.padFireball.material.opacity = 0.40 * ignK;
-    V.padFireball.material.color.setHex(0xfff3d8);
+    // Hidden during countdown to avoid fake 2D sprite washed over pad; trench firelight provides true 3D lighting
+    V.padFireball.material.opacity = 0;
   }
 }
 
@@ -4703,10 +5182,9 @@ function directCountdownCam(tEl, now) {
     // verify-time; procedural-tower fallback). Look height centers the
     // stack's angular span as seen from the camera (≈68% SLS, ≈62% F9).
     const tt = V._towerTop || { x: 4.9, y: 13.4, z: 1.5 };
-    px = tt.x + 1.6; py = tt.y + 0.6; pz = tt.z + 1.6;
-    const tD = Math.max(0.5, Math.hypot(px, pz));
-    const aTop = Math.atan2(py - topY, tD), aBase = Math.atan2(py - baseY, tD);
-    lx = 0; ly = py - tD * Math.tan((aTop + aBase) * 0.5); lz = 0;
+    // Exterior vantage outside tower perimeter: eliminates view obstruction
+    px = 4.8; py = tt.y + 1.1; pz = 6.2;
+    lx = 0.4; ly = topY * 0.74; lz = 0;
   } else { lx = 0; ly = baseY + stackH * 0.52; lz = 0; }
   // Still heads: no pan/drift by owner direction — position is the table
   // value, motion is ignition rumble only (below).
@@ -4765,18 +5243,33 @@ function introCamPose(f, now, sdt, fIntro) {
   _hLA.set(-(_pp0.z / iD) * iox, lookY + ioy, (_pp0.x / iD) * iox);
 }
 function lookbackCamPose(now) {
-  // Wall-graze (owner + reference): lens just off the skin (body radius +
-  // 0.35) staring nearly straight down past it — mirrored to put the wall on
-  // the LEFT (body east of lens would read right; lens west reads left).
-  // Pad/smoke open right-below, bell bottom-center. Look rides WITH the
-  // vehicle so framing holds through the climb.
+  // Wall-graze (owner + reference): lens just off the skin staring nearly straight down past it.
   const rp = V.rocket.position;
   const lcfg = (typeof LV_STACKS !== 'undefined' && (LV_STACKS[V.lvId] || LV_STACKS.f9)) || { coreD: 3.7, h: 70 };
   const lvk = (V.rocket && V.rocket.scale && isFinite(V.rocket.scale.x) && V.rocket.scale.x > 0)
     ? V.rocket.scale.x : SITE_VK;
   const bodyR = Math.max(0.1, (lcfg.coreD || 3.7) * 0.5 * lvk);
-  _hPB.set(rp.x - bodyR - 0.35, rp.y + 1.2, rp.z);
-  const tx = rp.x - bodyR - 0.2, ty = rp.y - 1.8, tz = rp.z + 0.6;
+
+  let px, py, pz, tx, ty, tz;
+  if (lcfg.triple) {
+    // Falcon Heavy: front inter-core oblique angle showing all 3 cores, grid fins, and 27 engines
+    const spanZ = bodyR * 3.4 + 0.35;
+    px = rp.x - bodyR * 0.8;
+    py = rp.y + 2.2;
+    pz = rp.z + spanZ;
+    tx = rp.x;
+    ty = rp.y - 2.8;
+    tz = rp.z + 0.1;
+  } else {
+    px = rp.x - bodyR - 0.35;
+    py = rp.y + 1.2;
+    pz = rp.z;
+    tx = rp.x - bodyR - 0.2;
+    ty = rp.y - 1.8;
+    tz = rp.z + 0.6;
+  }
+  _hPB.set(px, py, pz);
+
   const redL = (V.ascS || ASCENT_S) < ASCENT_S;
   if (redL) { _hLB.set(tx, ty, tz); return; }
   _pp0.set(tx - _hPB.x, ty - _hPB.y, tz - _hPB.z);
@@ -4929,6 +5422,8 @@ function frame(now) {
   const prof = clk.phase === 'countdown'
     ? { alt: 0, vel: 0, downrange: 0, gForce: 1.0, met: 0 }
     : ascentProfile(f, V.lvId);
+  V.flightProfile = prof;
+  V._lastF = f;
   // Smoke wall clock (expert smoke method): measured frame delta, clamped for
   // hitches, scaled so reduced-motion preserves shape (nomScale = 1 normal).
   V.nomScale = clk.phase === 'countdown' ? COUNT_S / (V.countS || COUNT_S) : ASCENT_S / (V.ascS || ASCENT_S);
@@ -5150,8 +5645,10 @@ function stop() {
   try {
     V.env.forEach(g => {
       try {
+        if (g === V.nasaML || g === V.nasaCrawler) return;
         g.traverse(o => {
-          if (o.isMesh || o.isPoints) { // Points: Step-1 star field (old code leaked it; dispose here)
+          if (o.isMesh || o.isPoints) {
+            if (o.userData && o.userData.isCachedEnv) return;
             if (o.geometry) o.geometry.dispose();
             if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
           }
@@ -5166,13 +5663,25 @@ function stop() {
   } catch (e) {}
   V.sun = null; V.skyDome = null; V.stars = null; V.visibleBodies = [];
   V.nasaML = null; V.nasaMLOn = false; V.nasaCrawler = null;
-  V.deluge = []; V.rofi = []; V.vent = []; V.skyGlow = null;
-  V.padLights = []; V._ignK = 0;
+  V.deluge = [];
+  if (V.rofi && V.rofi.pts) {
+    try {
+      if (V.rofi.pts.geometry) V.rofi.pts.geometry.dispose();
+      if (V.rofi.pts.material) {
+        if (V.rofi.pts.material.map) V.rofi.pts.material.map.dispose();
+        V.rofi.pts.material.dispose();
+      }
+      if (V.scene) V.scene.remove(V.rofi.pts);
+    } catch (e) {}
+  }
+  V.rofi = null; V.vent = []; V.skyGlow = null;
+  V.padLights = []; V._ignK = 0; V._ignKs = 0;
   V.chaseFill = null;
   try { if (V._flareMat) V._flareMat.dispose(); } catch (e) {}
   try { if (V._flareTex) V._flareTex.dispose(); } catch (e) {}
   try { if (V._dotTex) V._dotTex.dispose(); } catch (e) {}
-  V._flareMat = null; V._flareTex = null; V._dotTex = null;
+  try { if (V._throatGlowTex) V._throatGlowTex.dispose(); } catch (e) {}
+  V._flareMat = null; V._flareTex = null; V._dotTex = null; V._throatGlowTex = null;
   try { if (V._paintRough) V._paintRough.dispose(); } catch (e) {}
   try { if (V._groundGrain) V._groundGrain.dispose(); } catch (e) {}
   try { if (V._envTex) V._envTex.dispose(); } catch (e) {}
@@ -5320,8 +5829,21 @@ function start(mountParent, opts) {
     buildScene();
     ensureHud();
     initLaunchAudio();
-    // Vendored LC-39 environment loads async; procedural tower stands until then.
+
+    // Build the modular multi-stage rocket stack first so rocket is ready before pad/ML mount
+    let payloadModel = null;
+    if (opts.craft && opts.craft.isObject3D) {
+      payloadModel = opts.craft;
+    } else if (typeof window !== 'undefined' && window.M3D && window.M3D.craft && window.M3D.craft.isObject3D) {
+      payloadModel = window.M3D.craft;
+    }
+    V.rocket = buildModularStack(V.lvId, payloadModel);
+    V.scene.add(V.rocket);
+    try { V.rocket.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } }); } catch (e) {}
+
+    // Pre-warmed pad environment and NASA ML mount synchronously when cached
     try { loadEnvironment(); } catch (e) {}
+    try { loadML(); } catch (e) {}
 
     V.active = true;
     V.t0 = performance.now();
@@ -5332,20 +5854,6 @@ function start(mountParent, opts) {
     V.camera.aspect = w / h;
     V.camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
-
-    // Build the modular multi-stage rocket stack
-    let payloadModel = null;
-    if (opts.craft && opts.craft.isObject3D) {
-      payloadModel = opts.craft;
-    } else if (typeof window !== 'undefined' && window.M3D && window.M3D.craft && window.M3D.craft.isObject3D) {
-      payloadModel = window.M3D.craft;
-    }
-    V.rocket = buildModularStack(V.lvId, payloadModel);
-    V.scene.add(V.rocket);
-    // Phase A step 3: rocket casts (GLB/ground receive). Set once before first render.
-    try { V.rocket.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } }); } catch (e) {}
-    // True-scale NASA ground hardware (needs V.rocket scale + old-env slab).
-    try { loadML(); } catch (e) {}
 
     // Size the Max-Q collar to the LIVE vehicle body (display units): the old
     // fixed cone read as a fairing event on slender stacks. Stores the core
@@ -5375,4 +5883,16 @@ function isActive() { return V.active; }
 const LaunchView = { start, stop, isActive };
 try { window.LaunchView = LaunchView; } catch (e) {}
 try { window.__LAUNCH_VIEW__ = V; } catch (e) {} // dev harness introspection
-export { LaunchView };
+/* Stack builder + verified stack table + the LC-39B pad assets/scale are
+   shared with the launch-screen 3D vehicle preview (js/lv-preview.js) — one
+   geometry implementation, one set of measured site constants. */
+export {
+  LaunchView, buildModularStack, LV_STACKS,
+  envGltfLoader, ENV_URL, ENV_SCALE, ML_URL,
+  ML_M_PER_UNIT, WORLD_M_PER_UNIT, SLAB_TOP_Y, SITE_DECK_Y,
+  measureGlbGround,
+  // Static environment builders, shared with the launch-screen preview so the
+  // panel renders the SAME site (ground, floodlights, lamps, sky, stars).
+  buildSiteGround, buildLampHousings, buildPadSpotLights, buildFieldLights,
+  buildTowerLampsFromML, buildLightShafts, buildSkyDome, buildRealStars, LAMP_HEADS,
+};

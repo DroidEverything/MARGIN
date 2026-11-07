@@ -22,10 +22,10 @@ const MOON_PARENT = { moon: 'earth', io: 'jupiter', europa: 'jupiter', ganymede:
 function focusStatusLine() {
   const key = V.selectedPlanet || V.toKey || (V.cur && LEVEL_BODY[V.cur]) || 'earth';
   let prov = 'NONE', stat = 'UNAVAILABLE', extra = '';
-  try { prov = providerOf(key, V.simDays); } catch (e) {}
-  try { stat = statusOf(key, V.simDays) || stat; } catch (e) {}
+  try { prov = providerOf(key, V.simDays); } catch (e) { }
+  try { stat = statusOf(key, V.simDays) || stat; } catch (e) { }
   if (MOON_PARENT[key]) {
-    try { extra = ' · ' + moonPathOf(key, MOON_PARENT[key], V.simDays); } catch (e) {}
+    try { extra = ' · ' + moonPathOf(key, MOON_PARENT[key], V.simDays); } catch (e) { }
   }
   const degraded = (stat !== 'OK') || (extra.indexOf('analytic') >= 0);
   return { key, html: `<span class="ephem${degraded ? ' off' : ''}">${esc_(key)} · ${esc_(prov)} · ${esc_(stat)}${esc_(extra)}</span>` };
@@ -34,7 +34,7 @@ let statusTick = 0;
 function refreshStatusBadge() {
   if ((statusTick++ % 30) !== 0) return; // ~2Hz — no per-frame DOM churn
   const el = document.getElementById('selstatus'); if (!el) return;
-  try { el.innerHTML = focusStatusLine().html; } catch (e) {}
+  try { el.innerHTML = focusStatusLine().html; } catch (e) { }
 }
 
 const V = {
@@ -60,11 +60,11 @@ function detectPhysicalMode() {
     const sp = new URLSearchParams(globalThis.location.search);
     if (sp.get('mode') === 'presentation' || sp.has('presentation') || sp.has('pres')) return false;
     if (sp.has('phys') || sp.get('mode') === 'physical') return true;
-  } catch (e) {}
+  } catch (e) { }
   try {
     if (globalThis.Astronomy && globalThis.Astronomy.mode === 'presentation') return false;
     if (globalThis.Astronomy && globalThis.Astronomy.mode === 'physical') return true;
-  } catch (e) {}
+  } catch (e) { }
   return true;
 }
 
@@ -76,19 +76,33 @@ function stop() {
   if (V.onClick) document.removeEventListener('click', V.onClick);
   if (V.onKey) window.removeEventListener('keydown', V.onKey);
   if (V._cbsDocClick) document.removeEventListener('click', V._cbsDocClick);
+  const bottomDeck = document.querySelector('.sel-bottom') || document.querySelector('.lvstrip');
+  if (bottomDeck && V._onDeckWheel) {
+    bottomDeck.removeEventListener('wheel', V._onDeckWheel);
+  }
+  const strip = document.querySelector('.lvstrip');
+  if (strip) {
+    if (V._onStripWheel) strip.removeEventListener('wheel', V._onStripWheel);
+    if (V._onStripPointerDown) strip.removeEventListener('pointerdown', V._onStripPointerDown);
+  }
+  if (V._onStripPointerUp) window.removeEventListener('pointerup', V._onStripPointerUp, true);
+  if (V._onStripPointerCancel) window.removeEventListener('pointercancel', V._onStripPointerCancel, true);
+  if (V._onStripPointerMove) window.removeEventListener('pointermove', V._onStripPointerMove);
+  V._onDeckWheel = null;
+  V._onStripWheel = V._onStripPointerDown = V._onStripPointerUp = V._onStripPointerCancel = V._onStripPointerMove = null;
   V._cbsDocClick = null;
   V.onHover = V.onFocus = V.onClick = V.onKey = null;
   if (V.hudEl && V.hudEl.parentNode) V.hudEl.parentNode.removeChild(V.hudEl);
   if (V.infoEl && V.infoEl.parentNode) V.infoEl.parentNode.removeChild(V.infoEl);
   V.hudEl = V.infoEl = null;
 
-  if (V.composer) { try { V.composer.dispose(); } catch (e) {} }
+  if (V.composer) { try { V.composer.dispose(); } catch (e) { } }
   if (V.renderer) {
-    try { V.renderer.dispose(); } catch (e) {}
+    try { V.renderer.dispose(); } catch (e) { }
     const r = V.renderer;
-    setTimeout(() => { try { r.forceContextLoss(); } catch (e) {} }, 600);
+    setTimeout(() => { try { r.forceContextLoss(); } catch (e) { } }, 600);
   }
-  if (V.controls) { try { V.controls.dispose(); } catch (e) {} }
+  if (V.controls) { try { V.controls.dispose(); } catch (e) { } }
 
   V.renderer = V.composer = V.bloomPass = V.outlinePass = V.scene = V.camera = V.canvas = null;
   V.bodies = V.flareMats = V.atmospheres = V.orbitLines = V.orbitTags = V.asteroidBelts = V.nameGroup = V.nameList = null;
@@ -97,7 +111,8 @@ function stop() {
   V.diving = false; V.W = 0; V.H = 0; V.cur = null; V.toKey = null; V.failed = false;
   V.isPhys = false; V.originKm = [0, 0, 0]; V.raycastTargets = [];
   V.sysView = false;
-  try { document.body.classList.remove('sysview'); } catch (e) {}
+  invalidateSunElements();
+  try { document.body.classList.remove('sysview'); } catch (e) { }
 }
 
 /* Cinematic overview camera position (isometric angle displaying all planetary orbits) */
@@ -155,24 +170,24 @@ function applyLabelVis() {
 }
 
 function capHTML(L, B) {
-  const tag = V.ephem === 'live' ? '<span class="ephem">SBDB ✓</span>' : (V.ephem === 'cached' ? '<span class="ephem off">CACHED</span>' : '');
-  const modeTag = V.isPhys ? `<span class="ephem">PHYSICAL Earth=${(radiusKmTrue('earth') * UNITS_PER_KM).toExponential(2)}u</span>` : `<span class="ephem">PRESENTATION Earth=${radiusOf('earth').toFixed(4)}u safe</span>`;
+  const modeTag = V.isPhys ? `PHYSICAL ${esc_(B.n)}=${(radiusKmTrue(L.body || 'earth') * UNITS_PER_KM).toExponential(2)}u` : `PRESENTATION ${esc_(B.n)}`;
   return `
-    <div class="sc-row"><span class="sc-dest">DESTINATION · ${esc_(B.n.toUpperCase())}</span></div>
+    <div class="sc-head">
+      <span class="sc-dest">DESTINATION · ${esc_(B.n.toUpperCase())}</span>
+      <span class="sc-target-badge">INSPECTOR</span>
+    </div>
     <div class="sc-name">${esc_(L.name)}</div>
     <div class="sc-sub">${esc_(L.sub)}</div>
     <div class="sc-stats">
-      <span><b>DIST</b>${B.au ? B.au.toFixed(2) + ' AU' : '—'}</span>
-      <span><b>CRUISE</b>${L.years} YR</span>
-      <span><b>BUDGET</b>$${L.capM}M CAP</span>
-      <span><b>DOSE</b>${L.dose} KRAD/YR</span>
-      ${tag}
+      <div class="sc-stat-item"><b>DIST</b><em>${B.au ? B.au.toFixed(2) + ' AU' : '—'}</em></div>
+      <div class="sc-stat-item"><b>CRUISE</b><em>${L.years} YR</em></div>
+      <div class="sc-stat-item"><b>BUDGET</b><em>$${L.capM}M CAP</em></div>
+      <div class="sc-stat-item"><b>DOSE</b><em>${L.dose} KRAD/YR</em></div>
     </div>
-    <div class="sc-harness" style="margin:4px 0;font-size:10px;opacity:0.7;">${modeTag} · ${V.isPhys ? 'physical' : 'presentation'}</div>
-    <div id="selstatus" style="margin:2px 0 4px;font-size:10px;"></div>
-    <div class="sc-actions">
-      <button class="sysbtn" data-act="sysview">${V.sysView ? 'RETURN TO MISSION' : 'FULL SYSTEM'}</button>
-    </div>
+    <details class="sc-debug">
+      <summary>System ephemeris cache</summary>
+      <div class="sc-debug-body">${modeTag} · <span id="selstatus">OK · physical</span></div>
+    </details>
   `;
 }
 
@@ -189,14 +204,31 @@ function setCaption(id) {
   if (V.sysView) return;
   const L = levelById(id || V.cur);
   if (!L) return;
-  let B = { n: '—' }; try { B = BODY[L.body] || B; } catch (e) {}
+  let B = { n: '—' }; try { B = BODY[L.body] || B; } catch (e) { }
   cap.innerHTML = capHTML(L, B);
 }
 
 function markCard(id) {
-  document.querySelectorAll('.lvcard.selviewing').forEach((el) => el.classList.remove('selviewing'));
+  const cards = Array.from(document.querySelectorAll('.lvcard'));
+  const activeIdx = cards.findIndex((el) => el.dataset.id === id);
+
+  cards.forEach((el, idx) => {
+    el.classList.remove('selviewing', 'pos-dist-1', 'pos-dist-2', 'pos-dist-far');
+    if (activeIdx >= 0) {
+      const dist = Math.abs(idx - activeIdx);
+      if (dist === 0) el.classList.add('selviewing');
+      else if (dist === 1) el.classList.add('pos-dist-1');
+      else if (dist === 2) el.classList.add('pos-dist-2');
+      else el.classList.add('pos-dist-far');
+    }
+  });
+
   const c = document.querySelector('.lvcard[data-id="' + id + '"]');
-  if (c) c.classList.add('selviewing');
+  if (c) {
+    try {
+      c.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    } catch (e) { }
+  }
 }
 
 const _p = new THREE.Vector3(), _t = new THREE.Vector3(), _b = new THREE.Vector3(), _a = new THREE.Vector3();
@@ -205,8 +237,8 @@ const VISUAL_CENTER_BODIES = { bennu: true, phobos: true, deimos: true };
 /* Camera target must be the visible geometry centre, not merely an object's
    transform origin. Offset-bearing GLB hierarchies can otherwise focus beside
    the disc. Resolve the centre once in local space and transform it per frame. */
-function bodyVisualCenter(body, out){
-  out.set(0,0,0);
+function bodyVisualCenter(body, out) {
+  out.set(0, 0, 0);
   if (!body) return out;
   if (body.userData.visualCenterLocal) {
     out.copy(body.userData.visualCenterLocal).applyMatrix4(body.matrixWorld);
@@ -216,12 +248,143 @@ function bodyVisualCenter(body, out){
   _visualBox.setFromObject(body);
   if (!_visualBox.isEmpty()) {
     _visualBox.getCenter(out);
-    body.userData.visualCenterLocal=body.worldToLocal(out.clone());
+    body.userData.visualCenterLocal = body.worldToLocal(out.clone());
   } else body.getWorldPosition(out);
   return out;
 }
 const _gd = new THREE.Vector3(); // penetration-guard scratch (no per-frame allocation)
 const _sd = new THREE.Vector3(); // sun-direction scratch for dayside-biased arrival
+
+const _uiSunPos = new THREE.Vector3();
+const _uiSunTgt = new THREE.Vector3();
+const _uiSunScr = new THREE.Vector3();
+const _uiSunDir = new THREE.Vector3();
+const _uiSunCam = new THREE.Vector3();
+let _lastRootPosX = -999;
+let _lastRootPosY = -999;
+let _lastRootIntensity = -999;
+let _sunElementsCache = null;
+let _sunElementsLastCollect = 0;
+
+function invalidateSunElements() {
+  _sunElementsCache = null;
+}
+
+function refreshSunElements() {
+  const now = performance.now();
+  if (_sunElementsCache && now - _sunElementsLastCollect < 800) return _sunElementsCache;
+  _sunElementsLastCollect = now;
+  const list = [];
+  const selcap = document.getElementById('selcap');
+  if (selcap) {
+    const r = selcap.getBoundingClientRect();
+    if (r.width > 0) list.push({ el: selcap, cx: r.left + r.width / 2, cy: r.top + r.height / 2, lastAngle: -999 });
+  }
+  const bottom = document.querySelector('.sel-bottom');
+  if (bottom) {
+    const r = bottom.getBoundingClientRect();
+    if (r.width > 0) list.push({ el: bottom, cx: r.left + r.width / 2, cy: r.top + r.height / 2, lastAngle: -999 });
+  }
+  const cards = document.querySelectorAll('.sel-full .lvcard');
+  for (let i = 0; i < cards.length; i++) {
+    const el = cards[i];
+    const r = el.getBoundingClientRect();
+    if (r.width > 0) {
+      list.push({ el, cx: r.left + r.width / 2, cy: r.top + r.height / 2, lastAngle: -999 });
+    }
+  }
+  _sunElementsCache = list;
+  return list;
+}
+
+function updateSunlightUI() {
+  if (!V.camera || !V.bodies || !V.canvas) return;
+  const w = V.W || window.innerWidth;
+  const h = V.H || window.innerHeight;
+
+  const sunMesh = V.bodies.sun;
+  if (sunMesh) {
+    sunMesh.getWorldPosition(_uiSunPos);
+  } else if (V.sunLight) {
+    _uiSunPos.copy(V.sunLight.position);
+  } else {
+    _uiSunPos.set(-100, 100, 50);
+  }
+
+  // 1. Calculate irradiance intensity from line-of-sight vector
+  const key = V.selectedPlanet || V.toKey || 'earth';
+  const tgtMesh = V.bodies[key];
+  if (tgtMesh) tgtMesh.getWorldPosition(_uiSunTgt);
+  else if (V.controls) _uiSunTgt.copy(V.controls.target);
+  else _uiSunTgt.set(0, 0, 0);
+
+  _uiSunDir.subVectors(_uiSunPos, _uiSunTgt);
+  let globalIntensity = 0.75;
+  if (_uiSunDir.lengthSq() > 1e-4) {
+    _uiSunDir.normalize();
+    _uiSunCam.copy(_uiSunDir).transformDirection(V.camera.matrixWorldInverse);
+    globalIntensity = Math.max(0.35, Math.min(1.0, 0.5 + 0.5 * _uiSunCam.z));
+  }
+
+  // 2. Project 3D Sun position to exact 2D screen coordinates
+  _uiSunScr.copy(_uiSunPos).project(V.camera);
+  const isFront = _uiSunScr.z <= 1.0;
+  let sunPx, sunPy;
+  if (isFront) {
+    sunPx = (_uiSunScr.x * 0.5 + 0.5) * w;
+    sunPy = (-_uiSunScr.y * 0.5 + 0.5) * h;
+  } else {
+    // When sun is behind camera plane, project away from screen center
+    sunPx = (-_uiSunScr.x * 0.5 + 0.5) * w;
+    sunPy = (_uiSunScr.y * 0.5 + 0.5) * h;
+  }
+
+  // 3. Compute exact individual incident light position for each UI card / element
+  const items = refreshSunElements();
+  let firstPosX = 50, firstPosY = 50, firstNdx = -0.707, firstNdy = 0.707;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const dx = sunPx - item.cx;
+    const dy = sunPy - item.cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const ndx = dx / dist;
+    const ndy = dy / dist; // in screen pixels, +dy is down
+
+    // Compute incident light focus along card perimeter (diffuse point source)
+    const posX = 50 + ndx * 55;
+    const posY = 50 + ndy * 55;
+
+    if (i === 0) {
+      firstPosX = posX; firstPosY = posY;
+      firstNdx = ndx; firstNdy = ndy;
+    }
+
+    if (item.lastPosX === undefined || Math.abs(posX - item.lastPosX) > 0.4 || Math.abs(posY - item.lastPosY) > 0.4) {
+      item.lastPosX = posX;
+      item.lastPosY = posY;
+      item.el.style.setProperty('--sun-pos-x', `${posX.toFixed(1)}%`);
+      item.el.style.setProperty('--sun-pos-y', `${posY.toFixed(1)}%`);
+      item.el.style.setProperty('--sun-dx', ndx.toFixed(3));
+      item.el.style.setProperty('--sun-dy', (-ndy).toFixed(3));
+      item.el.style.setProperty('--sun-intensity', globalIntensity.toFixed(2));
+    }
+  }
+
+  // 4. Update root global fallback
+  if (_lastRootPosX === undefined || Math.abs(firstPosX - _lastRootPosX) > 0.4 || Math.abs(firstPosY - _lastRootPosY) > 0.4 || Math.abs(globalIntensity - _lastRootIntensity) > 0.02) {
+    _lastRootPosX = firstPosX;
+    _lastRootPosY = firstPosY;
+    _lastRootIntensity = globalIntensity;
+    const root = document.documentElement;
+    root.style.setProperty('--sun-pos-x', `${firstPosX.toFixed(1)}%`);
+    root.style.setProperty('--sun-pos-y', `${firstPosY.toFixed(1)}%`);
+    root.style.setProperty('--sun-dx', firstNdx.toFixed(3));
+    root.style.setProperty('--sun-dy', (-firstNdy).toFixed(3));
+    root.style.setProperty('--sun-intensity', globalIntensity.toFixed(2));
+    root.style.setProperty('--sun-screen-x', `${(sunPx / w * 100).toFixed(1)}%`);
+    root.style.setProperty('--sun-screen-y', `${(sunPy / h * 100).toFixed(1)}%`);
+  }
+}
 
 function getOriginForFocus(focusKey, simDays) {
   if (!V.isPhys) return [0, 0, 0];
@@ -235,22 +398,22 @@ function getOriginForFocus(focusKey, simDays) {
    hover), flyWide (overview), flyToPlanetDirect (click/dropdown),
    flyToBrief (dive commit). Each clears the others' state (V.fly, approach,
    selection anchor) so flights can never stack, fight, or go stale. */
-function updateFocusClamp(key){
+function updateFocusClamp(key) {
   if (!V.controls) return;
   const k = key || V.toKey || 'earth';
   if (V.isPhys) {
-    try { V.controls.minDistance = approachMinDist(k, UNITS_PER_KM); } catch(e){}
+    try { V.controls.minDistance = approachMinDist(k, UNITS_PER_KM); } catch (e) { }
   } else {
     try {
       const r = radiusOf(k);
       V.controls.minDistance = Math.max(r * 1.15, 0.04);
-    } catch(e) { V.controls.minDistance = 0.04; }
+    } catch (e) { V.controls.minDistance = 0.04; }
   }
 }
 
 function commitFly(toKey) {
   V.sysView = false;
-  try { document.body.classList.remove('sysview'); } catch (e) {}
+  try { document.body.classList.remove('sysview'); } catch (e) { }
   V.selectedPlanet = null;
   V.trackAnchor = null;
   V.isMovingTowardsPlanet = false;
@@ -259,7 +422,7 @@ function commitFly(toKey) {
   const p1 = new THREE.Vector3(), t1 = new THREE.Vector3();
   const originKm = getOriginForFocus(toKey, V.simDays);
   const opts = { physical: V.isPhys, unitsPerKm: UNITS_PER_KM, originKm: originKm, focusKey: toKey, floatingOrigin: V.isPhys && !V.sysView };
-  if(!frameOf(toKey, V.simDays, p1, t1, opts)) { V.fly = null; return; } // unavailable — settle, never run a stale flight
+  if (!frameOf(toKey, V.simDays, p1, t1, opts)) { V.fly = null; return; } // unavailable — settle, never run a stale flight
   updateFocusClamp(toKey);
   /* Snap the iris to the new focus on the cut (a real camera cuts exposure
      on a scene change): smoothing from a 35×-off value leaves targets
@@ -271,10 +434,10 @@ function commitFly(toKey) {
        parent's distance instead of falling back to wide exposure. */
     if ((!isFinite(km) || !(km > 0)) && MOON_PARENT[toKey]) km = helioDistKm(MOON_PARENT[toKey], V.simDays);
     V.exposure = (isFinite(km) && km > 0) ? exposureForBody(toKey, km * UNITS_PER_KM) : wideExposure();
-  } catch (e) {}
+  } catch (e) { }
 
   let still = false;
-  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
   if (still) {
     V.camera.position.copy(p1);
     V.camera.lookAt(t1);
@@ -309,7 +472,7 @@ function setBody(id) {
   const key = LEVEL_BODY[id] || 'mars';
   if (V.sysView) {
     V.sysView = false;
-    try { document.body.classList.remove('sysview'); } catch (e) {}
+    try { document.body.classList.remove('sysview'); } catch (e) { }
     if (V.nameGroup) V.nameGroup.visible = false;
   }
   markCard(id);
@@ -323,7 +486,7 @@ function setBody(id) {
 function flyToBrief(cb) {
   if (!V.scene || V.diving) { if (!V.scene && cb) cb(); return; }
   let still = false;
-  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
   if (still) { if (cb) cb(); return; }
   V.dive = { t: 0, dur: 0.95, key: LEVEL_BODY[V.cur] || 'mars', cb };
   V.diving = true; V.fly = null;
@@ -355,16 +518,16 @@ function toggleSystem() {
   V._lastToggle = now;
 
   let still = false;
-  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
   V.sysView = !V.sysView;
   /* full-system mode clears the mission UI (cards, title, dossier extras) —
      exit paths stay: caption RETURN, nav ↩ RETURN, Escape. Cleared in stop(). */
-  try { document.body.classList.toggle('sysview', V.sysView); } catch (e) {}
+  try { document.body.classList.toggle('sysview', V.sysView); } catch (e) { }
   /* Labels stay on in both modes. */
 
   const btnFullSys = document.getElementById('btnFullSys');
   if (btnFullSys) {
-    btnFullSys.innerHTML = V.sysView ? '↩ RETURN' : '🌐 FULL SYSTEM';
+    btnFullSys.innerHTML = V.sysView ? 'RETURN' : 'FULL SYSTEM';
     btnFullSys.title = V.sysView ? 'Return to Mission Focus' : 'Explore Full Solar System';
   }
 
@@ -397,7 +560,7 @@ function toggleSystem() {
 function resetView() {
   if (V.diving || !V.scene || !V.sysView) return;
   let still = false;
-  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
   if (still) {
     V.camera.position.copy(WIDE_POS);
     V.camera.lookAt(WIDE_TGT);
@@ -422,7 +585,7 @@ function toggleFullscreen(forceState) {
   if (btnFs) {
     btnFs.classList.toggle('active', V.isFullscreen);
     btnFs.setAttribute('aria-pressed', V.isFullscreen);
-    btnFs.innerHTML = V.isFullscreen ? '🗗 EXIT' : '⛶ FULLSCREEN';
+    btnFs.innerHTML = V.isFullscreen ? 'EXIT' : 'FULLSCREEN';
     btnFs.title = V.isFullscreen ? 'Exit Fullscreen' : 'Expand Fullscreen View';
   }
 
@@ -478,6 +641,7 @@ function size() {
   const w = Math.max(1, cv.clientWidth), h = Math.max(1, cv.clientHeight);
   if (w === V.W && h === V.H) return;
   V.W = w; V.H = h;
+  invalidateSunElements();
   V.camera.aspect = w / h;
   /* center-right composition (fullscreen harmonious UI): the focused body
      renders at ~65% frame width, leaving the left dossier and bottom strip
@@ -486,7 +650,7 @@ function size() {
      raycast (inverse matrix carries the offset) and clipping untouched. */
   try {
     V.camera.setViewOffset(w, h, (w >= 768) ? -Math.round(w * 0.15) : 0, 0, w, h);
-  } catch (e) {}
+  } catch (e) { }
   V.camera.updateProjectionMatrix();
   const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
   V.renderer.setPixelRatio(dpr);
@@ -571,7 +735,7 @@ function flyToPlanetDirect(bodyKey) {
   /* Same-planet selection: already there and framed — show the card, refresh
      the clamp, skip the absurd re-flight swoop. */
   if (bodyKey === (V.selectedPlanet || V.toKey) &&
-      V.camera.position.distanceTo(targetPos) < offsetDist * 3) {
+    V.camera.position.distanceTo(targetPos) < offsetDist * 3) {
     updateFocusClamp(bodyKey);
     showPlanetInfo(bodyKey);
     /* Still re-centre on the visual geometry origin. Dropdown re-selection can
@@ -582,7 +746,7 @@ function flyToPlanetDirect(bodyKey) {
     let km = helioDistKm(bodyKey, V.simDays);
     if ((!isFinite(km) || !(km > 0)) && MOON_PARENT[bodyKey]) km = helioDistKm(MOON_PARENT[bodyKey], V.simDays);
     V.exposure = (isFinite(km) && km > 0) ? exposureForBody(bodyKey, km * UNITS_PER_KM) : wideExposure();
-  } catch (e) {}
+  } catch (e) { }
   if (bodyKey === 'sun') offsetDist = V.isPhys ? Math.max(r * 8, 0.02) : 2.4;
   if (bodyKey === 'saturn') offsetDist = Math.max(offsetDist, r * 5.0);
   if (bodyKey === 'uranus') offsetDist = Math.max(offsetDist, r * 4.5);
@@ -607,7 +771,7 @@ function flyToPlanetDirect(bodyKey) {
   }
 
   let still = false;
-  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
   V.targetCamPos.copy(targetPos).addScaledVector(dir, offsetDist);
   V.targetLookAt.copy(targetPos);
   if (still) {
@@ -649,34 +813,34 @@ const CELESTIAL_MENU_GROUPS = [
   {
     label: 'STAR & INNER WORLDS',
     items: [
-      { key: 'sun', icon: '☀️', name: 'Sun', tag: 'STAR' },
-      { key: 'mercury', icon: '☿', name: 'Mercury', tag: 'PLANET' },
-      { key: 'venus', icon: '♀', name: 'Venus', tag: 'PLANET' },
-      { key: 'earth', icon: '🜨', name: 'Earth', tag: 'PLANET' },
-      { key: 'moon', icon: '🌔', name: 'Moon', tag: 'MOON', sub: true },
-      { key: 'mars', icon: '♂', name: 'Mars', tag: 'PLANET' },
-      { key: 'phobos', icon: '◈', name: 'Phobos', tag: 'MOON', sub: true },
-      { key: 'deimos', icon: '◈', name: 'Deimos', tag: 'MOON', sub: true }
+      { key: 'sun', icon: '•', name: 'Sun', tag: 'STAR' },
+      { key: 'mercury', icon: '•', name: 'Mercury', tag: 'PLANET' },
+      { key: 'venus', icon: '•', name: 'Venus', tag: 'PLANET' },
+      { key: 'earth', icon: '•', name: 'Earth', tag: 'PLANET' },
+      { key: 'moon', icon: '•', name: 'Moon', tag: 'MOON', sub: true },
+      { key: 'mars', icon: '•', name: 'Mars', tag: 'PLANET' },
+      { key: 'phobos', icon: '•', name: 'Phobos', tag: 'MOON', sub: true },
+      { key: 'deimos', icon: '•', name: 'Deimos', tag: 'MOON', sub: true }
     ]
   },
   {
     label: 'GAS GIANTS & MOONS',
     items: [
-      { key: 'jupiter', icon: '♃', name: 'Jupiter', tag: 'PLANET' },
-      { key: 'io', icon: '◈', name: 'Io', tag: 'MOON', sub: true },
-      { key: 'europa', icon: '◈', name: 'Europa', tag: 'MOON', sub: true },
-      { key: 'ganymede', icon: '◈', name: 'Ganymede', tag: 'MOON', sub: true },
-      { key: 'callisto', icon: '◈', name: 'Callisto', tag: 'MOON', sub: true },
-      { key: 'saturn', icon: '♄', name: 'Saturn', tag: 'PLANET' },
-      { key: 'uranus', icon: '⛢', name: 'Uranus', tag: 'PLANET' },
-      { key: 'neptune', icon: '♆', name: 'Neptune', tag: 'PLANET' }
+      { key: 'jupiter', icon: '•', name: 'Jupiter', tag: 'PLANET' },
+      { key: 'io', icon: '•', name: 'Io', tag: 'MOON', sub: true },
+      { key: 'europa', icon: '•', name: 'Europa', tag: 'MOON', sub: true },
+      { key: 'ganymede', icon: '•', name: 'Ganymede', tag: 'MOON', sub: true },
+      { key: 'callisto', icon: '•', name: 'Callisto', tag: 'MOON', sub: true },
+      { key: 'saturn', icon: '•', name: 'Saturn', tag: 'PLANET' },
+      { key: 'uranus', icon: '•', name: 'Uranus', tag: 'PLANET' },
+      { key: 'neptune', icon: '•', name: 'Neptune', tag: 'PLANET' }
     ]
   },
   {
     label: 'OUTER & SMALL BODIES',
     items: [
-      { key: 'pluto', icon: '♇', name: 'Pluto', tag: 'DWARF' },
-      { key: 'bennu', icon: '◈', name: 'Bennu', tag: 'ASTEROID' }
+      { key: 'pluto', icon: '•', name: 'Pluto', tag: 'DWARF' },
+      { key: 'bennu', icon: '•', name: 'Bennu', tag: 'ASTEROID' }
     ]
   }
 ];
@@ -689,7 +853,6 @@ function renderCelestialDropdown() {
         <button type="button" class="cbs-item ${it.sub ? 'is-sub' : ''}" data-body="${it.key}" role="option">
           <span class="cbs-item-left">
             ${it.sub ? '<span class="cbs-sub-indent" aria-hidden="true">└</span>' : ''}
-            <span class="cbs-item-icon" aria-hidden="true">${it.icon}</span>
             <span class="cbs-item-name">${esc_(it.name)}</span>
           </span>
           <span class="cbs-tag cbs-tag-${it.tag.toLowerCase()}">${it.tag}</span>
@@ -706,16 +869,16 @@ function createHUD(host) {
   navBar.innerHTML = `
     <div class="cbs-wrap" id="cbsWrap">
       <button type="button" class="cbs-trigger" id="cbsTrigger" aria-haspopup="listbox" aria-expanded="false" title="Focus Celestial Body">
-        <span class="cbs-trig-icon">🪐</span>
+        <span class="cbs-trig-icon"><span class="g-icon icon-alone">public</span></span>
         <span class="cbs-trig-label">Focus Celestial Body...</span>
-        <span class="cbs-caret" aria-hidden="true">▾</span>
+        <span class="cbs-caret" aria-hidden="true"><span class="g-icon icon-alone">arrow_drop_down</span></span>
       </button>
       <div class="cbs-menu" id="cbsMenu" role="listbox" aria-label="Celestial Bodies" tabindex="-1">
         ${renderCelestialDropdown()}
       </div>
     </div>
     <select id="selPlanetJump" class="planet-select-dropdown" style="display:none;" aria-hidden="true">
-      <option value="">🪐 Focus Celestial Body...</option>
+      <option value="">Focus Celestial Body...</option>
       <option value="sun">Sun</option>
       <option value="mercury">Mercury</option>
       <option value="venus">Venus</option>
@@ -741,10 +904,7 @@ function createHUD(host) {
     <button class="orrery-toggle-btn ${ORRERY_SETTINGS.showLabels ? 'active' : ''}" id="btnToggleLabels" title="Show / Hide Labels" aria-pressed="${ORRERY_SETTINGS.showLabels}">
       <span class="toggle-dot"></span>LABELS
     </button>
-    <button class="orrery-fullsys-btn" id="btnFullSys" title="Toggle Full Solar System View">🌐 FULL SYSTEM</button>
-    <button class="orrery-fs-btn ${V.isFullscreen ? 'active' : ''}" id="btnToggleFullscreen" title="Toggle Fullscreen View" aria-pressed="${V.isFullscreen}">
-      ${V.isFullscreen ? '🗗 EXIT' : '⛶ FULLSCREEN'}
-    </button>
+    <button class="orrery-fullsys-btn" id="btnFullSys" title="Toggle Full Solar System View">FULL SYSTEM</button>
   `;
   /* dock into the header control row when the select screen provides its
      slot; otherwise fall back to the 3D host (unchanged legacy path). */
@@ -857,10 +1017,6 @@ function createHUD(host) {
     toggleSystem();
   });
 
-  navBar.querySelector('#btnToggleFullscreen').addEventListener('click', () => {
-    toggleFullscreen();
-  });
-
   /* Planet Info card element */
   const info = document.createElement('div');
   info.id = 'planetInfo';
@@ -895,7 +1051,7 @@ function frame(now) {
   V.simDays += simStep;
   /* publish the live clock: title/brief adopt it when fresh so bodies
      never jump between views of the same system. */
-  try { window.__MARGIN_SIMDAYS = V.simDays; } catch (e) {}
+  try { window.__MARGIN_SIMDAYS = V.simDays; } catch (e) { }
 
   if (V.isPhys) {
     if (V.sysView) V.originKm = [0, 0, 0];
@@ -920,7 +1076,7 @@ function frame(now) {
     const spinMult = ORRERY_SETTINGS.acceleration;
     for (const key of Object.keys(V.bodies)) {
       const m = V.bodies[key]; if (!m) continue;
-      if (V.isPhys){ const pw=bodyWorldPhysical(key, _p, V.simDays, V.originKm, UNITS_PER_KM); if(pw){ m.visible=true; m.position.copy(pw); } else m.visible=false; }
+      if (V.isPhys) { const pw = bodyWorldPhysical(key, _p, V.simDays, V.originKm, UNITS_PER_KM); if (pw) { m.visible = true; m.position.copy(pw); } else m.visible = false; }
       else m.position.copy(bodyWorld(key, _p, V.simDays));
 
       const style = BODY_STYLE[key];
@@ -982,7 +1138,7 @@ function frame(now) {
 
   /* Camera Movement Handling */
   if (V.dive) {
-    const D = V.dive; D.t += dt; const e = Math.min(1, D.t/D.dur); const k = e * e * e;
+    const D = V.dive; D.t += dt; const e = Math.min(1, D.t / D.dur); const k = e * e * e;
     if (V.isPhys) bodyWorldPhysical(LEVEL_BODY[V.cur] || 'mars', _t, V.simDays, V.originKm, UNITS_PER_KM);
     else bodyWorld(LEVEL_BODY[V.cur] || 'mars', _t, V.simDays);
     if (!D.p0) D.p0 = V.camera.position.clone();
@@ -1037,7 +1193,7 @@ function frame(now) {
     } else {
       const originForFrame = F.originKm || getOriginForFocus(F.toKey, V.simDays);
       const opts = { physical: V.isPhys, unitsPerKm: UNITS_PER_KM, originKm: originForFrame, focusKey: F.toKey, floatingOrigin: V.isPhys };
-      if(!frameOf(F.toKey, V.simDays, _p, _t, opts)) return; // unavailable — hold last camera frame
+      if (!frameOf(F.toKey, V.simDays, _p, _t, opts)) return; // unavailable — hold last camera frame
       V.originKm = originForFrame;
     }
     V.camera.position.lerpVectors(F.p0, _p, e);
@@ -1047,13 +1203,13 @@ function frame(now) {
     if (e >= 1) {
       V.fly = null;
       if (F.toKey && V.isPhys && !F.wide) {
-        try { V.originKm = getOriginKm(F.toKey, V.simDays); } catch (er) {}
+        try { V.originKm = getOriginKm(F.toKey, V.simDays); } catch (er) { }
       }
       updateClipping();
     }
   } else if (V.toKey && !V.sysView && !V.selectedPlanet) {
     const opts = { physical: V.isPhys, unitsPerKm: UNITS_PER_KM, originKm: V.originKm, focusKey: V.toKey, floatingOrigin: V.isPhys };
-    if(!frameOf(V.toKey, V.simDays, _p, _t, opts)) return; // unavailable — hold last camera frame
+    if (!frameOf(V.toKey, V.simDays, _p, _t, opts)) return; // unavailable — hold last camera frame
     /* Dwell tracks by body-motion delta (same pattern as selection tracking
        below): the old hard snap erased the user's orbital offset every frame,
        so mouse drags visibly did nothing. Offsets now survive; the body
@@ -1119,7 +1275,7 @@ function frame(now) {
         try {
           const km = helioDistKm(fkey, V.simDays);
           if (isFinite(km) && km > 0) sunDist = km * UNITS_PER_KM;
-        } catch (e) {}
+        } catch (e) { }
       }
       goal = exposureForBody(fkey, sunDist);
     }
@@ -1184,6 +1340,7 @@ function frame(now) {
      The outline pass renders its own depth mask; for true-scale 6–11 km moons
      that mask quantizes into horizontal slices at the giant physical depth
      range. Use the direct renderer for an active physical Martian moon. */
+  updateSunlightUI();
   const tinyPhysicalMoonSelected = V.isPhys && (V.selectedPlanet === 'phobos' || V.selectedPlanet === 'deimos');
   if (V.composer && ORRERY_SETTINGS.showBloom && !tinyPhysicalMoonSelected) {
     V.composer.render();
@@ -1342,7 +1499,7 @@ function start(host) {
     });
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
-    try { renderer.setClearColor(0x04070d, 1); } catch (e) {}
+    try { renderer.setClearColor(0x04070d, 1); } catch (e) { }
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   } catch (e) {
@@ -1364,12 +1521,12 @@ function start(host) {
         if (globalThis.Astronomy && typeof globalThis.Astronomy.setMode === 'function') {
           globalThis.Astronomy.setMode('physical');
         }
-      } catch (e) {}
+      } catch (e) { }
       console.info('[selview] physical mode — Earth ' + (radiusKmTrue('earth') * UNITS_PER_KM).toExponential(3) + 'u');
     } else {
       console.info('[selview] presentation mode — Earth ' + radiusOf('earth').toFixed(4) + 'u safe');
     }
-  } catch (e) {}
+  } catch (e) { }
 
   V.renderer = renderer;
   V.canvas = renderer.domElement;
@@ -1381,7 +1538,7 @@ function start(host) {
     const skybox = loadSpaceSkybox();
     if (skybox) V.scene.background = skybox;
     if ('backgroundIntensity' in V.scene) V.scene.backgroundIntensity = 0.7;
-  } catch (e) {}
+  } catch (e) { }
 
   try {
     V.controls = new OrbitControls(V.camera, V.canvas);
@@ -1497,11 +1654,11 @@ function start(host) {
   try {
     const s = window.__MARGIN_SIMDAYS;
     if (isFinite(s) && Math.abs(s - V.simDays) < 45) V.simDays = s;
-  } catch (e) {}
+  } catch (e) { }
   let def = 'l1';
   try {
     if (typeof S !== 'undefined' && S.levelId && LEVEL_BODY[S.levelId]) def = S.levelId;
-  } catch (e) {}
+  } catch (e) { }
   V.cur = def;
   V.toKey = LEVEL_BODY[def];
   V.sysView = false;
@@ -1520,14 +1677,14 @@ function start(host) {
       /* validate before trusting: a stale or non-finite viewpoint would fling
          the flight start exactly like the old title solver bug did. */
       if (h && isFinite(h.t) && performance.now() - h.t < 15000 &&
-          Array.isArray(h.pos) && h.pos.length === 3 &&
-          isFinite(h.pos[0] + h.pos[1] + h.pos[2]) &&
-          Math.hypot(h.pos[0], h.pos[1], h.pos[2]) < 100) {
+        Array.isArray(h.pos) && h.pos.length === 3 &&
+        isFinite(h.pos[0] + h.pos[1] + h.pos[2]) &&
+        Math.hypot(h.pos[0], h.pos[1], h.pos[2]) < 100) {
         V.camera.position.set(h.pos[0], h.pos[1], h.pos[2]);
         if (V.controls && Array.isArray(h.tgt)) V.controls.target.set(h.tgt[0], h.tgt[1], h.tgt[2]);
         adopted = true;
       }
-    } catch (e) {}
+    } catch (e) { }
     if (!adopted) V.camera.position.set(0, 8.5, 12.5);
     const d = new THREE.Vector3();
     V.camera.getWorldDirection(d);
@@ -1540,20 +1697,122 @@ function start(host) {
     V.ephem = r.live ? 'live' : 'cached';
     try {
       console.info('[selview] SBDB check:', V.ephem, r.delta == null ? '' : ('ΔM ' + r.delta.toFixed(2) + '°'));
-    } catch (e) {}
+    } catch (e) { }
     if (V.cur) setCaption(V.cur);
-  }).catch(() => {});
+  }).catch(() => { });
 
-  /* Hover and Focus syncing with mission cards */
-  V.onHover = (e) => {
-    const t = e.target && e.target.closest ? e.target.closest('[data-act="level"]') : null;
-    if (t && t.dataset.id) {
-      setBody(t.dataset.id);
+  /* Wheel navigation: scroll up/down anywhere in the bottom deck or strip smoothly steps to prev/next mission */
+  let wheelStepTimer = null;
+  V._onDeckWheel = (e) => {
+    // Only intercept when in mission selection view
+    if (V.sysView) return;
+    const dy = e.deltaY;
+    if (Math.abs(dy) < 18) return; // ignore micro-jitter
+    e.preventDefault();
+
+    if (wheelStepTimer) return; // throttle stepping to maintain clean animation pacing
+    wheelStepTimer = setTimeout(() => { wheelStepTimer = null; }, 240);
+
+    const levels = typeof LEVELS !== 'undefined' ? LEVELS : [];
+    if (!levels.length) return;
+    const curIdx = levels.findIndex(l => l.id === V.cur);
+    let nextIdx = curIdx >= 0 ? curIdx : 0;
+
+    if (dy > 0) {
+      // scroll down -> next mission
+      nextIdx = Math.min(levels.length - 1, nextIdx + 1);
+    } else {
+      // scroll up -> previous mission
+      nextIdx = Math.max(0, nextIdx - 1);
+    }
+
+    if (nextIdx !== curIdx && levels[nextIdx]) {
+      setBody(levels[nextIdx].id);
     }
   };
-  V.onFocus = V.onHover;
-  document.addEventListener('mouseover', V.onHover);
-  document.addEventListener('focusin', V.onFocus);
+
+  const bottomDeck = document.querySelector('.sel-bottom') || document.querySelector('.lvstrip');
+  if (bottomDeck) {
+    bottomDeck.addEventListener('wheel', V._onDeckWheel, { passive: false });
+  }
+
+  // Smooth drag-to-scroll implementation on the strip
+  const strip = document.querySelector('.lvstrip');
+  if (strip) {
+    let startX = 0, scrollLeft = 0, hasDragged = false;
+    V._isCarouselDragging = false;
+    V._pointerIsDown = false;
+
+    V._onStripPointerDown = (e) => {
+      // Accept primary button (0) or middle wheel button (1)
+      if (e.button !== 0 && e.button !== 1) return;
+      V._pointerIsDown = true;
+      hasDragged = false;
+      V._isCarouselDragging = false;
+      startX = e.clientX;
+      scrollLeft = strip.scrollLeft;
+    };
+
+    V._onStripPointerUp = (e) => {
+      if (V._pointerIsDown) {
+        if (hasDragged) {
+          e.stopPropagation();
+          e.preventDefault();
+          // Find card closest to strip center to auto-dock after drag
+          const stripRect = strip.getBoundingClientRect();
+          const centerX = stripRect.left + stripRect.width / 2;
+          let closestCard = null;
+          let minDist = Infinity;
+          strip.querySelectorAll('.lvcard').forEach((card) => {
+            const cardRect = card.getBoundingClientRect();
+            const cardCenter = cardRect.left + cardRect.width / 2;
+            const dist = Math.abs(cardCenter - centerX);
+            if (dist < minDist) {
+              minDist = dist;
+              closestCard = card;
+            }
+          });
+          if (closestCard && closestCard.dataset.id) {
+            setBody(closestCard.dataset.id);
+          }
+        }
+      }
+      V._pointerIsDown = false;
+      strip.classList.remove('is-dragging');
+      strip.classList.add('is-snapping');
+      setTimeout(() => { V._isCarouselDragging = false; }, 180);
+    };
+
+    V._onStripPointerCancel = (e) => {
+      V._pointerIsDown = false;
+      V._isCarouselDragging = false;
+      strip.classList.remove('is-dragging');
+      strip.classList.add('is-snapping');
+    };
+
+    V._onStripPointerMove = (e) => {
+      if (!V._pointerIsDown) return;
+      const x = e.clientX;
+      const walk = (x - startX) * 1.5;
+      if (Math.abs(walk) > 5) {
+        if (!hasDragged) {
+          hasDragged = true;
+          V._isCarouselDragging = true;
+          strip.classList.remove('is-snapping');
+          strip.classList.add('is-dragging');
+        }
+      }
+      if (hasDragged) {
+        strip.scrollLeft = scrollLeft - walk;
+        e.preventDefault();
+      }
+    };
+
+    strip.addEventListener('pointerdown', V._onStripPointerDown);
+    window.addEventListener('pointerup', V._onStripPointerUp, true);
+    window.addEventListener('pointercancel', V._onStripPointerCancel, true);
+    window.addEventListener('pointermove', V._onStripPointerMove, { passive: false });
+  }
 
   /* Handle Action Buttons in Caption */
   V.onClick = (e) => {
@@ -1572,7 +1831,7 @@ function start(host) {
   };
   window.addEventListener('keydown', V.onKey);
 
-  try { document.body.classList.add('sel3d'); } catch (e) {}
+  try { document.body.classList.add('sel3d'); } catch (e) { }
   V.W = 0; V.H = 0;
   size();
   V.last = performance.now();
@@ -1584,7 +1843,7 @@ function sync() {
   try { host = document.getElementById('selview'); } catch (e) { host = null; }
   if (!host) {
     if (V.raf || V.canvas) stop();
-    try { document.body.classList.remove('sel3d'); } catch (e) {}
+    try { document.body.classList.remove('sel3d'); } catch (e) { }
     return;
   }
   if (V.canvas && V.canvas.isConnected && V.raf) return;
@@ -1595,6 +1854,8 @@ function sync() {
 
 window.SelView = {
   sync,
+  setBody,
+  get cur() { return V.cur; },
   flyToBrief,
   toggleSystem,
   resetView,
@@ -1619,7 +1880,7 @@ window.SelView = {
     const o = { exposure: V.exposure, simDays: V.simDays };
     try { o.cam = V.camera.position.toArray().map((v) => +v.toFixed(3)); } catch (e) { o.cam = null; }
     try { o.target = V.controls ? V.controls.target.toArray().map((v) => +v.toFixed(3)) : null; } catch (e) { o.target = null; }
-    try { o.near = V.camera.near; o.far = V.camera.far; } catch (e) {}
+    try { o.near = V.camera.near; o.far = V.camera.far; } catch (e) { }
     try { o.prox = (V.proxM !== undefined) ? +V.proxM.toExponential(2) : null; } catch (e) { o.prox = null; }
     o.bg = !!V.scene.background;
     o.orbitLines = V.orbitLines ? { visible: V.orbitLines.visible, children: V.orbitLines.children.length } : null;
@@ -1665,12 +1926,14 @@ window.SelView = {
       if (n0) {
         const wp = new (V.camera.position.constructor)();
         n0.sprite.getWorldPosition(wp);
-        o.label0 = { key: n0.key, pos: wp.toArray().map((v) => +v.toFixed(3)),
+        o.label0 = {
+          key: n0.key, pos: wp.toArray().map((v) => +v.toFixed(3)),
           scale: [+(n0.sprite.scale.x).toFixed(3), +(n0.sprite.scale.y).toFixed(3)],
           visible: n0.sprite.visible, matVisible: n0.sprite.material.visible,
           opacity: n0.sprite.material.opacity,
           color: n0.sprite.material.color.toArray().map((v) => +v.toFixed(1)),
-          inScene: (function f(g) { return g === n0.sprite ? true : ((g.children || []).some(f)); })(V.scene) };
+          inScene: (function f(g) { return g === n0.sprite ? true : ((g.children || []).some(f)); })(V.scene)
+        };
       }
       o.nameGroupVisible = V.nameGroup.visible;
       o.ambient = V.ambient ? V.ambient.intensity : null;
@@ -1683,8 +1946,10 @@ window.SelView = {
           n.sprite.getWorldPosition(pv);
           const d = V.camera.position.distanceTo(pv);
           pv.project(V.camera);
-          return { key: n.key, x: Math.round(((pv.x + 1) / 2) * w), y: Math.round(((1 - pv.y) / 2) * h),
-            behind: pv.z > 1, dist: +d.toFixed(2) };
+          return {
+            key: n.key, x: Math.round(((pv.x + 1) / 2) * w), y: Math.round(((1 - pv.y) / 2) * h),
+            behind: pv.z > 1, dist: +d.toFixed(2)
+          };
         });
       } catch (e) { o.screenErr = String(e).slice(0, 100); }
     } catch (e) { o.labelErr = String(e).slice(0, 120); }

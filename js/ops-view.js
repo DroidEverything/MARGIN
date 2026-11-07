@@ -42,6 +42,11 @@ const V = {
   bodies: null,
   craftGroup: null,
   craftToken: 0,
+  fgScene: null,
+  fgCamera: null,
+  fgSun: null,
+  fgAmb: null,
+  fgCraftModel: null,
   craftMarker: null, // screen-space findability dot (UI, not the model)
   craftMarkerTex: null,
   cockpitLook: null, // {yaw,pitch,drag,lx,ly} — first-person look offsets (shared by mast-cam)
@@ -320,15 +325,120 @@ function readSel() {
    so the camera frames the right scale from the first frame. Read-only. */
 function craftTrueSize() {
   try {
-    const inner = V.craftGroup && V.craftGroup.children[0];
-    const s = inner && inner.userData && inner.userData.glbSize;
+    const s = trueCraftSpan();
     if (s && isFinite(s) && s > 0) return s;
   } catch (e) {}
-  return 10 * UNITS_PER_KM;
+  return (CRAFT_REF_SPAN_M / 1000) * UNITS_PER_KM;
 }
 function groupOfOps(id) {
   try { return groupOfInstr(id, (typeof INSTR !== 'undefined') ? INSTR : []); }
   catch (e) { return ''; }
+}
+
+/* ── Split-Depth Foreground Craft Layer (NASA Eyes convention) ──
+   The main scene renders celestial bodies, stars, and trajectories in AU coordinates.
+   The spacecraft model is rendered in a foreground pass (fgScene) at 1 unit = 1 meter,
+   with its own camera (fgCamera) matching view orientation and perspective.
+   The depth buffer is cleared between passes so the spacecraft has float32 millimeter
+   precision, 100% solid PBR materials, and zero Z-fighting or see-through artifacts. */
+
+const _fgCraftPos = new THREE.Vector3();
+const _fgCraftQuat = new THREE.Quaternion();
+const _fgSunDir = new THREE.Vector3();
+const _fgToCraft = new THREE.Vector3();
+const _fgToBody = new THREE.Vector3();
+const _fgClosest = new THREE.Vector3();
+
+function setupCraftLayer() {
+  if (V.fgScene) return;
+  V.fgScene = new THREE.Scene();
+  V.fgCamera = new THREE.PerspectiveCamera(V.camera ? V.camera.fov : 40, V.camera ? V.camera.aspect : 16 / 9, 0.05, 1e7);
+
+  // Sunlight for foreground pass (intensity matches main astronomical rig)
+  V.fgSun = new THREE.DirectionalLight(0xffffff, 2400.0);
+  V.fgScene.add(V.fgSun);
+  V.fgScene.add(V.fgSun.target);
+
+  // Cosmic ambient fill & studio rim lighting for authentic aerospace PBR look
+  V.fgAmb = new THREE.AmbientLight(0x405570, 60.0);
+  V.fgScene.add(V.fgAmb);
+
+  const craftFill = new THREE.DirectionalLight(0x5a7ca8, 120.0);
+  craftFill.position.set(-1, 0.5, -1).normalize();
+  V.fgScene.add(craftFill);
+
+  const craftRim = new THREE.DirectionalLight(0xffeedd, 180.0);
+  craftRim.position.set(1.5, 1.2, 0.8).normalize();
+  V.fgScene.add(craftRim);
+
+  if (V.renderer) V.renderer.autoClear = false;
+}
+
+function syncCraftLayer() {
+  if (!V.fgCraftModel || !V.craftGroup || !V.fgCamera || !V.camera) return;
+
+  V.craftGroup.getWorldPosition(_fgCraftPos);
+  V.craftGroup.getWorldQuaternion(_fgCraftQuat);
+
+  // Craft sits at foreground origin (0, 0, 0)
+  V.fgCraftModel.position.set(0, 0, 0);
+  V.fgCraftModel.quaternion.copy(_fgCraftQuat);
+
+  // Foreground camera placed relative to craft in meters:
+  // (camPos - craftPos) in AU scene units converted to meters
+  const metersPerSceneUnit = 1000 / UNITS_PER_KM;
+  V.fgCamera.position
+    .copy(V.camera.position).sub(_fgCraftPos)
+    .multiplyScalar(metersPerSceneUnit);
+  V.fgCamera.quaternion.copy(V.camera.quaternion);
+  V.fgCamera.fov = V.camera.fov;
+  V.fgCamera.aspect = V.camera.aspect;
+  V.fgCamera.updateProjectionMatrix();
+
+  // Sun direction as seen from the craft in heliocentric AU scene:
+  // Sun is at (0, 0, 0). Vector from craft to Sun is -craftPos
+  if (_fgCraftPos.lengthSq() > 1e-12) {
+    _fgSunDir.copy(_fgCraftPos).negate().normalize();
+  } else {
+    _fgSunDir.set(0, 0, 1);
+  }
+  V.fgSun.position.copy(_fgSunDir).multiplyScalar(1000);
+  V.fgSun.target.position.set(0, 0, 0);
+}
+
+function isCraftVisible() {
+  if (V.camMode === 'cockpit') return false; // Cockpit eye rides forward looking out
+  if (V.camMode === 'craft') return true;    // Close-up inspection mode is always focused on craft
+  if (!V.craftGroup || !V.camera) return false;
+
+  const craftPos = _fgCraftPos;
+  V.craftGroup.getWorldPosition(craftPos);
+  const camPos = V.camera.position;
+
+  // Bodies that can occlude the craft in orbital view
+  const bodies = [];
+  if (V.earthWorldPos) {
+    bodies.push({ pos: V.earthWorldPos, r: targetBodyRadius('earth') });
+  }
+  if (V.targetKey && V.targetKey !== 'earth' && V.targetWorldPos) {
+    bodies.push({ pos: V.targetWorldPos, r: targetBodyRadius(V.targetKey) });
+  }
+
+  const toCraft = _fgToCraft.subVectors(craftPos, camPos);
+  const distCraft = toCraft.length();
+  if (distCraft < 1e-12) return true;
+  const dir = toCraft.divideScalar(distCraft);
+
+  for (const b of bodies) {
+    if (!b.pos) continue;
+    const toBody = _fgToBody.subVectors(b.pos, camPos);
+    const t = THREE.MathUtils.clamp(toBody.dot(dir), 0, distCraft);
+    const closest = _fgClosest.copy(camPos).addScaledVector(dir, t);
+    if (closest.distanceTo(b.pos) < b.r && t < distCraft) {
+      return false; // occluded behind planet
+    }
+  }
+  return true;
 }
 function mountOpsCraft() {
   const token = ((V.craftToken | 0) + 1);
@@ -362,32 +472,30 @@ function mountOpsCraft() {
       const box = new THREE.Box3().setFromObject(group);
       const c = box.getCenter(new THREE.Vector3());
       const sz = box.getSize(new THREE.Vector3());
-      // Hierarchy: group (scale 1 — true scale, never rescaled)
-      //  -> trueScale (metres → ops scene units, UNITS_PER_KM)
-      //    -> centered (position -c in GLB units, INSIDE the scaled frame)
-      //      -> meshes.
-      // The offset MUST be a child of the scaled node: a single node with
-      // both position=-c and scale=S computes T(-c)·S, i.e. world offset -c
-      // unscaled (metres read as AU-scale scene units), flinging the model
-      // ~c scene units off the trajectory — invisible at 0.3-unit cam range.
-      const trueScale = new THREE.Group();
-      trueScale.name = 'craft_true';
-      trueScale.scale.setScalar(UNITS_PER_KM); // metres → ops scene units
+
+      /* Dual-pass meter architecture:
+         NASA 3D Resources models are authored in arbitrary units (cm, dm, or mm).
+         Normalize raw geometry so its maximum extent in fgScene is EXACTLY activeCraftSpanM()
+         (e.g. 16.7 m for Aqua, 4.3 m for LRO, 13.6 m for MRO, 10 m for kit assembly).
+         1 scene unit in fgScene = 1 meter. */
+      const maxDim = Math.max(sz.x, sz.y, sz.z) || 1;
+      const targetSpanM = activeCraftSpanM();
+      const modelScale = targetSpanM / maxDim;
+
       const centered = new THREE.Group();
       centered.name = 'craft_centered';
-      centered.position.set(-c.x, -c.y, -c.z); // GLB units, inside scaled frame
+      centered.position.set(-c.x, -c.y, -c.z); // Center about local origin
       for (const k of group.children.slice()) centered.add(k);
-      trueScale.add(centered);
-      group.add(trueScale);
-      group.updateMatrixWorld(true);
-      group.userData.glbSize = (Math.max(sz.x, sz.y, sz.z) || 1) * UNITS_PER_KM; // scene units at true scale
-      group.userData.trueScale = UNITS_PER_KM;
-      /* Per-mesh safety net (same killers normalizeHero repairs for heroes):
-         an empty kit part or a transparent-only shell must never yield an
-         empty bbox — that reads as an invisible craft on every mission. */
+
+      const scaledHolder = new THREE.Group();
+      scaledHolder.name = 'craft_meter_scaled';
+      scaledHolder.scale.setScalar(modelScale);
+      scaledHolder.add(centered);
+
+      /* Per-mesh safety net: enforce solid PBR materials, depth testing, and front-side hulls */
       try {
         let meshes = 0;
-        group.traverse(o => {
+        centered.traverse(o => {
           if (!o.isMesh) return;
           meshes++;
           try { o.frustumCulled = false; } catch (e2) {}
@@ -395,74 +503,90 @@ function mountOpsCraft() {
           for (const m of mats) {
             if (!m) continue;
             try {
-              if (m.transparent && (m.opacity === 0 || m.opacity < 0.03)) { m.transparent = false; m.opacity = 1; }
+              if (m.transparent && (m.opacity === 0 || m.opacity < 0.05 || m.opacity >= 0.95)) {
+                m.transparent = false;
+                m.opacity = 1.0;
+              }
+              m.depthTest = true;
+              m.depthWrite = true;
               if (m.alphaTest > 0.9) m.alphaTest = 0;
-              if (m.side === THREE.FrontSide) m.side = THREE.DoubleSide;
+              const isPlanar = /panel|wing|array|dish|solar|radiator|foil/i.test(m.name || '') ||
+                               /panel|wing|array|dish|solar|radiator|foil/i.test(o.name || '');
+              if (isPlanar) {
+                m.side = THREE.DoubleSide;
+              } else {
+                m.side = THREE.FrontSide;
+              }
               if (m.needsUpdate !== undefined) m.needsUpdate = true;
             } catch (e3) {}
           }
         });
-        const check = new THREE.Box3().setFromObject(group);
+        const check = new THREE.Box3().setFromObject(centered);
         if (!meshes || check.isEmpty()) {
           const marker = new THREE.Mesh(
             new THREE.BoxGeometry(1, 0.6, 1),
             new THREE.MeshBasicMaterial({ color: 0x9fb4cc, wireframe: true }));
           marker.name = 'craft_empty_fallback';
           try { marker.frustumCulled = false; } catch (e2) {}
-          try { group.children[0].add(marker); } catch (e4) { group.add(marker); }
-          group.updateMatrixWorld(true);
+          centered.add(marker);
         }
       } catch (e2) {}
+
+      // Move real model into meter-scale fgScene (1 unit = 1 meter)
+      if (V.fgCraftModel && V.fgScene) {
+        try { V.fgScene.remove(V.fgCraftModel); } catch (e) {}
+        V.fgCraftModel = null;
+      }
+      V.fgCraftModel = scaledHolder;
+      if (V.fgScene) V.fgScene.add(V.fgCraftModel);
+
+      // Leave empty proxy in AU scene so orbit code / update() keeps driving position & orientation
+      const wrap = new THREE.Group();
+      wrap.name = 'spacecraft_probe_proxy';
+      wrap.userData.glbSize = (targetSpanM / 1000) * UNITS_PER_KM;
+      wrap.userData.trueScale = UNITS_PER_KM;
+      try { wrap.position.copy(V.craftWorldPos); } catch (e) {}
+      V.scene.add(wrap);
+      V.craftGroup = wrap;
+
+      // Phase B: wing hinges for the deploy beat (kit path only; heroes ride log-only).
+      try {
+        V.deployPivots = null; V.deployT = -1;
+        const wings = centered.getObjectByName('kit_wings');
+        if (wings) V.deployPivots = buildWingHinges(wings);
+      } catch (e) { V.deployPivots = null; }
+
+      // Model size is known now: re-zoom the craft camera onto the true scale
+      if (V.camMode === 'craft' && V.camInitialized && V.camera && V.controls) {
+        startCameraGlide('craft');
+      }
     } catch (e) {}
-    const wrap = new THREE.Group();
-    wrap.name = 'spacecraft_probe';
-    wrap.add(group);
-    // Position immediately: the per-tick update() normally does this, but the
-    // report tableau (showFinal) only ticks once — a late-loading model would
-    // otherwise sit at the origin (inside the Sun) forever.
-    try { wrap.position.copy(V.craftWorldPos); } catch (e) {}
-    V.scene.add(wrap);
-    V.craftGroup = wrap;
-    // Phase B: wing hinges for the deploy beat (kit path only; heroes ride log-only).
-    try {
-      V.deployPivots = null; V.deployT = -1;
-      const wings = group.getObjectByName('kit_wings');
-      if (wings) V.deployPivots = buildWingHinges(wings);
-    } catch (e) { V.deployPivots = null; }
-    // Model size is known now: re-zoom the craft camera onto the true scale
-    // (the pre-load estimate may have been off for hero models).
-    if (V.camMode === 'craft' && V.camInitialized && V.camera && V.controls) {
-      startCameraGlide('craft');
-    }
   };
   const showDot = () => {
     if (token !== V.craftToken || !V.active || !V.scene) return;
-    // honest degraded marker (label still identifies the craft)
     const wrap = new THREE.Group();
-    wrap.name = 'spacecraft_probe';
-    const dot = new THREE.Mesh(
-      new THREE.OctahedronGeometry(10 * UNITS_PER_KM), // ~10 m true size
-      new THREE.MeshBasicMaterial({ color: 0x5ef6a0 }));
-    // Dot is already centred at the origin; tag its true size so camera
-    // framing (craftTrueSize) treats the fallback like any other model.
-    // No rescaling anywhere: the dot is ~10 m at true scale, like the GLBs.
-    dot.userData.glbSize = 20 * UNITS_PER_KM;
-    dot.userData.trueScale = UNITS_PER_KM;
-    const inner = new THREE.Group();
-    inner.name = 'craft_fallback';
-    inner.userData.glbSize = 20 * UNITS_PER_KM;
-    inner.userData.trueScale = UNITS_PER_KM;
-    inner.add(dot);
-    wrap.add(inner);
-    // Same immediate positioning as the model path (report tableau ticks once).
+    wrap.name = 'spacecraft_probe_proxy';
+    wrap.userData.glbSize = 10 * UNITS_PER_KM;
+    wrap.userData.trueScale = UNITS_PER_KM;
     try { wrap.position.copy(V.craftWorldPos); } catch (e) {}
     V.scene.add(wrap);
     V.craftGroup = wrap;
+
+    const dot = new THREE.Mesh(
+      new THREE.OctahedronGeometry(5), // ~10 m in fgScene
+      new THREE.MeshBasicMaterial({ color: 0x5ef6a0 }));
+    if (V.fgCraftModel && V.fgScene) {
+      try { V.fgScene.remove(V.fgCraftModel); } catch (e) {}
+    }
+    V.fgCraftModel = dot;
+    if (V.fgScene) V.fgScene.add(dot);
+
     if (V.camMode === 'craft' && V.camInitialized && V.camera && V.controls) {
       startCameraGlide('craft');
     }
   };
   if (V.craftGroup) { try { V.scene.remove(V.craftGroup); } catch (e) {} V.craftGroup = null; }
+  if (V.fgCraftModel && V.fgScene) { try { V.fgScene.remove(V.fgCraftModel); } catch (e) {} V.fgCraftModel = null; }
   const loadHero = () => loadKitGltf(hero.url).then((g) => normalizeHero(g.scene.clone(true)));
   (hero ? loadHero().catch(() => wantKit()) : wantKit())
     .then(gotModel)
@@ -567,6 +691,7 @@ function buildTrajectoryLines() {
     linewidth: 2.5,
     transparent: true,
     opacity: 0.95,
+    depthWrite: false,
     toneMapped: false,
     blending: THREE.AdditiveBlending
   });
@@ -581,6 +706,7 @@ function buildTrajectoryLines() {
     gapSize: 0.025,
     transparent: true,
     opacity: 0.85,
+    depthWrite: false,
     toneMapped: false
   });
   V.plannedLine = new THREE.Line(planGeo, planMat);
@@ -594,7 +720,8 @@ function buildTrajectoryLines() {
   const orbMat = new THREE.LineBasicMaterial({
     color: 0x9fd8b8,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.55,
+    depthWrite: false,
     toneMapped: false
   });
   V.targetOrbitLine = new THREE.Line(orbGeo, orbMat);
@@ -610,13 +737,13 @@ export function createBodyTextSprite(text, color, w) {
   cv.width = w || 256;
   cv.height = 64;
   const ctx = cv.getContext('2d');
-  ctx.font = '700 24px "JetBrains Mono", "IBM Plex Mono", monospace';
+  ctx.font = '600 20px "IBM Plex Mono", "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
-  ctx.shadowBlur = 6;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.98)';
+  ctx.shadowBlur = 4;
   ctx.shadowOffsetX = 1;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowOffsetY = 1;
   ctx.fillStyle = color || '#a0c4e8';
   ctx.fillText(text.toUpperCase(), (w || 256) / 2, 32);
 
@@ -626,14 +753,14 @@ export function createBodyTextSprite(text, color, w) {
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
-    opacity: 0.90,
+    opacity: 0.85,
     depthWrite: false,
     toneMapped: false
   });
   const sprite = new THREE.Sprite(mat);
-  const sx = 0.30 * ((w || 256) / 256); // keep texel density constant
-  sprite.scale.set(sx, 0.075, 1);
-  sprite.userData.baseScale = new THREE.Vector2(sx, 0.075);
+  const sx = 0.22 * ((w || 256) / 256);
+  sprite.scale.set(sx, 0.055, 1);
+  sprite.userData.baseScale = new THREE.Vector2(sx, 0.055);
   sprite.userData.labelKey = text.toLowerCase();
   return sprite;
 }
@@ -838,8 +965,8 @@ function updateBodyLabels() {
       // the craft on the user's screen, regardless of camera orbit angle, pitch, or roll.
       const camUp = _v1.set(0, 1, 0).applyQuaternion(V.camera.quaternion).normalize();
 
-      // Craft model visual radius in 3D:
-      const craftR = (V.camMode === 'cockpit' ? cockpitScale() : showroomSize()) * 0.55;
+      // Craft model visual radius in 3D (true NASA physical scale):
+      const craftR = trueCraftSpan() * 0.55;
 
       // Position the label center so its bottom edge hovers cleanly just above the craft top:
       // In close-up craft view: craftR + half label height + subtle clearance.
@@ -858,13 +985,27 @@ function updateBodyLabels() {
     sp.visible = true;
     sp.position.set(worldPos.x, worldPos.y + item.baseOffset, worldPos.z);
 
-    // Subtle distance scaling for celestial bodies
+    // Distance scaling for celestial bodies: keep constant readable screen size
     const d = camPos.distanceTo(sp.position);
-    const s = THREE.MathUtils.clamp(d * 0.12, 0.25, 2.5);
-    sp.scale.set(sp.userData.baseScale.x * s, sp.userData.baseScale.y * s, 1);
+    const fovRad = ((V.camera && V.camera.fov) || 45) * Math.PI / 180;
+    const frustumH = 2 * d * Math.tan(fovRad / 2);
+    const viewH = Math.max(300, V.H || (V.canvas && V.canvas.clientHeight) || window.innerHeight || 720);
+    // Fixed readable height in screen pixels (~12px height) so distant planets don't balloon into giant text
+    const targetPx = item.isMissionFocus ? 13 : 11;
+    const labelH = frustumH * (targetPx / viewH);
+    const aspect = sp.userData.baseScale.x / sp.userData.baseScale.y;
+    const labelW = labelH * aspect;
+    sp.scale.set(labelW, labelH, 1);
 
-    // Keep labels visible and clean at all times
-    const maxOp = item.isMissionFocus ? 0.95 : 0.65;
+    // If camera is in 'craft' chase mode, keep planetary body text hidden or tiny
+    // so planet names like EARTH / MOON never balloon or occlude the spacecraft
+    if (V.camMode === 'craft') {
+      sp.visible = false;
+      continue;
+    }
+
+    // Keep labels visible and clean in TARGET, SYSTEM, and FREE modes
+    const maxOp = item.isMissionFocus ? 0.85 : 0.55;
     sp.material.opacity = maxOp;
     sp.visible = true;
   }
@@ -983,6 +1124,14 @@ function stop() {
   V._perfArr = null; V._perfEl = null; V._perfLast = 0;
   V.sys = V.sunMat = V.sunLight = V.ambient = V.bodies = null;
   V.craftGroup = null; V.craftToken = (V.craftToken | 0) + 1;
+  if (V.fgCraftModel && V.fgScene) {
+    try { V.fgScene.remove(V.fgCraftModel); } catch (e) {}
+  }
+  V.fgCraftModel = null;
+  V.fgScene = null;
+  V.fgCamera = null;
+  V.fgSun = null;
+  V.fgAmb = null;
   if (V.craftMarkerTex) { try { V.craftMarkerTex.dispose(); } catch (e) {} }
   if (V.craftMarker) { try { V.craftMarker.material.dispose(); } catch (e) {} }
   V.craftMarker = V.craftMarkerTex = null;
@@ -1058,6 +1207,7 @@ function start(hostEl, config, kind) {
       antialias: true,
       alpha: false,
       powerPreference: 'high-performance',
+      logarithmicDepthBuffer: true,
       /* preserveDrawingBuffer: the surface camera-shutter (frame accumulation
          motion blur) integrates the previous frame — without this the buffer
          is undefined after present on some drivers and trails break (rendering
@@ -1070,6 +1220,7 @@ function start(hostEl, config, kind) {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true; // shared rig now casts (eclipses/ring-shade)
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.autoClear = false;
     V.renderer = renderer;
     try { if (PERF) window.__launchDbg = { renderer }; } catch (e) {}
     try { if (PERF) { try { V._gpuT = makeGpuTimer(renderer); } catch (e) { V._gpuT = null; } } } catch (e2) {}
@@ -1078,14 +1229,16 @@ function start(hostEl, config, kind) {
     scene.background = new THREE.Color(0x020307);
     V.scene = scene;
 
-    const camera = new THREE.PerspectiveCamera(40, (window.innerWidth || 1) / (window.innerHeight || 1), 0.001, 1500);
+    const camera = new THREE.PerspectiveCamera(40, (window.innerWidth || 1) / (window.innerHeight || 1), 1e-12, 1500);
     camera.position.set(0, 1.2, 2.4);
     V.camera = camera;
+
+    setupCraftLayer();
 
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.minDistance = 1e-9; // true-scale craft close-ups live at ~1e-7 units
+    controls.minDistance = 1e-13; // true-scale craft close-ups live at ~1e-11 to 1e-10 units
     controls.maxDistance = 60;
     // Cockpit free-look: pointer drags rotate the view (orientation only —
     // the ride, tracking and gaze anchor are untouched). Offsets PERSIST after
@@ -1653,7 +1806,18 @@ function animate(now) {
     V._mblurWasSurf = false; // orbital frames never accumulate into the shutter
     const _pf0 = PERF ? performance.now() : 0;
     if (PERF && V._gpuT) { try { V._gpuT.begin(); } catch (e) {} }
+
+    // Pass 1: Main astronomical AU scene (planets, stars, sun, trajectories)
+    V.renderer.clear();
     V.renderer.render(V.scene, V.camera);
+
+    // Pass 2: Split-depth foreground spacecraft layer (1 unit = 1 meter, solid PBR)
+    if (V.fgScene && V.fgCamera && V.fgCraftModel && isCraftVisible()) {
+      syncCraftLayer();
+      V.renderer.clearDepth();
+      V.renderer.render(V.fgScene, V.fgCamera);
+    }
+
     if (PERF && V._gpuT) { try { V._gpuT.end(); } catch (e) {} }
     if (PERF) perfSample(performance.now() - _pf0);
   }
@@ -1683,15 +1847,16 @@ function getIdealFraming(mode) {
      working distance — that was the "invisible craft" bug in craft/cockpit
      views. Both the per-frame lift and the framing math target 0.02u there.
      Target/system/free views keep the capped far-zoom lift. */
-  const closeSize = showroomSize();
+  const closeSize = trueCraftSpan();
 
   if (mode === 'craft') {
     // Sunward framing: park the camera BETWEEN the Sun and the craft (see the
     // -away offset below) so the Sun is behind the lens, the sunlit face is
     // toward the camera and the 0.5-unit disc + bloom never wash the frame.
     // Position stays simulation-true — only the viewpoint moves.
-    // Target-body capped showroom scale: the craft is strictly bounded by
-    // showroomSize() so it can NEVER be larger than the planet/target body.
+    // True NASA physical scale: camera stands off at ~5.5x true craft span.
+    // This frames the craft cleanly in the center with comfortable breathing room
+    // while the target planet naturally looms in true scale in the background.
     const away = _tmp.copy(craft);
     if (away.lengthSq() < 1e-6) away.set(0, 0, 1);
     away.normalize();
@@ -1700,7 +1865,7 @@ function getIdealFraming(mode) {
     if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
     const upTilt = new THREE.Vector3().crossVectors(right, away).normalize();
 
-    const dist = Math.max(closeSize * 2.6, 1e-6);
+    const dist = Math.max(closeSize * 5.5, 1e-13);
     /* -away (SUNWARD side): `away` points Sun→craft, so offsetting by -away
        parks the camera between the Sun and the craft — Sun BEHIND the camera,
        sunlit face toward the lens. */
@@ -1750,23 +1915,17 @@ function startCameraGlide(mode) {
   const ideal = getIdealFraming(mode);
   if (!ideal) return;
 
-  const currentCamPos = V.camera.position.clone();
-  const currentTarget = V.controls.target.clone();
+  V.glide = null; // hard cut: cancel any in-flight glide
 
-  // Cockpit handover: pre-seed the tangent up-vector so the 850 ms glide
-  // (Y-up OrbitControls) meets the radial-perch/tangent-up rider with no roll
-  // snap on the first tracked frame.
   if (mode === 'cockpit' && V.cockpitUp) {
     try { V.camera.up.copy(V.cockpitUp); } catch (e) {}
+  } else if (V.camera && mode !== 'cockpit') {
+    try { V.camera.up.set(0, 1, 0); } catch (e) {}
   }
 
-  V.glide = {
-    startTime: performance.now(),
-    duration: 850,
-    startTarget: currentTarget,
-    startOffset: currentCamPos.sub(currentTarget),
-    idealOffset: ideal.offset
-  };
+  // Instant snap to target and framing offset
+  if (V.controls) V.controls.target.copy(ideal.target);
+  if (V.camera) V.camera.position.copy(ideal.target).add(ideal.offset);
   V.lastTrackedPos.copy(ideal.target);
 }
 
@@ -1866,20 +2025,17 @@ function updateCamera(dt) {
   }
   V.lastTrackedPos.copy(subjectPos);
 
-  // Dynamic clip planes for true-scale close-ups: the craft parks ~1e-7 units
-  // out, far below the default 0.001 near plane — in ANY view mode, since the
-  // user can zoom onto the craft from target/system/free views too. Track the
-  // near plane to ~1% of the closest subject (controls target or craft),
-  // capped at the 0.001 default so wide views keep original depth precision;
-  // far stays at 1500.
+  // Dynamic clip planes for true-scale AU scene:
+  // The spacecraft model is rendered in V.fgScene (meter pass, split-depth).
+  // The main AU scene holds astronomical bodies, trajectories, and background stars.
+  // Floor near plane at 1e-6 scene units (~110 m) to protect 24-bit depth precision
+  // and prevent depth quantization / Z-fighting on planetary surfaces and cloud decks.
   try {
     const dTgt = V.camera.position.distanceTo(V.controls.target);
-    const dCraft = V.camera.position.distanceTo(V.craftWorldPos);
-    const dCam = Math.min(
-      (isFinite(dTgt) && dTgt > 0) ? dTgt : Infinity,
-      (isFinite(dCraft) && dCraft > 0) ? dCraft : Infinity);
-    if (isFinite(dCam)) {
-      const wantNear = Math.min(0.001, Math.max(dCam * 0.01, 1e-10));
+    const dTargetBody = (V.earthWorldPos) ? V.camera.position.distanceTo(V.earthWorldPos) : Infinity;
+    const dDist = Math.min((isFinite(dTgt) && dTgt > 0) ? dTgt : Infinity, dTargetBody);
+    if (isFinite(dDist)) {
+      const wantNear = Math.min(0.001, Math.max(dDist * 0.01, 1e-6));
       if (Math.abs(V.camera.near - wantNear) / wantNear > 0.1) {
         V.camera.near = wantNear;
         V.camera.updateProjectionMatrix();
@@ -1956,45 +2112,47 @@ function cockpitPerch(out, S) {
   return out.copy(V.craftWorldPos).addScaledVector(_t2, S * 0.6);
 }
 
-/* Reference deployed span of a player kit assembly, metres. Kit GLBs carry no
-   real-world unit, so true-scale rendering assumes a NuSTAR-class ~10 m span
-   (NuSTAR's deployed mast is 10.14 m). Surface appearance only; affects no
-   simulation value. Wide views render the model at exactly this span against
-   true-scale planets (NASA Eyes convention); the screen-space marker keeps it
-   findable, and close-ups keep the showroom lift below. */
+/* True-scale NASA spacecraft dimensions:
+   Flown hero models use verified NASA mission hardware specifications.
+   Custom player kit assemblies default to NuSTAR-class 10 m deployed span.
+   Zero exaggeration: ratios between spacecraft and celestial bodies are 100%
+   physically accurate to NASA JPL planetary and mission data. */
+const HERO_SPAN_M = {
+  l1: 16.7,      // Aqua: 16.7 m deployed solar array span (NASA EOS Flagship)
+  l2: 4.3,       // LRO: 4.3 m solar array span
+  l3: 13.6,      // MRO: 13.6 m solar array span
+  l4: 6.2,       // OSIRIS-REx: 6.2 m deployed span
+  l5: 13.0,      // Voyager: 13.0 m magnetometer boom span
+  sbx: 13.6,
+  sbx_moon: 4.3,
+  sbx_earth: 16.7
+};
 const CRAFT_REF_SPAN_M = 10;
-function trueCraftScale(modelUnits) {
-  const worldSpan = (CRAFT_REF_SPAN_M / 1000) * UNITS_PER_KM;
-  return worldSpan / modelUnits;
-}
 
-/* Close-up showroom size (scene units): the craft/cockpit cameras frame the
-   model at THIS rendered height. The craft must NEVER be larger than the planet
-   or target body. It is strictly capped so its diameter is always a fraction
-   of the target body's radius (never exceeding 12% of radius, 6% of diameter). */
-function showroomSize() {
-  const rT = targetBodyRadius();
-  const maxSafeRatio = 0.12;
-  const targetCap = rT * maxSafeRatio;
-  const baseCruiseSize = 0.002;
-  return Math.min(baseCruiseSize, targetCap);
-}
-
-/* Cockpit model size: the eye rides ~1.1 sizes ahead of the model along the
-   target axis, so the model must be small enough that (a) the eye never crosses
-   into the target's presentation sphere and (b) the eye clears the hull.
-   Strictly capped so it is NEVER larger than the target body. */
-function cockpitScale() {
-  let s = showroomSize();
+function activeCraftSpanM() {
   try {
-    const dT = V.craftWorldPos.distanceTo(V.targetWorldPos);
-    const rT = targetBodyRadius();
-    if (dT > 1e-9) s = Math.min(s, 0.25 * dT);
-    if (dT > rT) s = Math.min(s, 0.40 * (dT - rT));
-    s = Math.min(s, rT * 0.10); // ABSOLUTE GUARANTEE: never exceed 10% of target radius
-    if (!(s > 0) || !isFinite(s)) s = rT * 0.05;
+    const sel = readSel();
+    const lvl = sel && sel.level;
+    if (lvl && HERO_SPAN_M[lvl]) return HERO_SPAN_M[lvl];
   } catch (e) {}
-  return s;
+  return CRAFT_REF_SPAN_M;
+}
+
+function trueCraftSpan() {
+  return (activeCraftSpanM() / 1000) * UNITS_PER_KM;
+}
+
+function trueCraftScale(modelUnits) {
+  const worldSpan = trueCraftSpan();
+  return worldSpan / Math.max(modelUnits, 1e-15);
+}
+
+function showroomSize() {
+  return trueCraftSpan();
+}
+
+function cockpitScale() {
+  return trueCraftSpan();
 }
 
 /* Display orbit angle with anti-strobe slew limiting (presentation only —
@@ -2123,11 +2281,25 @@ function refreshDynamicFrame(nowMs) {
       } catch (e) {}
       if (D.linkF !== undefined) {
         const f = THREE.MathUtils.clamp(D.linkF, 0, 1);
-        V.commsLine.visible = f > 0 && V.camMode !== 'cockpit';
+        V.commsLine.visible = f > 0 && V.camMode !== 'cockpit' && V.camMode !== 'craft';
         V.commsLine.material.opacity = 0.06 + 0.69 * f;
       } else {
-        V.commsLine.visible = (V.camMode !== 'cockpit');
+        V.commsLine.visible = (V.camMode !== 'cockpit' && V.camMode !== 'craft');
       }
+    }
+    // Synchronize orbit ring positions on extrapolated per-frame planet center to eliminate orbit line wiggling
+    if (V.targetOrbitLine && V.targetOrbitLine.visible && V.orbitEllipse) {
+      const c = (V.orbitEllipse.key === 'earth') ? V.earthWorldPos : V.targetWorldPos;
+      const el = V.orbitEllipse;
+      const attr = V.targetOrbitLine.geometry.getAttribute('position');
+      for (let i = 0; i <= 128; i++) {
+        const a = (i / 128) * Math.PI * 2;
+        attr.setXYZ(i,
+          c.x + (el.fx ? Math.cos(a) : Math.sin(a)) * el.rx,
+          c.y + (el.fy ? Math.cos(a) : Math.sin(a)) * el.ry,
+          c.z + (el.fz ? Math.cos(a) : Math.sin(a)) * el.rz);
+      }
+      attr.needsUpdate = true;
     }
     try { updateCraftMarker(nowMs); } catch (e) {}
   } catch (e) { /* refresh never breaks the frame */ }
@@ -2221,7 +2393,7 @@ function update(state) {
   if (state.mode === 'leo' || state.targetKey === 'earth') {
     // Earth orbital mission (LEO Sun-synchronous)
     const earthR = isPhysicalMode() ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth');
-    const angle = orbitAngle(0.12, state.day);
+    const angle = orbitAngle(0.12, V.simDays);
     V.craftWorldPos.set(
       V.earthWorldPos.x + Math.sin(angle) * (earthR * 1.55),
       V.earthWorldPos.y + Math.cos(angle) * (earthR * 1.55) * 0.98,
@@ -2234,7 +2406,7 @@ function update(state) {
     if (V.arrived) {
       // Craft is in lunar orbit around the Moon
       const orbR = (isPhysicalMode() ? radiusKmTrue('moon') * UNITS_PER_KM : (radiusOf('moon') || 0.0039)) * 2.2;
-      const orbSpeed = orbitAngle(0.45, state.day);
+      const orbSpeed = orbitAngle(0.45, V.simDays);
       V.craftWorldPos.set(
         V.targetWorldPos.x + Math.cos(orbSpeed) * orbR,
         V.targetWorldPos.y + Math.sin(orbSpeed) * (orbR * 0.35),
@@ -2262,7 +2434,7 @@ function update(state) {
     if (V.arrived) {
       // Craft is in proximity orbit around target
       const orbR = targetBodyRadius() * 2.2;
-      const orbSpeed = orbitAngle(0.35, state.day);
+      const orbSpeed = orbitAngle(0.35, V.simDays);
       V.craftWorldPos.set(
         V.targetWorldPos.x + Math.cos(orbSpeed) * orbR,
         V.targetWorldPos.y + Math.sin(orbSpeed) * (orbR * 0.35),
@@ -2292,8 +2464,8 @@ function update(state) {
     if (V.craftLamp) {
       V.craftLamp.position.copy(V.craftWorldPos);
       try {
-        const cs = showroomSize();
-        if (isFinite(cs) && cs > 0) V.craftLamp.distance = cs * 4;
+        const cs = trueCraftSpan();
+        if (isFinite(cs) && cs > 0) V.craftLamp.distance = cs * 6;
       } catch (e) {}
     }
 
@@ -2307,30 +2479,22 @@ function update(state) {
       }
     }
 
-    // Per-mode model scale (presentation only; position is always true):
-    //  - craft/cockpit: Target-body capped showroom scale — the craft is
-    //    strictly smaller than the target planet (never exceeding 12% radius).
-    //  - target/system/free: TRUE SCALE — the model spans CRAFT_REF_SPAN_M
-    //    (~10 m, NuSTAR-class) against true-scale planets, NASA Eyes
-    //    convention. Sub-pixel at range, so the screen-space marker carries
-    //    findability (see updateCraftMarker).
+    // Dual-pass split-depth rendering:
+    // The spacecraft model lives in V.fgScene authored in meters at scale 1.
+    // The main AU scene holds V.craftGroup as an empty orientation proxy.
+    // NASA Eyes convention: zero artificial enlargement. Sub-pixel at system range,
+    // where the screen-space marker carries findability (see updateCraftMarker).
+
+    // Bounded camera controls: in close-up inspection, lock minDistance outside the craft hull
     try {
-      const inner = V.craftGroup.children[0];
-      if (inner && inner.userData && inner.userData.glbSize && V.camera) {
-        const ts = inner.userData.glbSize;
-        const closeUp = (V.camMode === 'craft' || V.camMode === 'cockpit');
-        if (ts > 0 && isFinite(ts)) {
-          let want = 1;
-          if (closeUp) {
-            want = (V.camMode === 'cockpit' ? cockpitScale() : showroomSize()) / ts;
-          } else {
-            want = trueCraftScale(ts);
-          }
-          if (!isFinite(want) || want <= 0) want = 1;
-          /* Two orders of magnitude of hysteresis: only rewrite the scale when
-             the target actually moved, so a steady camera never re-seeds the
-             matrix every frame (allocation-free + jitter-free). */
-          if (Math.abs(inner.scale.x - want) > want * 0.01) inner.scale.setScalar(want);
+      if (V.controls) {
+        if (V.camMode === 'craft' || V.camMode === 'cockpit') {
+          const s = trueCraftSpan();
+          V.controls.minDistance = s * 2.2;
+          V.controls.maxDistance = s * 40.0;
+        } else {
+          V.controls.minDistance = 0.00005;
+          V.controls.maxDistance = 60;
         }
       }
     } catch (e) {}
@@ -2375,11 +2539,11 @@ function update(state) {
        would streak across the whole frame. */
     if (state.linkF !== undefined) {
       const f = THREE.MathUtils.clamp(state.linkF, 0, 1);
-      V.commsLine.visible = f > 0 && V.camMode !== 'cockpit';
+      V.commsLine.visible = f > 0 && V.camMode !== 'cockpit' && V.camMode !== 'craft';
       V.commsLine.material.opacity = 0.06 + 0.69 * f;
     } else {
-      // No link factor this tick (e.g. LEO): visible except in cockpit.
-      V.commsLine.visible = (V.camMode !== 'cockpit');
+      // No link factor this tick (e.g. LEO): visible except in cockpit and close-up craft inspection.
+      V.commsLine.visible = (V.camMode !== 'cockpit' && V.camMode !== 'craft');
     }
   }
   /* (health beacon tint retired with the strobe sprite) */
