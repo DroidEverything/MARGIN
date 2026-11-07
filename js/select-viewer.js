@@ -1500,7 +1500,9 @@ function start(host) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     try { renderer.setClearColor(0x04070d, 1); } catch (e) { }
-    renderer.shadowMap.enabled = true;
+    /* The select stage is a background: no shadow receivers are visible here,
+       and the extra depth pass only delays first paint. */
+    renderer.shadowMap.enabled = false;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   } catch (e) {
     V.failed = true;
@@ -1571,6 +1573,7 @@ function start(host) {
   V.asteroidBelts = built.asteroidBelts;
   V.sunMat = built.sunMat;
   V.sunLight = built.sunLight;
+  try{ if(V.sunLight) V.sunLight.castShadow=false; }catch(e){}
   V.ambient = built.ambient || null;
   V.built = built; // owner of light/corona/uniforms for applySunPosition()
 
