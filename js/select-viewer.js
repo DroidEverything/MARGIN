@@ -1563,7 +1563,8 @@ function start(host) {
     physical: V.isPhys,
     unitsPerKm: UNITS_PER_KM,
     focusKey: null,
-    originKm: [0, 0, 0]
+    originKm: [0, 0, 0],
+    lowRes: true
   });
   V.bodies = built.bodies;
   V.flareMats = built.flareMats;

@@ -5010,6 +5010,78 @@ a:focus-visible {
   }
 }
 
+/* ── Mission-select preload ── */
+.sel-preload {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 45%, rgba(9, 14, 22, .96), rgba(2, 3, 5, .985) 70%);
+  transition: opacity .28s ease;
+}
+
+.sel-preload.done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sel-preload-card {
+  width: min(380px, 78vw);
+  text-align: center;
+}
+
+.sel-preload-kicker {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .18em;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+
+.sel-preload-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 14px;
+}
+
+.sel-preload-bar {
+  display: block;
+  height: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .09);
+}
+
+.sel-preload-bar i {
+  display: block;
+  width: 38%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--phosphor), transparent);
+  animation: selPreload 1.15s ease-in-out infinite;
+}
+
+.sel-preload-note {
+  display: block;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--dim);
+}
+
+@keyframes selPreload {
+  from {
+    transform: translateX(-110%)
+  }
+
+  to {
+    transform: translateX(360%)
+  }
+}
+
 #modal.on .mbox {
   animation: min .24s cubic-bezier(.2, .7, .3, 1)
 }

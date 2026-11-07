@@ -262,16 +262,30 @@ export function bennuModel(tag){
   return BENNU_MODEL[key];
 }
 
-export function tex(key){
-  if(!BODY_TEX[key]) return null;
-  if(!TEX_CACHE[key]){
-    TEX_CACHE[key]=new THREE.TextureLoader().load(BODY_TEX[key], undefined, undefined, ()=>{
-      try{ console.warn('[orrery] texture failed:', BODY_TEX[key]); }catch(e){}
+const BODY_TEX_LOW = {
+  earth:           'assets/textures/earth_day.jpg',
+  earthNight:      'assets/textures/earth_night.jpg',
+  earthClouds:     'assets/textures/earth_clouds.png',
+  moon:            'assets/textures/lroc_color_2k.jpg',
+  mars:            'assets/textures/mars.jpg',
+  mercury:         'assets/textures/mercury.jpg',
+  venus:           'assets/textures/venus.jpg',
+  jupiter:         'assets/textures/jupiter.jpg',
+  saturn:          'assets/textures/saturn.jpg'
+};
+
+export function tex(key, low){
+  const src = (low && BODY_TEX_LOW[key]) ? BODY_TEX_LOW[key] : BODY_TEX[key];
+  if(!src) return null;
+  const ck = (low && BODY_TEX_LOW[key]) ? key + ':low' : key;
+  if(!TEX_CACHE[ck]){
+    TEX_CACHE[ck]=new THREE.TextureLoader().load(src, undefined, undefined, ()=>{
+      try{ console.warn('[orrery] texture failed:', src); }catch(e){}
     });
-    TEX_CACHE[key].colorSpace=THREE.SRGBColorSpace;
-    TEX_CACHE[key].anisotropy=16; // grazing-angle sharpness (max 16x anisotropic filtering)
+    TEX_CACHE[ck].colorSpace=THREE.SRGBColorSpace;
+    TEX_CACHE[ck].anisotropy=16; // grazing-angle sharpness (max 16x anisotropic filtering)
   }
-  return TEX_CACHE[key];
+  return TEX_CACHE[ck];
 }
 
 /* Linear (non-sRGB) loader for DATA maps — roughness/metalness/normal masks.
@@ -617,10 +631,10 @@ export function approachMinDist(key,unitsPerKm){
      the shell rides 1.5% above the surface, so parallax is negligible).
    Responds to eclipses, terminator, and the Mercury-to-Pluto gradient
    exactly like every other body. */
-export function createEarthMaterial(sunPosVec){
+export function createEarthMaterial(sunPosVec, low){
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    map: tex('earth'),
+    map: tex('earth', low),
     /* Land/sea material contrast ONLY — deliberately NOT a mirror.
        The white-is-water specular mask is shipped pre-inverted as a roughnessMap,
        remapped to 0.62 (sea) .. 1.00 (land) so the GGX lobe is far too broad to
@@ -661,8 +675,8 @@ export function createEarthMaterial(sunPosVec){
   mat.userData.sunPos = { value: new THREE.Vector3(0, 0, 0) };
   const sunPosU = mat.userData.sunPos;
   mat.onBeforeCompile = (shader)=>{
-    shader.uniforms.nightTex = { value: tex('earthNight') };
-    shader.uniforms.cloudTex = { value: tex('earthClouds') };
+    shader.uniforms.nightTex = { value: tex('earthNight', low) };
+    shader.uniforms.cloudTex = { value: tex('earthClouds', low) };
     shader.uniforms.uNightBoost = nightBoost;
     shader.uniforms.uDayMeter = dayMeter;
     shader.uniforms.sunPos = sunPosU;
@@ -709,7 +723,7 @@ export function sphereMesh(key,opts){
        physical point-light/shadow path is intentionally not used for these
        sub-pixel moon discs: at this scale it made them disappear/break. */
     mat = new THREE.MeshBasicMaterial({
-      map: tex(def.tex),
+      map: tex(def.tex, opts.lowRes),
       color: 0xffffff,
       side: THREE.FrontSide,
       toneMapped: false,
@@ -720,13 +734,13 @@ export function sphereMesh(key,opts){
       depthWrite: true
     });
   } else if (key==='earth'&&opts.sunPos){
-    mat = createEarthMaterial(opts.sunPos);
+    mat = createEarthMaterial(opts.sunPos, opts.lowRes);
   } else if(def.tex){
     mat = new THREE.MeshStandardMaterial({
       color: def.tint,
       roughness: 0.85,
       metalness: 0.05,
-      map: tex(def.tex),
+      map: tex(def.tex, opts.lowRes),
       side: THREE.DoubleSide // bodies never cull to see-through (see Earth note)
     });
   } else {
@@ -861,12 +875,12 @@ function ringMesh(innerR, outerR, kind){
 /* Real MODIS cloud deck (see assets/ASSET_SOURCES.md): white shell textured
    by the vendored RGBA map — diffuse alpha carries the cloud fraction, so
    the Sun shades it like the surface (bright by day, dark by night). */
-export function createClouds(r){
+export function createClouds(r, low){
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(r*1.008, 128, 96),
     new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      map: tex('earthClouds'),
+      map: tex('earthClouds', low),
       transparent: true,
       opacity: 0.90,
       roughness: 1.0,
@@ -1249,7 +1263,7 @@ function coronaSprite(r, mult){
       const host = mesh.isGroup ? mesh.children[0] : mesh;
       host.add(fresnelShell(r));
       if(key==='earth'){
-        const clouds = createClouds(r);
+        const clouds = createClouds(r, opts.lowRes);
         host.add(clouds);
         out.atmospheres.earth = clouds;
       }

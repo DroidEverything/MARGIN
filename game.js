@@ -1969,49 +1969,34 @@ function cascade(prev){
    SCREENS
    ══════════════════════════════════════════════════════════════ */
 let lastScreen=null;
-let selViewTimer=0, selViewIdle=0, selViewLastInput=0, selViewArmedAt=0;
+let selViewReady=false, selViewStarted=false;
 
-function cancelSelViewStart(){
-  if(selViewTimer){ clearTimeout(selViewTimer); selViewTimer=0; }
-  if(selViewIdle && typeof window.cancelIdleCallback==="function"){
-    try{ window.cancelIdleCallback(selViewIdle); }catch(e){}
-    selViewIdle=0;
-  }
+function selViewLoadEl(){
+  try{ return document.getElementById("selviewLoad"); }catch(e){ return null; }
+}
+function showSelViewLoading(){
+  const e=selViewLoadEl(); if(e) e.classList.remove("done");
+}
+function hideSelViewLoading(){
+  const e=selViewLoadEl(); if(e) e.classList.add("done");
 }
 
-function startSelViewNow(){
-  selViewTimer=0; selViewIdle=0;
+/* The select scene is heavy to build and compile. Paint the loading card
+   first, then run the build; the card stays up through the first frame. */
+function scheduleSelViewStart(){
   if(typeof S==="undefined" || S.screen!=="select") return;
-  const now=performance.now();
-  if(!selViewArmedAt) selViewArmedAt=now;
-  if(now-selViewArmedAt < 900){ scheduleSelViewStart(900-(now-selViewArmedAt)); return; }
-  const modal=document.getElementById("modal");
-  if(modal && modal.classList.contains("on")){ scheduleSelViewStart(1400); return; }
-  if(now-selViewLastInput < 500){ scheduleSelViewStart(700); return; }
-  try{ if(window.SelView) SelView.sync(); }catch(e){}
+  if(selViewReady){ hideSelViewLoading(); return; }
+  if(selViewStarted) return;
+  selViewStarted=true;
+  showSelViewLoading();
+  requestAnimationFrame(()=>{ setTimeout(()=>{
+    if(typeof S==="undefined" || S.screen!=="select"){ selViewStarted=false; return; }
+    if(!window.SelView){ selViewStarted=false; setTimeout(scheduleSelViewStart, 200); return; }
+    try{ if(window.SelView) SelView.sync(); }catch(e){}
+    selViewReady=true;
+    requestAnimationFrame(()=>requestAnimationFrame(hideSelViewLoading));
+  }, 30); });
 }
-
-/* The select scene is heavy to build and compile. Let the screen paint and
-   stay interactive first; only start it once the player is idle, and restart
-   the idle window on any input. */
-function scheduleSelViewStart(minDelay){
-  cancelSelViewStart();
-  const delay = minDelay==null ? 700 : minDelay;
-  const run=()=>{ selViewTimer=0; selViewIdle=0; startSelViewNow(); };
-  if(typeof window.requestIdleCallback==="function"){
-    selViewIdle=window.requestIdleCallback(run, { timeout: Math.max(1800, delay) });
-  }else{
-    selViewTimer=setTimeout(run, delay);
-  }
-}
-
-["pointerdown","keydown","wheel","touchstart"].forEach(evt=>{
-  document.addEventListener(evt, ()=>{
-    if(typeof S==="undefined" || S.screen!=="select") return;
-    selViewLastInput=performance.now();
-    if(selViewTimer || selViewIdle) scheduleSelViewStart(900);
-  }, { passive:true, capture:true });
-});
 
 function render(){
   renderSteps();
@@ -2035,10 +2020,14 @@ function render(){
   try{ if(window.TitleEarth)TitleEarth.sync(); }catch(e){}
   try{
     if(S.screen==="select"){
-      if(!selViewArmedAt) selViewArmedAt=performance.now();
+      /* A select repaint replaces #selview, detaching the canvas. Rebuild on
+         the new host under the loading card rather than showing a dead stage. */
+      if(selViewReady && !document.querySelector("#selview canvas")){
+        selViewReady=false; selViewStarted=false;
+      }
       scheduleSelViewStart();
     }
-    else { selViewArmedAt=0; cancelSelViewStart(); if(window.SelView) SelView.sync(); }
+    else { selViewReady=false; selViewStarted=false; if(window.SelView) SelView.sync(); }
   }catch(e){}
   try{ if(window.BriefView)BriefView.sync(); }catch(e){}
   try{
@@ -2147,6 +2136,14 @@ function scrSelect(){
      best, every badge and the history button share this array. */
   const runs=loadRuns();
   return `<div class="sel-full">
+    <div class="sel-preload" id="selviewLoad" role="status" aria-live="polite">
+      <div class="sel-preload-card">
+        <span class="sel-preload-kicker">MISSION SELECT</span>
+        <strong class="sel-preload-title">Preparing the solar system</strong>
+        <span class="sel-preload-bar"><i></i></span>
+        <span class="sel-preload-note">Loading planetary maps and orbit geometry.</span>
+      </div>
+    </div>
     <div id="selview" role="img" aria-label="Solar system destination view"><div class="selview-fallback" aria-hidden="true"></div></div>
     <div class="sel-top">
       <div class="sel-title"><h2>Choose a mission</h2>
@@ -9248,7 +9245,7 @@ addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="
     if(!(t.getContext("webgl2")||t.getContext("webgl"))) return;
     import("./js/view3d.js?v=" + Date.now()).catch(function(){});
     import("./js/title-earth.js").catch(function(){});
-    import("./js/select-viewer.js?v=20261107a").catch(function(){});
+    import("./js/select-viewer.js?v=20261107b").catch(function(){});
     import("./js/brief-view.js").catch(function(){});
     import("./js/ops-view.js?v=20261030j").catch(function(err){ console.error("[ops-view] import failed:", err); });
   }catch(e){}
