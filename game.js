@@ -8939,14 +8939,19 @@ function jumpToScene(s,m,lv){
 }
 function showDevJump(){
   const m=S._devM||"l1";
-  const missions=["l1","l2","l3","l4","l5","sbx","sbx_moon","sbx_earth"].map(id=>
-    `<button class="btn ${id===m?"primary":"ghost"}" data-act="devm" data-id="${id}" style="flex:1">${id.toUpperCase()}</button>`).join("");
+  const label=id=>id.toUpperCase().replace("SBX_","SBX ");
+  const missions=["l1","l2","l3","l4","l5","sbx","sbx_moon","sbx_earth"].map(id=>{
+    const lv=LEVELS.find(l=>l.id===id);
+    return `<button class="btn ${id===m?"primary":"ghost"}" data-act="devm" data-id="${id}" title="${esc(lv?lv.name:id)}">${label(id)}</button>`;
+  }).join("");
   const dests=[["select","SELECT"],["brief","BRIEF"],["build","BUILD"],["launch","LAUNCH"],["ascent","ASCENT"],["ops","OPS"],["surface","SURFACE"]].map(d=>
-    `<button class="btn ghost" data-act="devgo" data-to="${d[0]}" style="flex:1">${d[1]}</button>`).join("");
-  el("mbox").innerHTML=`<h3>DEV JUMP <span class="code">TEST ONLY</span></h3><div class="mb" style="font-size:12px;line-height:1.6">
-    <p class="hint">Mission</p><div style="display:flex;gap:6px;margin:4px 0 10px">${missions}</div>
-    <p class="hint">Jump to <span class="code">${m.toUpperCase()}</span> (demo-seeded, first-listed LV)</p><div style="display:flex;gap:6px;flex-wrap:wrap">${dests}</div>
-    <p class="hint mt-s">Same as URL shortcuts: <span class="code">?s=surface&m=l2</span> or <span class="code">?s=launch&m=${m}</span> — composes with <span class="code">&lv= &no3d</span>.</p>
+    `<button class="btn ghost" data-act="devgo" data-to="${d[0]}">${d[1]}</button>`).join("");
+  el("mbox").innerHTML=`<h3>QUICK JUMP</h3><div class="mb">
+    <p class="quickjump-intro">Jump straight to a mission and phase. Each run is demo-seeded with the first listed launch vehicle.</p>
+    <p class="hint quickjump-label">Mission</p>
+    <div class="quickjump-grid">${missions}</div>
+    <p class="hint quickjump-label">Phase — <span class="code">${label(m)}</span></p>
+    <div class="quickjump-grid">${dests}</div>
     <button class="btn ghost mt" data-act="closeModal" style="width:100%">CLOSE</button></div>`;
   el("modal").classList.add("on");
 }
