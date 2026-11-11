@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Instrument+Sans:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="styles/nasa-theme.css?v=20261107c">
-<link rel="stylesheet" href="styles/boot-loader.css?v=20261111a">
+<link rel="stylesheet" href="styles/boot-loader.css?v=20261111b">
 <script type="importmap">
 {"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/addons/"}}
 </script>
@@ -20,6 +20,10 @@
 <body>
 <div id="app">
   <header id="topbar">
+    <button class="tb-btn fs-btn" id="btnFullscreen" type="button" aria-pressed="false" aria-label="Toggle fullscreen" title="Toggle fullscreen">
+      <svg class="fs-ico fs-enter" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>
+      <svg class="fs-ico fs-exit" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/></svg>
+    </button>
     <div class="mark">MARG<i>I</i>N</div>
     <nav id="steps" aria-label="Mission phase"></nav>
     <div id="teambadge" class="team-badge" hidden></div>
@@ -32,50 +36,51 @@
     <button class="tb-btn title-only" data-act="devjump" title="Quick jump to a mission or phase">JUMP</button>
     <button class="tb-btn select-only" data-act="gohome" title="Back to homescreen">HOME</button>
   </header>
-  <main id="screen" tabindex="-1">
-    <div class="boot-loader" id="bootLoader" role="status" aria-live="polite" aria-label="Loading MARGIN telemetry and NASA ephemeris data">
-      <div class="boot-grid" aria-hidden="true"></div>
-      <div class="boot-card">
-        <div class="boot-top">
-          <div class="boot-eye"><span class="boot-pulse" aria-hidden="true"></span>DSN TELEMETRY // COLD BOOT</div>
-          <div class="boot-ver">NASA DE440 · DEM</div>
-        </div>
-        <div class="boot-hero">
-          <svg class="boot-orbit" viewBox="0 0 96 96" aria-hidden="true">
-            <circle class="ring-outer" cx="48" cy="48" r="42" />
-            <circle class="ring-mid" cx="48" cy="48" r="30" />
-            <circle class="ring-inner" cx="48" cy="48" r="17" />
-            <g class="orbit-sweep">
-              <circle class="ring-arc" cx="48" cy="48" r="36" />
-              <circle class="sat-glow" cx="48" cy="12" r="5" />
-              <circle class="sat-core" cx="48" cy="12" r="2.3" />
-            </g>
-            <circle class="planet-core" cx="48" cy="48" r="5.5" />
-          </svg>
-          <div class="boot-titles">
-            <div class="boot-mark">MARGIN</div>
-            <div class="boot-sub">INITIALIZING FLIGHT SIMULATION ENVIRONMENT</div>
-          </div>
-        </div>
-        <div class="boot-meta">
-          <span class="boot-stage" id="bootStage">FETCHING FLIGHT CONSTANTS…</span>
-          <span class="boot-readout"><span id="bootBytes">0.6 / 31.0 MB</span><span class="boot-pct" id="bootPct">2%</span></span>
-        </div>
-        <div class="boot-track" aria-hidden="true"><div class="boot-fill" id="bootFill" style="width:2%"></div></div>
-        <div class="boot-steps" id="bootSteps" aria-hidden="true">
-          <span class="bstep active" data-bstep="0"><i></i>EPHEMERIS</span>
-          <span class="bstep" data-bstep="1"><i></i>ASTEROIDS</span>
-          <span class="bstep" data-bstep="2"><i></i>TERRAIN DEM</span>
-          <span class="bstep" data-bstep="3"><i></i>HARDWARE</span>
-          <span class="bstep" data-bstep="4"><i></i>FLIGHT CORE</span>
-        </div>
-        <p class="boot-note">Downloading vendored JPL DE440 ephemerides &amp; planetary terrain grids — cached locally after first load.</p>
-      </div>
-    </div>
-  </main>
+  <main id="screen" tabindex="-1"></main>
   <div id="dock" class="action-dock hidden"></div>
   <div id="hud" class="hidden"></div>
   <footer id="telem"><button id="btnTelemToggle" class="telem-btn" title="Toggle telemetry ticker">TICKER</button><div class="run" id="telemRun"></div></footer>
+</div>
+<div class="boot-gate" id="bootGate" role="status" aria-live="polite" aria-label="Loading MARGIN telemetry, 3D Earth textures, and flight shaders">
+  <div class="boot-bg" aria-hidden="true"></div>
+  <div class="boot-card">
+    <div class="boot-top">
+      <div class="boot-eye"><span class="boot-pulse" aria-hidden="true"></span>DSN TELEMETRY // PRE-FLIGHT SYNC</div>
+      <div class="boot-ver">JPL DE440 · WEBGL2</div>
+    </div>
+    <div class="boot-hero">
+      <svg class="boot-orbit" viewBox="0 0 96 96" aria-hidden="true">
+        <circle class="ring-outer" cx="48" cy="48" r="41" />
+        <circle class="ring-mid" cx="48" cy="48" r="29" />
+        <ellipse class="ring-tilt" cx="48" cy="48" rx="43" ry="18" transform="rotate(-22 48 48)" />
+        <g class="orbit-sweep">
+          <circle class="ring-arc" cx="48" cy="48" r="35" />
+          <circle class="sat-glow" cx="48" cy="13" r="5" />
+          <circle class="sat-core" cx="48" cy="13" r="2.2" />
+        </g>
+        <circle class="planet-core" cx="48" cy="48" r="5.5" />
+      </svg>
+      <div class="boot-titles">
+        <div class="boot-mark">MARG<i>I</i>N</div>
+        <div class="boot-sub">EVERY GRAM, EVERY WATT, EVERY BIT</div>
+      </div>
+    </div>
+    <div class="boot-meta">
+      <span class="boot-stage" id="bootStage">SYNCHRONIZING JPL CONSTANTS…</span>
+      <span class="boot-readout"><span id="bootDetail">0.6 / 31.0 MB</span><span class="boot-pct" id="bootPct">2%</span></span>
+    </div>
+    <div class="boot-track" aria-hidden="true"><div class="boot-fill" id="bootFill" style="width:2%"></div></div>
+    <div class="boot-steps" id="bootSteps" aria-hidden="true">
+      <span class="bstep active" data-bstep="0"><i></i>EPHEMERIS</span>
+      <span class="bstep" data-bstep="1"><i></i>FLIGHT CORE</span>
+      <span class="bstep" data-bstep="2"><i></i>8K PLANETARY</span>
+      <span class="bstep" data-bstep="3"><i></i>GPU SHADERS</span>
+    </div>
+    <div class="boot-foot">
+      <p class="boot-note">Verifying JPL ephemerides, 8K planetary &amp; cloud layers, and GPU shaders before entry.</p>
+      <button type="button" class="boot-skip" id="bootSkip" hidden>ENTER NOW &#8594;</button>
+    </div>
+  </div>
 </div>
 <div id="veil" aria-hidden="true"></div>
 <div id="tip" role="tooltip"></div>
@@ -95,62 +100,124 @@
 <audio id="marginBgm" src="assets/audio/margin_theme.mp3" loop preload="auto"></audio>
 <script>
 (function(){
-  var TOTAL_MB=31.0,disp=2,cap=27,timer=0;
+  var gate=document.getElementById('bootGate');
   var stageEl=document.getElementById('bootStage');
   var fillEl=document.getElementById('bootFill');
   var pctEl=document.getElementById('bootPct');
-  var bytesEl=document.getElementById('bootBytes');
+  var detailEl=document.getElementById('bootDetail');
   var stepsEl=document.getElementById('bootSteps');
+  var skipBtn=document.getElementById('bootSkip');
+  var disp=2,cap=16,done=false,timer=0,skipTimer=0,hasCustomDetail=false;
+
   function paint(v){
     var p=Math.max(0,Math.min(100,v));
     if(fillEl) fillEl.style.width=p.toFixed(1)+'%';
     if(pctEl) pctEl.textContent=Math.round(p)+'%';
-    if(bytesEl) bytesEl.textContent=(p/100*TOTAL_MB).toFixed(1)+' / '+TOTAL_MB.toFixed(1)+' MB';
+    if(detailEl&&!hasCustomDetail){
+      var mb=Math.min(31.0, (p/50)*31.0);
+      detailEl.textContent=mb.toFixed(1)+' / 31.0 MB';
+    }
   }
-  window.__bootStep=function(pct,msg,nextCap,stepIdx){
+  function setStep(idx){
+    if(!stepsEl||typeof idx!=='number') return;
+    var nodes=stepsEl.querySelectorAll('.bstep');
+    for(var i=0;i<nodes.length;i++){
+      nodes[i].classList.toggle('done',i<idx);
+      nodes[i].classList.toggle('active',i===idx);
+    }
+  }
+  function step(pct,msg,nextCap,stepIdx,detail){
+    if(done) return;
     if(pct>disp) disp=pct;
     cap=Math.max(disp,nextCap||pct);
     if(stageEl&&msg) stageEl.textContent=msg;
-    if(stepsEl&&typeof stepIdx==='number'){
-      var nodes=stepsEl.querySelectorAll('.bstep');
-      for(var i=0;i<nodes.length;i++){
-        nodes[i].classList.toggle('done',i<stepIdx);
-        nodes[i].classList.toggle('active',i===stepIdx);
-      }
-    }
+    if(detail!=null&&detailEl){hasCustomDetail=true;detailEl.textContent=detail;}
+    setStep(stepIdx);
     paint(disp);
-  };
-  window.__bootDone=function(){
+  }
+  function finish(msg){
+    if(done) return;
+    done=true;
     if(timer){clearInterval(timer);timer=0;}
-    disp=100;cap=100;paint(100);
-    try{delete window.__bootStep;delete window.__bootDone;}catch(e){window.__bootStep=window.__bootDone=null;}
-  };
+    if(skipTimer){clearTimeout(skipTimer);skipTimer=0;}
+    disp=100;cap=100;
+    if(stageEl) stageEl.textContent=msg||'ALL TELEMETRY LOCKED · READY';
+    if(detailEl&&hasCustomDetail) detailEl.textContent='NOMINAL';
+    else if(detailEl) detailEl.textContent='31.0 / 31.0 MB';
+    setStep(4);
+    paint(100);
+    if(!gate) return;
+    setTimeout(function(){
+      if(!gate) return;
+      gate.classList.add('ready');
+      setTimeout(function(){
+        if(gate&&gate.parentNode) gate.parentNode.removeChild(gate);
+        gate=null;
+      },500);
+    },180);
+  }
+  if(skipBtn) skipBtn.addEventListener('click',function(){finish('ENTERING PROGRESSIVELY…');});
+  window.__MARGIN_BOOT={step:step,finish:finish,isDone:function(){return done;}};
   paint(disp);
   timer=setInterval(function(){
-    if(!document.getElementById('bootLoader')){window.__bootDone&&window.__bootDone();return;}
+    if(done){clearInterval(timer);timer=0;return;}
     var ceil=Math.max(disp,cap-0.8);
-    if(disp<ceil){disp+=(ceil-disp)*0.045;paint(disp);}
+    if(disp<ceil){disp+=(ceil-disp)*0.055;paint(disp);}
   },120);
+  skipTimer=setTimeout(function(){if(!done&&skipBtn) skipBtn.hidden=false;},12000);
+
+  // Fullscreen toggle in top-left corner (supports desktop + mobile desktop mode)
+  var fsBtn=document.getElementById('btnFullscreen');
+  if(fsBtn){
+    var root=document.documentElement;
+    var req=root.requestFullscreen||root.webkitRequestFullscreen||root.msRequestFullscreen;
+    var supported=!!(req&&(document.fullscreenEnabled!==false&&document.webkitFullscreenEnabled!==false));
+    if(!supported){
+      fsBtn.hidden=true;
+    } else {
+      function syncFs(){
+        var active=!!(document.fullscreenElement||document.webkitFullscreenElement);
+        fsBtn.classList.toggle('is-fs',active);
+        fsBtn.setAttribute('aria-pressed',active?'true':'false');
+        fsBtn.title=active?'Exit fullscreen':'Enter fullscreen';
+      }
+      fsBtn.addEventListener('click',function(){
+        var active=!!(document.fullscreenElement||document.webkitFullscreenElement);
+        if(active){
+          var ex=document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen;
+          if(ex) try{ex.call(document);}catch(e){}
+        } else {
+          try{
+            var r=req.call(root,{navigationUI:'hide'});
+            if(r&&r.catch) r.catch(function(){try{req.call(root);}catch(e){}});
+          }catch(e){}
+        }
+      });
+      document.addEventListener('fullscreenchange',syncFs);
+      document.addEventListener('webkitfullscreenchange',syncFs);
+      syncFs();
+    }
+  }
 })();
 </script>
 <script src="js/constants.js"></script>
 <script src="js/time-service.js"></script>
-<script>window.__bootStep&&window.__bootStep(3,'DOWNLOADING JPL DE440 EPHEMERIS (EARTH & PLANETS)…',28,0);</script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(3,'DOWNLOADING JPL DE440 EPHEMERIS (EARTH & PLANETS)…',16,0);</script>
 <script src="js/astronomy-jpl-data.js"></script>
-<script>window.__bootStep&&window.__bootStep(29,'DOWNLOADING JPL DE440 LUNAR LIBRATION TABLES…',45,0);</script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(16,'DOWNLOADING JPL DE440 LUNAR LIBRATION TABLES…',25,0);</script>
 <script src="js/astronomy-jpl-data-de440.js"></script>
-<script>window.__bootStep&&window.__bootStep(45,'DOWNLOADING BENNU EPHEMERIS & ASTEROID KERNELS…',84,1);</script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(25,'DOWNLOADING BENNU EPHEMERIS & ASTEROID KERNELS…',42,0);</script>
 <script src="js/astronomy-jpl-data-bennu.js"></script>
-<script>window.__bootStep&&window.__bootStep(84,'COMPILING ORBITAL MECHANICS SOLVER…',86,1);</script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(42,'COMPILING ORBITAL MECHANICS SOLVER…',43,0);</script>
 <script src="js/astronomy.js"></script>
-<script>window.__bootStep&&window.__bootStep(86,'DOWNLOADING LRO LUNAR TERRAIN DEM…',93,2);</script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(43,'DOWNLOADING LRO LUNAR TERRAIN DEM…',46,0);</script>
 <script src="js/surface-data.js"></script>
-<script>window.__bootStep&&window.__bootStep(93,'DOWNLOADING MGS MARS TERRAIN DEM…',98,2);</script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(46,'DOWNLOADING MGS MARS TERRAIN DEM…',48,0);</script>
 <script src="js/mars-surface-data.js"></script>
-<script>window.__bootStep&&window.__bootStep(98,'LOADING NASA LAUNCH HARDWARE CATALOG…',99,3);</script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(48,'LOADING NASA LAUNCH HARDWARE CATALOG…',50,1);</script>
 <script src="js/nasa-hardware-data.js?v=20261108c"></script>
 <script src="js/mission-profiles.js"></script>
-<script>window.__bootStep&&window.__bootStep(99,'INITIALIZING FLIGHT SIMULATION CORE…',100,4);</script>
-<script src="game.js?v=20261111a"></script>
+<script>window.__MARGIN_BOOT&&window.__MARGIN_BOOT.step(50,'INITIALIZING FLIGHT CORE…',52,1);</script>
+<script src="game.js?v=20261111b"></script>
 </body>
 </html>

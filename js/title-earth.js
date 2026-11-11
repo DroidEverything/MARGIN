@@ -52,7 +52,7 @@
 import * as THREE from 'three';
 import {
   DPR_CAP, DAYS_PER_SEC, BODY_STYLE, radiusWorld,
-  buildStars, buildSolarSystem, todayDays,
+  buildStars, buildSolarSystem, todayDays, tex, dataTex,
   bodyWorldUnified, exposureForBody, isPhysicalMode, UNITS_PER_KM
 } from './orrery.js';
 
@@ -88,7 +88,7 @@ const V = {
   s: new THREE.Vector3(0, 0, 1), u: new THREE.Vector3(1, 0.4, 0),
   goodE: new THREE.Vector3(1.35, 0, 0),
   raf: 0, W: 0, H: 0, last: 0, failed: false, graded: false,
-  loadDone: false, loadHideTimer: 0, mgrPending: 0, mgrSave: null, mgrHooks: null
+  loadDone: false, bootMaxTimer: 0, mgrPending: 0, mgrSettled: 0, mgrSave: null, mgrHooks: null
 };
 const UP = new THREE.Vector3(0, 1, 0);
 const _E = new THREE.Vector3(), _C = new THREE.Vector3(), _T = new THREE.Vector3(),
@@ -194,28 +194,28 @@ function dispose() {
     V.starMat = V.sunMat = null;
 }
 
-function setTitleStreamUI(pct, label, done) {
-  const el = document.getElementById('title3dLoad');
-  if (!el) return;
-  if (V.loadHideTimer) { clearTimeout(V.loadHideTimer); V.loadHideTimer = 0; }
-  const txt = document.getElementById('title3dTxt');
-  const fill = document.getElementById('title3dFill');
-  const pEl = document.getElementById('title3dPct');
-  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-  if (txt && label) txt.textContent = label;
-  if (fill) fill.style.width = clamped + '%';
-  if (pEl) pEl.textContent = clamped + '%';
-  if (done) {
-    el.classList.add('done');
-    V.loadHideTimer = setTimeout(() => {
-      V.loadHideTimer = 0;
-      const cur = document.getElementById('title3dLoad');
-      if (cur && V.loadDone) cur.hidden = true;
-    }, 520);
-  } else {
-    el.hidden = false;
-    el.classList.remove('done');
-  }
+function shortAssetName(url) {
+  try {
+    const clean = String(url || '').split('?')[0].split('/').pop() || '';
+    return clean.replace(/\.(jpg|jpeg|png|webp|glb)$/i, '').replace(/^(8k|2k)_/i, '').replace(/_/g, ' ').toUpperCase().slice(0, 22);
+  } catch (e) { return ''; }
+}
+
+function waitTexReady(t) {
+  if (!t || !t.image) return Promise.resolve();
+  const img = t.image;
+  const loadP = img.complete ? Promise.resolve() : new Promise((resolve) => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; resolve(); } };
+    img.addEventListener('load', fin, { once: true });
+    img.addEventListener('error', fin, { once: true });
+    setTimeout(fin, 4500);
+  });
+  return loadP.then(() => {
+    if (img.naturalWidth > 0 && typeof img.decode === 'function') {
+      return Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 2500))]);
+    }
+  });
 }
 
 function restoreMgrHooks() {
@@ -229,50 +229,93 @@ function restoreMgrHooks() {
   V.mgrSave = null; V.mgrHooks = null;
 }
 
-function finishTitleStream() {
-  if (V.loadDone) return;
+function syncEarthGraded() {
+  if (V.graded || !V.bodies || !V.bodies.earth) return;
+  try {
+    const host = V.bodies.earth.isMesh ? V.bodies.earth : (V.bodies.earth.children || [])[0];
+    const map = host && host.material && host.material.map;
+    if (map && map.image && map.image.complete && map.image.naturalWidth > 0) {
+      document.body.classList.add('earth3d');
+      V.graded = true;
+    }
+  } catch (e) {}
+}
+
+async function prepareGpuAndReveal() {
+  if (V.loadDone || !V.scene || !V.renderer) return;
   V.loadDone = true;
+  if (V.bootMaxTimer) { clearTimeout(V.bootMaxTimer); V.bootMaxTimer = 0; }
   restoreMgrHooks();
-  const el = document.getElementById('title3dLoad');
-  if (el && !el.hidden) setTitleStreamUI(100, '3D EARTH ONLINE', true);
+  const boot = window.__MARGIN_BOOT;
+  if (boot) boot.step(95, 'DECODING 8K EARTH & CLOUD LAYERS…', 98, 3, 'DECODING');
+  try {
+    const critical = [tex('earth'), tex('earthClouds'), tex('earthNight'), dataTex('earthRough')].filter(Boolean);
+    await Promise.all(critical.map(waitTexReady));
+    for (const t of critical) {
+      if (t.image && t.image.naturalWidth > 0) t.needsUpdate = true;
+    }
+  } catch (e) {}
+  if (!V.scene || !V.renderer || !V.camera) return;
+  if (boot) boot.step(98, 'COMPILING WEBGL SHADERS & ATMOSPHERE…', 100, 3, 'SHADERS');
+  try { V.renderer.compile(V.scene, V.camera); } catch (e) {}
+  try { V.renderer.render(V.scene, V.camera); } catch (e) {}
+  syncEarthGraded();
+  await new Promise((resolve) => {
+    let settled = false;
+    const fin = () => { if (!settled) { settled = true; resolve(); } };
+    requestAnimationFrame(() => requestAnimationFrame(fin));
+    setTimeout(fin, 260);
+  });
+  syncEarthGraded();
+  if (boot) boot.finish('ALL TELEMETRY LOCKED · READY');
 }
 
 function hookTitleStream() {
   restoreMgrHooks();
   V.loadDone = false;
   V.mgrPending = 0;
+  V.mgrSettled = 0;
+  if (V.bootMaxTimer) { clearTimeout(V.bootMaxTimer); V.bootMaxTimer = 0; }
   const mgr = THREE.DefaultLoadingManager;
   if (!mgr) return;
+  const boot = window.__MARGIN_BOOT;
   const prev = {
     onStart: mgr.onStart, onProgress: mgr.onProgress,
     onLoad: mgr.onLoad, onError: mgr.onError
   };
-  const update = (loaded, total) => {
-    if (V.loadDone || !V.scene) return;
+  const report = (url, total) => {
+    if (V.loadDone || !V.scene || !boot) return;
     if (total > 0) {
       V.mgrPending = Math.max(V.mgrPending, total);
-      const pct = Math.max(8, Math.min(96, Math.round((loaded / total) * 96)));
-      setTitleStreamUI(pct, `STREAMING 3D EARTH · ${loaded}/${total}`, false);
+      const frac = Math.min(1, V.mgrSettled / total);
+      const pct = Math.max(58, Math.min(95, 58 + Math.round(frac * 37)));
+      const nextCap = Math.min(96, pct + Math.max(2, Math.round(37 / total)));
+      const nm = shortAssetName(url);
+      boot.step(pct, nm ? `STREAMING ${nm}…` : 'STREAMING 8K PLANETARY TEXTURES…', nextCap, 2, `${Math.min(V.mgrSettled, total)} / ${total} ASSETS`);
     }
   };
   const hooks = {
     onStart(url, loaded, total) {
       try { if (prev.onStart) prev.onStart.call(mgr, url, loaded, total); } catch (e) {}
-      V.mgrPending++;
-      update(loaded, total);
+      V.mgrPending = Math.max(V.mgrPending + 1, total || 0);
+      report(url, Math.max(V.mgrPending, total || 0));
     },
     onProgress(url, loaded, total) {
       try { if (prev.onProgress) prev.onProgress.call(mgr, url, loaded, total); } catch (e) {}
-      update(loaded, total);
-      if (total > 0 && loaded >= total) finishTitleStream();
+      V.mgrSettled = Math.max(V.mgrSettled, loaded || 0);
+      report(url, Math.max(V.mgrPending, total || 0));
+      if (total > 0 && V.mgrSettled >= total) prepareGpuAndReveal();
     },
     onLoad() {
       try { if (prev.onLoad) prev.onLoad.call(mgr); } catch (e) {}
-      finishTitleStream();
+      prepareGpuAndReveal();
     },
     onError(url) {
       try { if (prev.onError) prev.onError.call(mgr, url); } catch (e) {}
-      finishTitleStream();
+      V.mgrSettled++;
+      const total = Math.max(V.mgrPending, V.mgrSettled);
+      report(url, total);
+      if (total > 0 && V.mgrSettled >= total) prepareGpuAndReveal();
     }
   };
   V.mgrSave = prev;
@@ -281,14 +324,15 @@ function hookTitleStream() {
   mgr.onProgress = hooks.onProgress;
   mgr.onLoad = hooks.onLoad;
   mgr.onError = hooks.onError;
+  V.bootMaxTimer = setTimeout(() => { V.bootMaxTimer = 0; prepareGpuAndReveal(); }, 26000);
 }
 
 function stop() {
   if (V.raf) cancelAnimationFrame(V.raf);
   V.raf = 0;
-  if (V.loadHideTimer) { clearTimeout(V.loadHideTimer); V.loadHideTimer = 0; }
+  if (V.bootMaxTimer) { clearTimeout(V.bootMaxTimer); V.bootMaxTimer = 0; }
   restoreMgrHooks();
-  V.loadDone = false; V.mgrPending = 0;
+  V.loadDone = false; V.mgrPending = 0; V.mgrSettled = 0;
   dispose();
   V.canvas = null; V.W = 0; V.H = 0; V.failed = false; V.graded = false;
   V.dist = 0; V.preset = 0; V.cycleT = 0; V.exposure = 0;
@@ -396,17 +440,9 @@ function frame(now) {
   V.u.copy(V.camera.position).sub(_E).normalize();
   applyIris(dt);
   publishHandoff();
-  /* reveal only once the live Earth texture is on the mesh, so the first
-     paint is never a gray disc (the CSS fallback covers the wait). */
-  if (!V.graded && V.bodies && V.bodies.earth) {
-    try {
-      const host = V.bodies.earth.isMesh ? V.bodies.earth : (V.bodies.earth.children || [])[0];
-      if (host && host.material && host.material.map) {
-        document.body.classList.add('earth3d');
-        V.graded = true;
-      }
-    } catch (e) {}
-  }
+  /* reveal only once the live Earth texture is decoded on the mesh, so the first
+     paint is never a gray/half-loaded disc. */
+  syncEarthGraded();
   /* direct rendering: the one post-processing experiment fogged the frame,
      so the glow is geometry again (see sunHalo below) — deterministic. */
   V.renderer.render(V.scene, V.camera);
@@ -452,7 +488,11 @@ function start(cv) {
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
-  } catch (e) { V.failed = true; return; }
+  } catch (e) {
+    V.failed = true;
+    try { if (window.__MARGIN_BOOT) window.__MARGIN_BOOT.finish('2D FALLBACK READY'); } catch (e2) {}
+    return;
+  }
   V.renderer = renderer;
   V.canvas = cv;
   try { renderer.setClearColor(0x04070d, 1); } catch (e) {}
@@ -470,13 +510,12 @@ function start(cv) {
   } catch (e) {}
   /* the live solar system — same assembly the select/brief views fly,
      REAL Sun included. */
+  try { if (window.__MARGIN_BOOT) window.__MARGIN_BOOT.step(56, 'INITIALIZING 3D SOLAR SYSTEM…', 62, 2, 'SOLAR SYSTEM'); } catch (e) {}
   hookTitleStream();
   const built = buildSolarSystem(V.scene, () => !!V.scene, {
     simDays: todayDays(), physical: V.isPhys,
     unitsPerKm: UNITS_PER_KM, focusKey: null, originKm: [0, 0, 0]
   });
-  if (V.mgrPending === 0) finishTitleStream();
-  else if (!V.loadDone) setTitleStreamUI(8, 'STREAMING 3D EARTH TEXTURES', false);
   V.sys = built;
   V.bodies = built.bodies;
   V.ambient = built.ambient || null;
@@ -519,6 +558,10 @@ function start(cv) {
   publishHandoff();
   V.last = performance.now();
   if (!V.raf) V.raf = requestAnimationFrame(frame);
+  if (V.mgrPending === 0) prepareGpuAndReveal();
+  else if (!V.loadDone && window.__MARGIN_BOOT) {
+    window.__MARGIN_BOOT.step(58, 'STREAMING 8K EARTH & SOLAR MAPS…', 68, 2, `0 / ${V.mgrPending} ASSETS`);
+  }
 }
 
 /* Called (guarded) from game.js render(). Starts on the title canvas,
@@ -526,10 +569,17 @@ function start(cv) {
 function sync() {
   let cv = null;
   try { cv = document.getElementById('earthCanvas'); } catch (e) { cv = null; }
-  if (!cv) { if (V.raf || V.canvas) stop(); return; }
+  if (!cv) {
+    if (V.raf || V.canvas) stop();
+    try { if (window.__MARGIN_BOOT) window.__MARGIN_BOOT.finish('FLIGHT SYSTEM READY'); } catch (e) {}
+    return;
+  }
   if (V.canvas === cv && V.raf) return;
   stop();
-  if (V.failed) return;
+  if (V.failed) {
+    try { if (window.__MARGIN_BOOT) window.__MARGIN_BOOT.finish('2D FALLBACK READY'); } catch (e) {}
+    return;
+  }
   start(cv);
 }
 

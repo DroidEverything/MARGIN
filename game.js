@@ -2109,14 +2109,7 @@ function scrTitle(){
       </span>
     </div>
     <p class="proto">NASA-DERIVED DATA &#183; INDEPENDENT SPACE APPS CHALLENGE PROTOTYPE</p>
-  </div>
-  <div id="title3dLoad" class="title-3d-status" aria-live="polite" hidden>
-    <span class="t3d-dot" aria-hidden="true"></span>
-    <span class="t3d-lbl" id="title3dTxt">STREAMING 3D EARTH TEXTURES</span>
-    <span class="t3d-bar" aria-hidden="true"><i id="title3dFill"></i></span>
-    <span class="t3d-pct" id="title3dPct">0%</span>
-  </div>
-  </div>`;
+  </div></div>`;
 }
 
 /* ── MISSION SELECT (fullscreen solar-system stage) ── */
@@ -9238,7 +9231,6 @@ try{
     el("btnSound").setAttribute("aria-pressed", "false");
   }
 }catch(e){}
-window.__bootDone&&window.__bootDone();
 if(!applySceneShortcut()) render();
 addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="launch"&&PORK)drawPork();
   if(S.screen==="ops"){drawOrbit();drawTL();} });
@@ -9246,15 +9238,26 @@ addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="
 /* ── 3D presentation (Phase 3B): progressive enhancement, silent 2D fallback.
    Module loads only over http(s) with WebGL; file:// and ?no3d stay Canvas2D. */
 (function(){
+  const boot=window.__MARGIN_BOOT;
   try{
-    if(location.protocol.indexOf("http")!==0) return;
-    if(/[?&]no3d/.test(location.search)) return;
+    if(location.protocol.indexOf("http")!==0 || /[?&]no3d/.test(location.search)){
+      if(boot) boot.finish("2D FALLBACK MODE READY");
+      return;
+    }
     const t=document.createElement("canvas");
-    if(!(t.getContext("webgl2")||t.getContext("webgl"))) return;
+    if(!(t.getContext("webgl2")||t.getContext("webgl"))){
+      if(boot) boot.finish("2D FALLBACK MODE READY");
+      return;
+    }
+    if(S.screen==="title" && boot){
+      boot.step(51,"LOADING 3D ENGINE & EARTH SHADERS…",58,1,"WEBGL");
+    } else if(boot){
+      boot.finish("FLIGHT SYSTEM READY");
+    }
     import("./js/view3d.js?v=" + Date.now()).catch(function(){});
-    import("./js/title-earth.js").catch(function(){});
-    import("./js/select-viewer.js?v=20261108c").catch(function(){});
+    import("./js/title-earth.js?v=20261111b").catch(function(){ if(boot) boot.finish("2D FALLBACK READY"); });
+    import("./js/select-viewer.js?v=20261111b").catch(function(){});
     import("./js/brief-view.js").catch(function(){});
     import("./js/ops-view.js?v=20261108n").catch(function(err){ console.error("[ops-view] import failed:", err); });
-  }catch(e){}
+  }catch(e){ if(boot) boot.finish("FLIGHT SYSTEM READY"); }
 })();

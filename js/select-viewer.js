@@ -112,7 +112,7 @@ function stop() {
   V.isPhys = false; V.originKm = [0, 0, 0]; V.raycastTargets = [];
   V.sysView = false;
   invalidateSunElements();
-  try { document.body.classList.remove('sysview'); } catch (e) { }
+  try { document.body.classList.remove('sysview', 'planet-info-open'); } catch (e) { }
 }
 
 /* Cinematic overview camera position (isometric angle displaying all planetary orbits) */
@@ -413,7 +413,8 @@ function updateFocusClamp(key) {
 
 function commitFly(toKey) {
   V.sysView = false;
-  try { document.body.classList.remove('sysview'); } catch (e) { }
+  if (V.infoEl && V.infoEl.style.display !== 'none') V.infoEl.style.display = 'none';
+  try { document.body.classList.remove('sysview', 'planet-info-open'); } catch (e) { }
   V.selectedPlanet = null;
   V.trackAnchor = null;
   V.isMovingTowardsPlanet = false;
@@ -677,7 +678,11 @@ function showPlanetInfo(planetKey) {
     <div class="pi-actions">
       <button class="sysbtn" data-act="sysview">RETURN TO MISSION</button>
     </div>
-  ` : '';
+  ` : `
+    <div class="pi-actions">
+      <button class="sysbtn" data-act="close-info">RETURN TO MISSION</button>
+    </div>
+  `;
 
   content.innerHTML = `
     <button class="close-btn" data-act="close-info" title="Close & Return to Solar System">&times;</button>
@@ -697,10 +702,12 @@ function showPlanetInfo(planetKey) {
     ${returnBtn}
   `;
   V.infoEl.style.display = 'block';
+  try { document.body.classList.add('planet-info-open'); } catch (e) {}
 }
 
 function closeInfo() {
   if (V.infoEl) V.infoEl.style.display = 'none';
+  try { document.body.classList.remove('planet-info-open'); } catch (e) {}
   V.selectedPlanet = null;
   V.isMovingTowardsPlanet = false;
   V.trackAnchor = null;
