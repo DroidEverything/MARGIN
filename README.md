@@ -1,21 +1,29 @@
 # MARGIN — NASA Space Mission Design Game
 
+[![Play Live](https://img.shields.io/badge/PLAY_LIVE-droideverything.github.io%2FMARGIN-2ea043?style=for-the-badge)](https://droideverything.github.io/MARGIN/)
+[![2D Fallback Mode](https://img.shields.io/badge/2D_FALLBACK-%3Fno3d-1f2937?style=for-the-badge)](https://droideverything.github.io/MARGIN/?no3d)
+
 MARGIN is an offline-first, browser-based space mission design game built for the
 **NASA Space Apps Challenge**. Pick a mission, engineer a spacecraft under real
 mass, power, thermal, comms, and budget margins, select a launch vehicle, fly the
 trajectory, and operate the mission in orbit or on the surface — anchored to
 public NASA and JPL datasets.
 
-No build step, no bundler, no runtime network requests.
+No build step, no bundler, no runtime external API calls.
 
 ---
 
 ## Quick Start
 
-For the full 3D WebGL experience, serve the folder over local HTTP (browsers block
-ES module and asset `fetch` calls on `file://`).
+### Play Live in Browser (Recommended)
 
-### Windows
+Open **[https://droideverything.github.io/MARGIN/](https://droideverything.github.io/MARGIN/)** in Chrome, Edge, or Firefox.
+
+- **First visit:** Preloads vendored JPL DE440 ephemerides (~31 MB) and 8K planetary/cloud textures behind a telemetry boot screen so every 3D shader and surface map is ready before entry, then caches locally for fast repeat visits.
+- **2D fallback:** Append [`?no3d`](https://droideverything.github.io/MARGIN/?no3d) to bypass WebGL and play in Canvas2D mode.
+- **Mobile desktop mode:** Use the fullscreen button in the top-left corner of the header bar.
+
+### Run Locally (Windows)
 
 Double-click **`launch_margin.bat`** (or run it from a terminal). It locates
 Python 3, starts a local HTTP server at <http://localhost:8906/index.html>, and
@@ -29,7 +37,7 @@ taskkill /FI "WINDOWTITLE eq MARGIN server*"
 
 If port 8906 is busy, edit `PORT` at the top of `launch_margin.bat`.
 
-### macOS / Linux / Manual
+### Run Locally (macOS / Linux / Manual)
 
 ```bash
 python3 -m http.server 8906 --bind 127.0.0.1
@@ -40,7 +48,8 @@ python3 -m http.server 8906 --bind 127.0.0.1
 
 | Launch Mode | Behavior |
 |---|---|
-| Local HTTP (default) | Full interactive Three.js 3D scenes + Web Audio + authoritative simulation |
+| [Live Demo (GitHub Pages)](https://droideverything.github.io/MARGIN/) | Full 3D WebGL + JPL ephemerides hosted over HTTPS; caches locally after initial boot |
+| Local HTTP (default) | Same full interactive Three.js 3D scenes + Web Audio + authoritative simulation offline |
 | `?no3d` query parameter | Forces the lightweight Canvas2D rendering path across every screen |
 | Direct `file://` (`index.html`) | Automatically falls back to the Canvas2D simulation mode when ES modules are blocked |
 
