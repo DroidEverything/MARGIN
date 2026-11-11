@@ -10,7 +10,7 @@
    ops-view <-> surface-view cycle is safe: neither module touches the other
    at load time. */
 import * as THREE from 'three';
-import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261030j';
+import { loadRoverGltf, calibrateRover } from './kit-assembly.js?v=20261108c';
 import { bodyWorld, UNITS_PER_KM, tex } from './orrery.js';
 import { SOLAR_CONSTANT_W_M2 } from './solar-system-accuracy.js';
 import { createBodyTextSprite, buildCraftMarker, loadLanderGltf } from './ops-view.js';
@@ -24,9 +24,8 @@ const _zero = new THREE.Vector3(0, 0, 0);
    each alongside the code that owns them (moved verbatim); do NOT re-add
    them here — duplicate top-level consts kill the module at link time. */
 
-/* Pass-A diagnostic mode (`?terrain-debug`): isolation toggles + debug shading
-   modes + stats readout URL-gated;
-   zero effect on normal loads.  */
+/* Diagnostic mode (`?terrain-debug`): isolation toggles + debug shading
+   modes + stats readout. URL-gated; zero effect on normal loads. */
 const SURF_DEBUG = (() => {
   try { return new URLSearchParams(location.search).has("terrain-debug"); }
   catch (e) { return false; }
@@ -593,18 +592,25 @@ function buildRocks(scene, patch, isMars, siteId) {
       const il = 1 / (Math.hypot(e.x, e.y, e.z) || 1);
       na[k * 3] = e.x * il; na[k * 3 + 1] = e.y * il; na[k * 3 + 2] = e.z * il;
       // Baked contact shadow: bottom third dark even outside the shadow box.
-      const c = 0.55 + 0.45 * sstep(-0.6, 0.3, pa.getY(k));
-      ca[k * 3] = c; ca[k * 3 + 1] = c; ca[k * 3 + 2] = c;
+      if (isMars) {
+        const upF = Math.max(0, na[k * 3 + 1]);
+        const dustF = Math.pow(upF, 1.3) * (0.8 + 0.4 * sstep(-0.4, 0.4, pa.getY(k)));
+        const contact = 0.55 + 0.45 * sstep(-0.6, 0.2, pa.getY(k));
+        ca[k * 3] = contact * (0.42 + 0.52 * dustF);
+        ca[k * 3 + 1] = contact * (0.40 + 0.18 * dustF);
+        ca[k * 3 + 2] = contact * (0.38 - 0.08 * dustF);
+      } else {
+        const c = 0.55 + 0.45 * sstep(-0.6, 0.3, pa.getY(k));
+        ca[k * 3] = c; ca[k * 3 + 1] = c; ca[k * 3 + 2] = c;
+      }
     }
     geo.setAttribute('normal', new THREE.BufferAttribute(na, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(ca, 3));
   } catch (e) { /* faceted fallback stands */ }
   // Part-5 (P): dust-coated base — boulders wear the same regolith as soil.
-  // Mars: basaltic rocks run darker/redder than the dust (×0.72 transform of
-  // the measured site base — display relation, not a separate measurement).
-  const rockBase = (isMars && MARS_SURF_TINT[siteId]) ? new THREE.Color(MARS_SURF_TINT[siteId].base).multiplyScalar(0.72).getHex()
-    : 0x6e6e70;
-  const mat = new THREE.MeshStandardMaterial({ color: rockBase, roughness: 1, metalness: 0, vertexColors: true });
+  // Mars: dual population (dark basalt gray vs oxidized red stones) + upward dust.
+  const rockBase = isMars ? 0xffffff : 0x6e6e70;
+  const mat = new THREE.MeshStandardMaterial({ color: rockBase, roughness: 0.94, metalness: 0.04, vertexColors: true });
   const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(),
     eu = new THREE.Euler(), sv = new THREE.Vector3(), pv = new THREE.Vector3(),
@@ -668,8 +674,17 @@ function buildRocks(scene, patch, isMars, siteId) {
   };
   const _col = new THREE.Color();
   const tint = () => {
-    // ±10% dust variation around the regolith base.
-    const g = 0.9 + rnd() * 0.2;
+    if (isMars) {
+      if (rnd() > 0.48) {
+        // Viking/Spirit-style oxidized red dust-coated rock
+        return _col.setRGB(0.74 + rnd() * 0.14, 0.46 + rnd() * 0.10, 0.28 + rnd() * 0.08);
+      } else {
+        // Pathfinder/Curiosity-style dark volcanic basalt rock
+        const g = 0.38 + rnd() * 0.16;
+        return _col.setRGB(g * 1.04, g, g * 0.96);
+      }
+    }
+    const g = 0.85 + rnd() * 0.25;
     return _col.setRGB(g, g, g);
   };
   let placed = 0, guard = 0;
@@ -900,6 +915,39 @@ const MARS_SURF_TINT = {
   gale: { base: 0x856443 },
   elysium: { base: 0x8f6b44 }
 };
+
+function loadSurfaceDetailMap(F, isMars, mat) {
+  try {
+    const detailFile = isMars ? 'assets/textures/mars_sand_tile_v2.png' : 'assets/textures/lroc_nac_tile.png';
+    new THREE.TextureLoader().load(detailFile, (t) => {
+      try {
+        if (!F.scene || !mat) return;
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        const rep = isMars ? 32 : 150;
+        t.repeat.set(rep, rep);
+        try {
+          t.anisotropy = ((F.gl ? F.gl.capabilities.getMaxAnisotropy() : 4) || 4);
+        } catch (e) { try { t.anisotropy = 4; } catch (e2) {} }
+        try { t.needsUpdate = true; } catch (e) {}
+
+        const old = mat.normalMap;
+        mat.normalMap = t;
+        mat.normalScale = new THREE.Vector2(isMars ? 0.25 : 1.1, isMars ? 0.25 : 1.1);
+        mat.needsUpdate = true;
+        F.detailTex = t;
+        try { if (old && old !== t && old.dispose) old.dispose(); } catch (e2) {}
+        try {
+          if (F.rocks && F.rocks.material && !F.rocks.material.normalMap) {
+            F.rocks.material.normalMap = t;
+            F.rocks.material.normalScale.set(isMars ? 0.35 : 0.9, isMars ? 0.35 : 0.9);
+            F.rocks.material.needsUpdate = true;
+          }
+        } catch (e3) {}
+      } catch (e) {}
+    }, undefined, () => {});
+  } catch (e) {}
+}
+
 function buildSurface(siteId) {
   const P = (typeof SURFACE_PATCHES !== 'undefined') ? SURFACE_PATCHES : null;
   let patch = P && P.sites ? decodeSite(P.sites[siteId]) : null;
@@ -912,15 +960,8 @@ function buildSurface(siteId) {
   if (!patch || !patch._dec) return null;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
-  // Mars: thin dusty atmosphere — butterscotch presentation haze over the
-  // 48 km MOLA context. Exponential falloff (NOT linear): real dust is
-  // additive airlight that LOWERS contrast with distance while preserving
-  // relief modulation — linear fog went full-flat-white by ~20 km (owner
-  // screenshots). Density 4.5e-5: ~12% at the 8 km mound foothills, ~72%
-  // at the 25 km far rim. Color+range are illustration (opacity is
-  // seasonal), heights stay true-metre. Foreground stays clean (walkaround,
-  // rover, label all <500 m). Moon keeps vacuum-sharp black (linear Fog).
-  scene.fog = isMars ? new THREE.FogExp2(0xbf8f5e, 0.000045)
+  // Mars: authentic suspended dust atmosphere — exponential dust haze matching horizon sky (0xd87b46).
+  scene.fog = isMars ? new THREE.FogExp2(0xd87b46, 0.000085)
     : new THREE.Fog(0x000000, 12000, 38000);
   const n = patch.n, size = patch.sizeM;
   // Part-8 (geometric depth): 750² mesh (~4 m spacing) so D ≥ 18 m bowls
@@ -981,11 +1022,27 @@ function buildSurface(siteId) {
     const jxp = jx + 1 > VN - 1 ? k : k + VN, jxm = jx - 1 < 0 ? k : k - VN;
     const cav = Math.max(-1, Math.min(1,
       (py[ixp * 3 + 1] + py[ixm * 3 + 1] + py[jxp * 3 + 1] + py[jxm * 3 + 1] - 4 * py[k * 3 + 1]) / (2 * vpost)));
-    let g = (0.52 + t * 0.16) * (1 - Math.min(45, sl) / 45 * 0.5) * (1 - cav * 0.08);
-    // Measured drape (expert: raw I/F display over the base hue). Mesh jx
-    // runs north→south exactly like the col grid rows — direct mapping.
-    if (colAt) g *= colAt(ix / (VN - 1) * (colN - 1), jx / (VN - 1) * (colN - 1));
-    colArr[k * 3] = g; colArr[k * 3 + 1] = g; colArr[k * 3 + 2] = g;
+    if (isMars) {
+      // Regolith variation: bright ferric dust drifts, dark downwind basalt scour, pale crusty sulfate patches
+      const px = py[k * 3], pz = py[k * 3 + 2];
+      const drift = Math.sin(px * 0.014 + Math.cos(pz * 0.010) * 2.8) * 0.5 + 0.5;
+      const scour = Math.sin((px + pz * 0.6) * 0.032) * 0.5 + 0.5;
+      const crust = Math.sin(px * 0.038 + 1.2) * Math.cos(pz * 0.034 + 2.1);
+      const isCrust = (crust > 0.70 && sl < 7.0) ? (crust - 0.70) * 3.3 : 0;
+      let dF = Math.max(0, Math.min(1, (1 - Math.min(25, sl) / 25) * 0.70 + cav * 0.30 + 0.15 + (drift - 0.5) * 0.40));
+      const rD = (drift > 0.65) ? 0.94 : 0.86, gD = (drift > 0.65) ? 0.52 : 0.48, bD = (drift > 0.65) ? 0.24 : 0.27;
+      const rB = 0.24, gB = 0.20, bB = 0.19;
+      let cr = rB + (rD - rB) * dF, cg = gB + (gD - gB) * dF, cb = bB + (bD - bB) * dF;
+      if (scour > 0.65 && drift < 0.45) { const sf = (scour - 0.65) * 1.5; cr *= (1 - 0.35 * sf); cg *= (1 - 0.35 * sf); cb *= (1 - 0.35 * sf); }
+      if (isCrust > 0) { cr = cr * (1 - isCrust) + 0.88 * isCrust; cg = cg * (1 - isCrust) + 0.80 * isCrust; cb = cb * (1 - isCrust) + 0.70 * isCrust; }
+      let bright = (0.80 + t * 0.26) * (1 - cav * 0.04);
+      if (colAt) bright *= colAt(ix / (VN - 1) * (colN - 1), jx / (VN - 1) * (colN - 1));
+      colArr[k * 3] = cr * bright; colArr[k * 3 + 1] = cg * bright; colArr[k * 3 + 2] = cb * bright;
+    } else {
+      let g = (0.52 + t * 0.16) * (1 - Math.min(45, sl) / 45 * 0.5) * (1 - cav * 0.08);
+      if (colAt) g *= colAt(ix / (VN - 1) * (colN - 1), jx / (VN - 1) * (colN - 1));
+      colArr[k * 3] = g; colArr[k * 3 + 1] = g; colArr[k * 3 + 2] = g;
+    }
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
   // Part-5 (M): patch-wide meso + horizon maps (built once per site entry;
@@ -1014,9 +1071,7 @@ function buildSurface(siteId) {
   // only, never a recompile. All other sites keep the white placeholder
   // (×1.0, pixel-identical to before).
   const JEZERO_MICRO = (siteId === 'jezero');
-  const microBase = (isMars && MARS_SURF_TINT[siteId])
-    ? new THREE.Color(MARS_SURF_TINT[siteId].base).multiplyScalar(JEZERO_MICRO ? 2 : 1).getHex()
-    : 0x78787a;
+  const microBase = isMars ? 0xffffff : 0x78787a;
   if (!buildSurface._phTex) buildSurface._phTex = {};
   const phKey = JEZERO_MICRO ? 'g128' : 'w255';
   if (!buildSurface._phTex[phKey]) {
@@ -1153,14 +1208,17 @@ function buildSurface(siteId) {
     const og = new THREE.PlaneGeometry(osz, osz, on - 1, on - 1);
     og.rotateX(-Math.PI / 2);
     const op = og.attributes.position;
+    const innerHalf = (patch.sizeM || 3000) / 2;
+    const holeI0 = Math.floor((osz / 2 - innerHalf) / opost);
+    const holeI1 = Math.ceil((osz / 2 + innerHalf) / opost);
     for (let j = 0; j < on; j++) for (let i = 0; i < on; i++) {
       const idx = j * on + i;
       let x = -osz / 2 + i * opost;
       let z = -osz / 2 + j * opost;
-      if (i === 93) x = -1500;
-      else if (i === 106) x = 1500;
-      if (j === 93) z = -1500;
-      else if (j === 106) z = 1500;
+      if (i === holeI0) x = -innerHalf;
+      else if (i === holeI1) x = innerHalf;
+      if (j === holeI0) z = -innerHalf;
+      else if (j === holeI1) z = innerHalf;
       op.setXYZ(idx, x, oh[idx], z);
     }
     op.needsUpdate = true;
@@ -1168,7 +1226,7 @@ function buildSurface(siteId) {
       const kept = [];
       for (let j = 0; j < on - 1; j++) {
         for (let i = 0; i < on - 1; i++) {
-          if (i >= 93 && i <= 105 && j >= 93 && j <= 105) continue;
+          if (i >= holeI0 && i < holeI1 && j >= holeI0 && j < holeI1) continue;
           const v00 = j * on + i;
           const v10 = j * on + i + 1;
           const v01 = (j + 1) * on + i;
@@ -1188,7 +1246,7 @@ function buildSurface(siteId) {
       const sd = patch.seamDelta || 0;
       if (sd !== 0) {
         for (let k = 0; k < on * on; k++) {
-          const d = Math.max(Math.abs(op.getX(k)), Math.abs(op.getZ(k))) - 1450;
+          const d = Math.max(Math.abs(op.getX(k)), Math.abs(op.getZ(k))) - (innerHalf - 50);
           if (d >= 0 && d < 300) op.setY(k, op.getY(k) + sd * 0.5 * (1 + Math.cos(Math.PI * d / 300)));
         }
       }
@@ -1213,12 +1271,23 @@ function buildSurface(siteId) {
         const az = oh[Math.min(on - 1, jx + 1) * on + ix], bz = oh[Math.max(0, jx - 1) * on + ix];
         const sl = Math.atan(Math.hypot(ax - bx, az - bz) / (2 * opost)) * D2G;
         const cav = Math.max(-1, Math.min(1, (ax + bx + az + bz - 4 * oh[k]) / (2 * opost)));
-        const g = (0.52 + t * 0.16) * (1 - Math.min(45, sl) / 45 * 0.5) * (1 - cav * 0.08);
-        ocol[k * 3] = g; ocol[k * 3 + 1] = g; ocol[k * 3 + 2] = g;
+        if (isMars) {
+          const dustFactor = Math.max(0, Math.min(1, (1 - Math.min(30, sl) / 30) * 0.72 + cav * 0.35 + 0.15));
+          const rD = 0.65, gD = 0.38, bD = 0.20;
+          const rB = 0.32, gB = 0.19, bB = 0.13;
+          const cr = rB + (rD - rB) * dustFactor;
+          const cg = gB + (gD - gB) * dustFactor;
+          const cb = bB + (bD - bB) * dustFactor;
+          let bright = (0.65 + t * 0.12) * (1 - cav * 0.05);
+          ocol[k * 3] = cr * bright; ocol[k * 3 + 1] = cg * bright; ocol[k * 3 + 2] = cb * bright;
+        } else {
+          const g = (0.52 + t * 0.16) * (1 - Math.min(45, sl) / 45 * 0.5) * (1 - cav * 0.08);
+          ocol[k * 3] = g; ocol[k * 3 + 1] = g; ocol[k * 3 + 2] = g;
+        }
       }
       og.setAttribute('color', new THREE.BufferAttribute(ocol, 3));
     } catch (e) { /* untinted skirt still stands */ }
-    const om = new THREE.MeshStandardMaterial({ color: (isMars && MARS_SURF_TINT[siteId]) ? MARS_SURF_TINT[siteId].base : 0x78787a, roughness: 1, metalness: 0, vertexColors: true });
+    const om = new THREE.MeshStandardMaterial({ color: isMars ? 0xffffff : 0x78787a, roughness: 1, metalness: 0, vertexColors: true });
     const outer = new THREE.Mesh(og, om);
     outer.position.y = 0;
     outer.receiveShadow = false;
@@ -1244,8 +1313,10 @@ function buildSurface(siteId) {
   sun.shadow.camera.near = 200; sun.shadow.camera.far = 1100;
   sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05;
   scene.add(sun); scene.add(sun.target);
-  const amb = new THREE.AmbientLight(isMars ? 0x5a4636 : 0x334455, 0.4);
+  const amb = new THREE.AmbientLight(isMars ? 0x8e7256 : 0x334455, 0.4);
   scene.add(amb);
+  const hemi = new THREE.HemisphereLight(0xdf986c, 0x5a3d28, isMars ? 115.0 : 0.0);
+  scene.add(hemi);
   // Earthshine fill (directional, from the LIVE Earth vector): the only
   // honest night light on the Moon. Physical earthshine (~0.15 W/m²) would
   // expose black under our metered iris, so this carries a disclosed ~40×
@@ -1271,54 +1342,14 @@ function buildSurface(siteId) {
     scene.add(label);
   } catch (e) {}
   const sky = buildSurfSky(scene, isMars);
-  const F = { scene, sun, amb, terrain, grain: null, rocks, rover: null, marker: null,
+  const F = { scene, sun, amb, hemi, terrain, grain: null, rocks, rover: null, marker: null,
     siteId, isMars, patch, sunDir: sdir, label, sky, detailTex: null, nightF: 0,
     mot: motionState(),
     mesoTex: (mesoHorizon && mesoHorizon.mesoTex) || null,
     horizonTex: (mesoHorizon && mesoHorizon.horizonTex) || null,
     outer: outerMesh, esh, eshDir, _stdMat: mat, _dbgBasic: null, _slopeAttr: null, _curvAttr: null };
-  // Part-5 (M): micro velvet normal map swaps the flat placeholder on
-  // arrival (same slot/defines — texture upload only, no recompile).
-  // repeat 150 = 20 m tiles of sub-meter velvet; normalScale 0.3 gentle.
-  // (Comment stale as of Part-7: scale is 1.1; repeat unchanged.)
-  const detailCommon = (t) => {
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(150, 150); // 20 m tiles: texel ≈ 3.9 cm
-    try {
-      t.anisotropy = ((F.gl ? F.gl.capabilities.getMaxAnisotropy() : 4) || 4);
-    } catch (e) { try { t.anisotropy = 4; } catch (e2) {} }
-    try { t.needsUpdate = true; } catch (e) {}
-  };
-  try {
-    // Lunar NAC velvet is Moon regolith — never draped on Mars (provenance).
-    // Mars keeps the baked meso-normal/horizon maps (real MOLA) + grain-free
-    // physical material until a Mars-analogue detail bake exists.
-    if (!isMars) {
-      // Seamless Apollo 11 regolith normal map: provides physical micro-porosity and rock pitting
-      // without ANY repeating tile seams or grid lines across the 3 km terrain.
-      // Moon diffuse albedo is driven by verified LOLA topography, slope shading, and Lommel-Seeliger
-      // photometric scattering (mat.map remains 1x1 placeholder to avoid repeating photographic tile seams).
-      new THREE.TextureLoader().load('assets/textures/lroc_nac_tile.png', (t) => {
-        try {
-          if (!F.scene || !mat) return;
-          detailCommon(t);
-          const old = mat.normalMap;
-          mat.normalMap = t;
-          mat.normalScale = new THREE.Vector2(1.1, 1.1);
-          mat.needsUpdate = true;
-          F.detailTex = t;
-          try { if (old && old !== t && old.dispose) old.dispose(); } catch (e2) {}
-          try {
-            if (F.rocks && F.rocks.material && !F.rocks.material.normalMap) {
-              F.rocks.material.normalMap = t;
-              F.rocks.material.normalScale.set(0.9, 0.9);
-              F.rocks.material.needsUpdate = true;
-            }
-          } catch (e3) { /* smooth fallback stands */ }
-        } catch (e) { /* regolith stands down */ }
-      }, undefined, () => { /* regolith stands down */ });
-    }
-  } catch (e) { /* velvet stands down */ }
+  // Micro regolith normal map: lunar Apollo regolith or Martian aeolian sand-ripple & basalt grit
+  loadSurfaceDetailMap(F, isMars, mat);
   /* Jezero measured micro-detail arrival (progressive enhancement):
      real 1 m normals replace the runtime meso uniform (horizon gate keeps
      the runtime horizon map — same code path); real high-passed albedo
@@ -1368,6 +1399,127 @@ const SURF_PLANETS = [
   { key: 'jupiter', map: 'jupiter', km: 69911 },
   { key: 'saturn', map: 'saturn', km: 58232 }
 ];
+function buildMarsAtmosphereDome(skyD) {
+  const domeR = skyD - 1200;
+  // Extend thetaLength to 0.85 * PI so dome wraps 63 deg below horizon, eliminating black seams
+  const domeGeo = new THREE.SphereGeometry(domeR, 64, 40, 0, Math.PI * 2, 0, Math.PI * 0.85);
+  const domeMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uDayF: { value: 1.0 },
+      uZenithColor: { value: new THREE.Color(0xc89262) },
+      uHorizonColor: { value: new THREE.Color(0xde7436) },
+      uSunsetBlue: { value: new THREE.Color(0x5286c9) },
+      uNightHaze: { value: new THREE.Color(0x0c0a09) }
+    },
+    vertexShader: `
+      varying vec3 vWorldPos;
+      varying float vElevation;
+      void main() {
+        vWorldPos = normalize(position);
+        vElevation = position.y / ${domeR.toFixed(1)};
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uSunDir;
+      uniform float uDayF;
+      uniform vec3 uZenithColor;
+      uniform vec3 uHorizonColor;
+      uniform vec3 uSunsetBlue;
+      uniform vec3 uNightHaze;
+      varying vec3 vWorldPos;
+      varying float vElevation;
+
+      void main() {
+        float el = clamp(vElevation, -0.25, 1.0);
+        float elPos = pow(clamp(el, 0.0, 1.0), 0.55);
+        vec3 daySky = mix(uHorizonColor, uZenithColor, elPos);
+        if (el < 0.0) {
+          daySky = mix(uHorizonColor, uHorizonColor * 0.82, clamp(-el * 4.0, 0.0, 1.0));
+        }
+
+        // Solar forward-scattering (Mie dust haze / glare around the sun)
+        float cosTheta = max(0.0, dot(vWorldPos, uSunDir));
+        float sunGlow = pow(cosTheta, 6.0) * 0.35 + pow(cosTheta, 28.0) * 0.65;
+        float lowSun = smoothstep(0.30, -0.05, uSunDir.y);
+        float blueHalo = pow(cosTheta, 14.0) * lowSun * 0.78;
+        vec3 col = mix(daySky, vec3(1.0, 0.92, 0.80), sunGlow);
+        col = mix(col, uSunsetBlue, blueHalo);
+
+        // Clean twilight fade: transparent at night (reveals 8K starfield & Milky Way)
+        float alpha = clamp(smoothstep(0.02, 0.38, uDayF), 0.0, 1.0);
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+    side: THREE.BackSide,
+    depthWrite: false,
+    transparent: true,
+    fog: false,
+    toneMapped: false
+  });
+  const mesh = new THREE.Mesh(domeGeo, domeMat);
+  mesh.name = 'marsSkyDome';
+  mesh.renderOrder = -2;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+function placeSurfBody(out, d, D, enu) {
+  const e = d.dot(enu.east), n = d.dot(enu.north), u = Math.max(-1, Math.min(1, d.dot(enu.up)));
+  const ce = Math.sqrt(Math.max(0, 1 - u * u));
+  const az = Math.atan2(e, n);
+  return out.set(Math.sin(az) * ce * D, u * D, -Math.cos(az) * ce * D);
+}
+
+function updateMarsSky(F, sk, _v1, _t, _enu, moonKm, visDays) {
+  if (!F.isMars) return;
+  const dayF = 1 - (F.nightF || 0);
+  if (sk.marsDome) {
+    if (sk.marsDome.material && sk.marsDome.material.uniforms) {
+      sk.marsDome.material.uniforms.uDayF.value = dayF;
+      sk.marsDome.material.uniforms.uSunDir.value.copy(F.sunDir);
+    }
+    sk.marsDome.visible = dayF > 0.01;
+  }
+  if (F.scene && F.scene.fog && F.scene.fog.color) {
+    const dayFog = new THREE.Color(0xd87b46);
+    const nightFog = new THREE.Color(0x020203);
+    F.scene.fog.color.copy(nightFog).lerp(dayFog, dayF);
+    F.scene.fog.density = 0.000025 + 0.000060 * dayF;
+  }
+  if (sk.blueHalo) {
+    sk.blueHalo.position.copy(_v1);
+    const elDeg = (F._dbgSunEl !== undefined) ? F._dbgSunEl : 10;
+    const tw = Math.max(0, Math.min(1, 1 - Math.abs(elDeg - 4) / 7.5));
+    sk.blueHalo.material.opacity = 0.52 * tw * (F._sunFadeF || 1);
+    sk.blueHalo.visible = sk.blueHalo.material.opacity > 0.01;
+  }
+  if (sk.earthStar) {
+    surfBodyDir('earth', moonKm, _t, visDays);
+    placeSurfBody(sk.earthStar.position, _t, SURF_SKY_D - 500, _enu);
+    sk.earthStar.visible = (_t.dot(_enu.up) > -0.02) && (dayF < 0.55);
+  }
+  if (sk.phobos) {
+    const a = 2 * Math.PI * ((visDays / 0.31891) % 1);
+    _t.set(Math.cos(a), 0.02 * Math.sin(a), Math.sin(a)).normalize();
+    placeSurfBody(sk.phobos.position, _t, SURF_SKY_D - 600, _enu);
+    sk.phobos.visible = (_t.dot(_enu.up) > -0.02) && (dayF < 0.65);
+  }
+  if (sk.map && sk.map.material) {
+    const starOpacity = Math.max(0, Math.min(1, (0.45 - dayF) / 0.45));
+    sk.map.material.opacity = starOpacity;
+    sk.map.visible = starOpacity > 0.005;
+  }
+  if (F.amb) {
+    F.amb.intensity = 0.16 + 0.40 * dayF;
+    if (F.amb.color) F.amb.color.setHex(dayF > 0.15 ? 0x8e7256 : 0x3a4456);
+  }
+  if (F.hemi) {
+    F.hemi.intensity = 115.0 * dayF;
+  }
+}
+
 function buildSurfSky(scene, isMars) {
   const group = new THREE.Group();
   group.name = 'surf_sky';
@@ -1383,35 +1535,79 @@ function buildSurfSky(scene, isMars) {
     const t = new THREE.CanvasTexture(cv);
     return t;
   })();
+  const sunRadius = isMars ? 135 : 200;
   const sunDisc = new THREE.Mesh(
-    new THREE.CircleGeometry(200, 40),
-    // depthWrite off: at 42 km with a 0.25 m near plane the depth precision
-    // cannot resolve the disc against the horizon — it flickered. The disc
-    // is background: terrain wins occlusion via depth TEST, not writes.
-    // transparent: lets the disc fade across the rise/set band instead of
-    // popping (same thresholds as before, now continuous).
-    new THREE.MeshBasicMaterial({ color: 0xfff6e0, fog: false, toneMapped: false, depthWrite: false, transparent: true }));
+    new THREE.CircleGeometry(sunRadius, 40),
+    new THREE.MeshBasicMaterial({ color: isMars ? 0xfff3de : 0xfff6e0, fog: false, toneMapped: false, depthWrite: false, transparent: true }));
   group.add(sunDisc);
   const glare = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: dot, color: 0xfff2d8, transparent: true, opacity: 0.28,
+    map: dot, color: isMars ? 0xffe6c8 : 0xfff2d8, transparent: true, opacity: isMars ? 0.22 : 0.28,
     blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false }));
-  glare.scale.set(1700, 1700, 1);
+  glare.scale.set(isMars ? 1350 : 1700, isMars ? 1350 : 1700, 1);
   group.add(glare);
-  let earth = null;
-  try {
-    const emap = tex('earth');
-    earth = new THREE.Mesh(
-      new THREE.SphereGeometry(745, 40, 28),
-      new THREE.MeshStandardMaterial({ map: emap || null, color: emap ? 0xffffff : 0x6a86b0,
-        roughness: 1, metalness: 0, fog: false, depthWrite: false }));
-    earth.rotation.z = -23.44 * Math.PI / 180; // axis tilt toward ecliptic north
-    earth.castShadow = false; earth.receiveShadow = false;
-    group.add(earth);
-  } catch (e) { earth = null; }
+
+  let blueHalo = null;
+  if (isMars) {
+    blueHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: dot, color: 0x5a8fd6, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false }));
+    blueHalo.scale.set(2200, 2200, 1);
+    group.add(blueHalo);
+  }
+
+  let marsDome = null;
+  if (isMars) {
+    try {
+      marsDome = buildMarsAtmosphereDome(SURF_SKY_D);
+      group.add(marsDome);
+    } catch (e) { marsDome = null; }
+  }
+
+  let earth = null, earthStar = null;
+  if (!isMars) {
+    try {
+      const emap = tex('earth');
+      earth = new THREE.Mesh(
+        new THREE.SphereGeometry(745, 40, 28),
+        new THREE.MeshStandardMaterial({ map: emap || null, color: emap ? 0xffffff : 0x6a86b0,
+          roughness: 1, metalness: 0, fog: false, depthWrite: false }));
+      earth.rotation.z = -23.44 * Math.PI / 180;
+      earth.castShadow = false; earth.receiveShadow = false;
+      group.add(earth);
+    } catch (e) { earth = null; }
+  } else {
+    try {
+      earthStar = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: dot, color: 0x82b4f8, transparent: true, opacity: 0.95,
+        blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false }));
+      earthStar.scale.set(110, 110, 1);
+      group.add(earthStar);
+    } catch (e) { earthStar = null; }
+  }
+
+  let phobos = null;
+  if (isMars) {
+    try {
+      const phMap = tex('phobos');
+      phobos = new THREE.Mesh(
+        new THREE.SphereGeometry(65, 24, 18),
+        new THREE.MeshStandardMaterial({
+          map: phMap || null,
+          color: phMap ? 0xffffff : 0x888078,
+          roughness: 0.95,
+          metalness: 0,
+          fog: false,
+          depthWrite: false
+        })
+      );
+      phobos.castShadow = false; phobos.receiveShadow = false;
+      group.add(phobos);
+    } catch (e) { phobos = null; }
+  }
+
   const planets = [];
   try {
     // Mars surface: drop the home-planet marker (cannot see Mars from Mars);
-    // Earth stays (real morning-star object, lunar-view disc scale — disclosed).
     for (const p of SURF_PLANETS) {
       if (isMars && p.key === 'mars') continue;
       let pm = null;
@@ -1431,134 +1627,102 @@ function buildSurfSky(scene, isMars) {
       planets.push(pm);
     }
   } catch (e) {}
-  // Skymap instead of flat points: the vendored 8K starfield texture
-  // (same asset as the orbital sky sphere) on a BackSide sphere INSIDE the
-  // camera-following group, so it inherits the tidal-lock rotation exactly
-  // like the points did. J2000 frame shared with the ephemeris math, so the
-  // existing R = S·Eᵀ quaternion orients it with no new calibration.
-  const ret = { group, sunDisc, glare, earth, planets, map: null, dot };
+  // Skymap sphere inside the camera-following group so it inherits the
+  // tidal-lock rotation in the shared J2000 frame (R = S·Eᵀ orientation).
+  const ret = { group, sunDisc, glare, blueHalo, earth, earthStar, marsDome, phobos, planets, map: null, dot, isMars };
   try {
-    new THREE.TextureLoader().load('assets/textures/stars_8k.jpg', (hTex) => {
-      try {
-        hTex.colorSpace = THREE.SRGBColorSpace;
-        hTex.minFilter = THREE.LinearFilter;
-        hTex.magFilter = THREE.LinearFilter;
-        try { hTex.anisotropy = 4; } catch (e) {}
-        hTex.needsUpdate = true;
-        const skyGeo = new THREE.SphereGeometry(SURF_SKY_D - 1000, 64, 40);
-        const skyMat = new THREE.MeshBasicMaterial({
-          map: hTex, side: THREE.BackSide, depthWrite: false,
-          fog: false, toneMapped: false });
-        /* T5: the 8K map arrives mid-session (slow on file://) — fade in
-           over ~1 s instead of popping the stars in one frame. */
-        skyMat.transparent = true;
-        skyMat.opacity = 0;
-        const skyMesh = new THREE.Mesh(skyGeo, skyMat);
-        skyMesh.name = 'surfSkymap';
-        skyMesh.renderOrder = -1;
-        skyMesh.frustumCulled = false;
-        group.add(skyMesh);
-        ret.map = skyMesh;
-        /* Phase-4 rotational sweep (presentation-only temporal exposure, ONE
-           extra draw): same sphere geometry + same texture as the main
-           skymap, driven by a small shader that integrates the texture along
-           the exact qPrev→qCur arc (up to 16 taps, additive, endpoint-sharp
-           main mesh untouched). Replaces the old discrete ghost quartet —
-           ghosts are not created at all. Hidden unless a frame enables it
-           (see updateSkySweep) and never under ?sky-spin. No new assets, no
-           extra scene renders, no per-star CPU. */
-        try {
-          const sweepUni = {
-            uMap: { value: hTex },
-            uQPrevInv: { value: { x: 0, y: 0, z: 0, w: 1 } },
-            uAxis: { value: { x: 0, y: 1, z: 0 } },
-            uAngle: { value: 0 },
-            uTapsF: { value: 0 },
-            uWeight: { value: 0 },
-          };
-          const sweepMat = new THREE.ShaderMaterial({
-            uniforms: sweepUni,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            depthTest: true,
-            fog: false,
-            side: THREE.BackSide,
-            vertexShader: [
-              "varying vec3 vDir;",
-              "void main() {",
-              "  vDir = position;",
-              "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
-              "}",
-            ].join("\n"),
-            /* Tap math (all derived render state, exact by construction):
-               - uQPrevInv maps the current pixel dir back through the
-                 previous orientation; uAxis/uAngle encode
-                 qDelta = skyPrev⁻¹ × skyCur (shortest arc, CPU-normalized).
-               - tap i samples slerp(I,qDelta,t)⁻¹ × base at t=(i+.5)/N,
-                 i.e. rotAA(base, axis, −angle·t): t=1 reproduces the current
-                 endpoint texel, t→0 the previous one. Midpoint rule.
-               - dir→uv inverts the vendored SphereGeometry mapping EXACTLY
-                 (verified against vendor/three.module.min.js: pole-row
-                 ±0.5/64 offsets included), so taps land on the same texels
-                 the main mesh shows. Pole singularity pinned (u=0.5).
-               - toneMapped:false (like the main material) keeps the shared
-                 sRGB texture decode + output encode identical, so the sweep
-                 is photometrically matched; weight normalizes by tap count
-                 so tap density never brightens the sky. */
-            fragmentShader: [
-              "uniform sampler2D uMap;",
-              "uniform vec4 uQPrevInv;",
-              "uniform vec3 uAxis;",
-              "uniform float uAngle;",
-              "uniform float uTapsF;",
-              "uniform float uWeight;",
-              "varying vec3 vDir;",
-              "vec3 quatApply(vec4 q, vec3 v) {",
-              "  return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);",
-              "}",
-              "vec3 rotAA(vec3 v, vec3 k, float a) {",
-              "  float c = cos(a), s = sin(a);",
-              "  return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c);",
-              "}",
-              "vec2 dirToUv(vec3 d) {",
-              "  float y = clamp(d.y, -1.0, 1.0);",
-              "  float th = acos(y);",
-              "  float st = sin(th);",
-              "  float u = (st < 1e-4) ? 0.5 : fract(atan(d.z, -d.x) / 6.283185307179586);",
-              "  float vRow = (th / 3.141592653589793) * 40.0;",
-              "  float uOff = (vRow < 0.5) ? (0.5 / 64.0) : (((40.0 - vRow) < 0.5) ? (-0.5 / 64.0) : 0.0);",
-              "  return vec2(u + uOff, 1.0 - th / 3.141592653589793);",
-              "}",
-              "void main() {",
-              "  vec3 dir = normalize(vDir);",
-              "  vec3 base = quatApply(uQPrevInv, dir);",
-              "  vec3 acc = vec3(0.0);",
-              "  for (int i = 0; i < 16; i++) {",
-              "    if (float(i) >= uTapsF - 0.5) break;",
-              "    float t = (float(i) + 0.5) / uTapsF;",
-              "    vec3 di = rotAA(base, uAxis, -uAngle * t);",
-              "    acc += texture2D(uMap, dirToUv(normalize(di))).rgb;",
-              "  }",
-              "  acc /= max(uTapsF, 1.0);",
-              "  gl_FragColor = vec4(acc * uWeight, 1.0);",
-              "  #include <tonemapping_fragment>",
-              "  #include <colorspace_fragment>",
-              "}",
-            ].join("\n"),
-          });
-          sweepMat.toneMapped = false;
-          const sweepMesh = new THREE.Mesh(skyGeo, sweepMat);
-          sweepMesh.name = 'surfSkymapSweep';
-          sweepMesh.renderOrder = 0;
-          sweepMesh.frustumCulled = false;
-          sweepMesh.visible = false;
-          group.add(sweepMesh);
-          ret.sweep = { mesh: sweepMesh, mat: sweepMat, uni: sweepUni };
-        } catch (e) { ret.sweep = null; }
-        try { ret.fadeT0 = performance.now(); } catch (e) { ret.fadeT0 = 0; }
-      } catch (e) { /* black sky stands */ }
-    }, undefined, () => { /* black sky stands */ });
+    const hTex = tex('hipparcos') || new THREE.TextureLoader().load('assets/textures/stars_8k.jpg');
+    hTex.colorSpace = THREE.SRGBColorSpace;
+    hTex.minFilter = THREE.LinearFilter;
+    hTex.magFilter = THREE.LinearFilter;
+    try { hTex.anisotropy = 4; } catch (e) {}
+    hTex.needsUpdate = true;
+    const skyGeo = new THREE.SphereGeometry(SURF_SKY_D - 1000, 64, 40);
+    const skyMat = new THREE.MeshBasicMaterial({
+      map: hTex, side: THREE.BackSide, depthWrite: false, depthTest: true,
+      fog: false, toneMapped: false, transparent: true, opacity: isMars ? 0 : 1
+    });
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    skyMesh.name = 'surfSkymap';
+    skyMesh.renderOrder = -10;
+    skyMesh.frustumCulled = false;
+    group.add(skyMesh);
+    ret.map = skyMesh;
+    try {
+      const sweepUni = {
+        uMap: { value: hTex },
+        uQPrevInv: { value: { x: 0, y: 0, z: 0, w: 1 } },
+        uAxis: { value: { x: 0, y: 1, z: 0 } },
+        uAngle: { value: 0 },
+        uTapsF: { value: 0 },
+        uWeight: { value: 0 },
+      };
+      const sweepMat = new THREE.ShaderMaterial({
+        uniforms: sweepUni,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true,
+        fog: false,
+        side: THREE.BackSide,
+        vertexShader: [
+          "varying vec3 vDir;",
+          "void main() {",
+          "  vDir = position;",
+          "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+          "}",
+        ].join("\n"),
+        fragmentShader: [
+          "uniform sampler2D uMap;",
+          "uniform vec4 uQPrevInv;",
+          "uniform vec3 uAxis;",
+          "uniform float uAngle;",
+          "uniform float uTapsF;",
+          "uniform float uWeight;",
+          "varying vec3 vDir;",
+          "vec3 quatApply(vec4 q, vec3 v) {",
+          "  return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);",
+          "}",
+          "vec3 rotAA(vec3 v, vec3 k, float a) {",
+          "  float c = cos(a), s = sin(a);",
+          "  return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c);",
+          "}",
+          "vec2 dirToUv(vec3 d) {",
+          "  float y = clamp(d.y, -1.0, 1.0);",
+          "  float th = acos(y);",
+          "  float st = sin(th);",
+          "  float u = (st < 1e-4) ? 0.5 : fract(atan(d.z, -d.x) / 6.283185307179586);",
+          "  float vRow = (th / 3.141592653589793) * 40.0;",
+          "  float uOff = (vRow < 0.5) ? (0.5 / 64.0) : (((40.0 - vRow) < 0.5) ? (-0.5 / 64.0) : 0.0);",
+          "  return vec2(u + uOff, 1.0 - th / 3.141592653589793);",
+          "}",
+          "void main() {",
+          "  vec3 dir = normalize(vDir);",
+          "  vec3 base = quatApply(uQPrevInv, dir);",
+          "  vec3 acc = vec3(0.0);",
+          "  for (int i = 0; i < 16; i++) {",
+          "    if (float(i) >= uTapsF - 0.5) break;",
+          "    float t = (float(i) + 0.5) / uTapsF;",
+          "    vec3 di = rotAA(base, uAxis, -uAngle * t);",
+          "    acc += texture2D(uMap, dirToUv(normalize(di))).rgb;",
+          "  }",
+          "  acc /= max(uTapsF, 1.0);",
+          "  gl_FragColor = vec4(acc * uWeight, 1.0);",
+          "  #include <tonemapping_fragment>",
+          "  #include <colorspace_fragment>",
+          "}",
+        ].join("\n"),
+      });
+      sweepMat.toneMapped = false;
+      const sweepMesh = new THREE.Mesh(skyGeo, sweepMat);
+      sweepMesh.name = 'surfSkymapSweep';
+      sweepMesh.renderOrder = 0;
+      sweepMesh.frustumCulled = false;
+      sweepMesh.visible = false;
+      group.add(sweepMesh);
+      ret.sweep = { mesh: sweepMesh, mat: sweepMat, uni: sweepUni };
+    } catch (e) { ret.sweep = null; }
+    try { ret.fadeT0 = performance.now(); } catch (e) { ret.fadeT0 = 0; }
   } catch (e) { /* black sky stands */ }
   /* Sun trail ghosts (presentation-only, max 2 disc + 2 glare pairs): disc
      clones share the sunDisc geometry, glare clones share the dot texture —
@@ -1643,7 +1807,11 @@ function updateSurfSky(V, dtArg) {
        steady (mean rate × mission-day deltas) instead of episodic. Anchored
        to truth at entry/teleport/clock-regression; `?truth-sky` bypasses.
        Sun/Earth/planets keep exact JPL geometry (disclosed divergence). */
-    const trueLon = surfLonEff(F.patch, moonKm, visDays);
+    const isMarsSite = !!F.isMars;
+    const marsSpinRate = 360 / 1.02595675; // 350.89 deg/day (24.62 h Sol)
+    const trueLon = isMarsSite
+      ? ((F.patch.lon0 + (visDays * marsSpinRate)) % 360)
+      : surfLonEff(F.patch, moonKm, visDays);
     let spinLon = trueLon;
     if (!TRUTH_SKY) {
       try {
@@ -1651,7 +1819,8 @@ function updateSurfSky(V, dtArg) {
           !(isFinite(F._spinLon) && isFinite(F._spinDay)) || visDays < F._spinDay;
         if (cutT) { F._spinLon = trueLon; F._spinDay = visDays; }
         else if (visDays !== F._spinDay) {
-          F._spinLon += SPIN_RATE_DEG_PER_DAY * (visDays - F._spinDay);
+          const rate = isMarsSite ? marsSpinRate : SPIN_RATE_DEG_PER_DAY;
+          F._spinLon += rate * (visDays - F._spinDay);
           F._spinDay = visDays;
         }
         spinLon = F._spinLon;
@@ -1784,9 +1953,9 @@ function updateSurfSky(V, dtArg) {
         }
       } catch (e) { /* default anisotropy stands */ }
       /* T5: fade the late-arriving skymap in (wall clock — entry theater,
-         converges even while paused). */
+         converges even while paused). Airless Moon only. */
       try {
-        if (sk.map && sk.map.material && sk.map.material.transparent
+        if (!F.isMars && sk.map && sk.map.material && sk.map.material.transparent
             && sk.map.material.opacity < 1) {
           const nowMs = performance.now();
           sk.map.material.opacity =
@@ -1794,13 +1963,7 @@ function updateSurfSky(V, dtArg) {
         }
       } catch (e) { /* black sky stands */ }
     }
-    const place = (out, d, D) => {
-      // unit J2000 dir -> ENU scene metres (east +x, up +y, north −z)
-      const e = d.dot(_enu.east), n = d.dot(_enu.north), u = Math.max(-1, Math.min(1, d.dot(_enu.up)));
-      const ce = Math.sqrt(Math.max(0, 1 - u * u));
-      const az = Math.atan2(e, n);
-      return out.set(Math.sin(az) * ce * D, u * D, -Math.cos(az) * ce * D);
-    };
+    const place = (out, d, D) => placeSurfBody(out, d, D, _enu);
     // Sun: shared vector drives disc, glare lookAt, AND the light (below).
     // TRUE elevation — no artificial floor. The old 1.2° polar clamp pinned
     // the sun at grazing incidence (horizontal slide + shadow-acne dance +
@@ -1811,14 +1974,24 @@ function updateSurfSky(V, dtArg) {
     // targets by rate/4, i.e. ~56 d at MAX warp, divorcing lighting from the
     // star field). High-warp continuity comes from the whole-frame shutter,
     // which integrates true positions; the astronomy itself stays current.
-    sunTrueFromFrame(moonKm, _enu, _sunTrue);
+    if (F.isMars) {
+      bodyWorld('mars', _p, visDays);
+      _t.copy(_p).negate().normalize();
+      const eu = _t.dot(_enu.up);
+      const elM = Math.asin(Math.max(-1, Math.min(1, eu)));
+      const ee = _t.dot(_enu.east), en = _t.dot(_enu.north);
+      const azM = Math.atan2(ee, en), ceM = Math.cos(elM);
+      _sunTrue.set(Math.sin(azM) * ceM, Math.sin(elM), -Math.cos(azM) * ceM).normalize();
+    } else {
+      sunTrueFromFrame(moonKm, _enu, _sunTrue);
+    }
     F.sunDir.copy(_sunTrue);
-    const el = Math.asin(Math.max(-1, Math.min(1, _sunTrue.dot(_enu.up))));
+    const el = Math.asin(Math.max(-1, Math.min(1, _sunTrue.y)));
     /* Phase-4.1: sun azimuth/elevation stamps for the polar-circling vs
        reversal diagnosis (debug only — pure stores, no behavior change). */
     if (SKY_DIAG && F) {
       try {
-        const se = _sunTrue.dot(_enu.east), sn = _sunTrue.dot(_enu.north);
+        const se = _sunTrue.x, sn = -_sunTrue.z;
         F._dbgSunAz = Math.atan2(se, sn) * 180 / Math.PI;
         F._dbgSunEl = el * 180 / Math.PI;
       } catch (e) {}
@@ -1842,7 +2015,7 @@ function updateSurfSky(V, dtArg) {
     try {
       // Fade follows the exact (current-timestamp) elevation; truth still
       // owns the mission clock/HUD.
-      const elV = Math.asin(Math.max(-1, Math.min(1, F.sunDir.dot(_enu.up))));
+      const elV = Math.asin(Math.max(-1, Math.min(1, F.sunDir.y)));
       if (typeof F.sunUp !== 'boolean') { F.sunUp = elV > -0.01; F._sunPops = 0; }
       else if (F.sunUp && !(elV > -0.015)) { F.sunUp = false; F._sunPops = (F._sunPops | 0) + 1; }
       else if (!F.sunUp && (elV > -0.005)) { F.sunUp = true; F._sunPops = (F._sunPops | 0) + 1; }
@@ -1863,6 +2036,7 @@ function updateSurfSky(V, dtArg) {
       const sd = visDays * 2 * Math.PI / 0.9973;
       sk.earth.rotation.y = sd % (Math.PI * 2);
     }
+    updateMarsSky(F, sk, _v1, _t, _enu, moonKm, visDays);
     for (const sp of sk.planets) {
       try {
         // Live distance → true angular radius (small-angle); 8 m floor keeps
@@ -1876,7 +2050,7 @@ function updateSurfSky(V, dtArg) {
         place(sp.position, _t, SURF_SKY_D - 500);
         const r = Math.max(8, (SURF_SKY_D - 500) * (sp.userData.bodyKm / Math.max(1, distKm)));
         sp.scale.setScalar(r);
-        sp.visible = (_t.dot(_enu.up)) > -0.02;
+        sp.visible = (_t.dot(_enu.up)) > -0.02 && (!F.isMars || (1 - (F.nightF || 0)) < 0.25);
       } catch (e) {}
     }
     /* Trail-ghost orientations (presentation only) — LAST: reuses the _mk /
@@ -2002,7 +2176,7 @@ function updateSkySweep(F, sk, M) {
     if (sw) sw.mesh.visible = false;
     if (M) { M.sweepTaps = 0; M.sweepMode = "off"; M.sweepActive = false; }
   };
-  if (!sw || !M || !M._init || NO_SWEEP) { off(); return; }
+  if (!sw || !M || !M._init || NO_SWEEP || (F && F.isMars)) { off(); return; }
   if (SKY_SPIN.on) { off(); return; } // stars unplugged: nothing truthful to integrate
   if (!M.skyValid || !M._pSky) { off(); return; }
   _qSwA.copy(M.skyPrev).invert();
@@ -2201,6 +2375,7 @@ function makeTrackRibbon(scene, F) {
   const trackBase = (F && F.isMars && MARS_SURF_TINT[F.siteId])
     ? new THREE.Color(MARS_SURF_TINT[F.siteId].base).multiplyScalar(0.85).getHex() : 0x847f75;
   const m = new THREE.MeshStandardMaterial({ color: trackBase, roughness: 1, metalness: 0,
+    transparent: true, opacity: 0.35, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const mesh = new THREE.Mesh(g, m);
   mesh.receiveShadow = true;

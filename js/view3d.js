@@ -1,27 +1,9 @@
-/* MARGIN 3D presentation layer — modular NASA spacecraft composer.
-   Sources (vendored static, NASA-only):
-     NASA 3D Resources hero models (aqua, lro, mro, osiris_rex, voyager)
-     Procedural aerospace subsystem assemblies
-     Per-level rover assets (perseverance, rassor)
-   Origin: NASA 3D Resources (public domain per NASA media guidelines).
-   The kit is modular BY DESIGN: body + wings + radio assemble at a shared origin.
-   All 9 kit GLBs use KHR_draco_mesh_compression — decoded by the vendored
-   static three r160 decoder (vendor/draco/, no network).
-   Selection is derived from authoritative game state S (never duplicated sim):
-     body  <- instrument count / dry mass tier
-     wings <- power source class
-     radio <- comms class
-   Instruments have no per-unit NASA CAD, so the selected payload is shown as
-   GENERIC procedural glyphs (one per instrument, shaped by its INSTR group:
-   camera barrel / spectrometer box / boom / radar panel / arm / small antenna).
-   They are labelled representative in-overlay, never flight hardware.
-   Canvas2D bay preview remains the no-WebGL fallback. */
 /* MARGIN 3D presentation layer — build-bay viewer (renderer + highlight).
    The craft itself is built by the ONE shared composer (js/kit-assembly.js),
    also used by ops — this file only frames, highlights and hosts it.
-   Fixed missions (l2–l5) show their real NASA hero craft (HERO_BY_LEVEL);
-   l1/sbx show the player's modular kit build. Canvas2D bay preview remains
-   the no-WebGL fallback. */
+   Fixed missions (l2–l5) show their NASA hero craft (HERO_BY_LEVEL);
+   l1/sbx assemble procedural aerospace subsystems. Canvas2D bay preview
+   remains the no-WebGL fallback. */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import {
@@ -29,7 +11,7 @@ import {
   loadRoverGltf, calibrateRover, ROVER_TRUE_SPAN_M,
   bodyTierOf, wingTierOf, radioTierOf, wingScaleOf, radioScaleOf,
   engineSpecOf, keyOf, groupOfInstr, mountEngineRow, mountGlyphRow
-} from './kit-assembly.js?v=20261030b';
+} from './kit-assembly.js?v=20261108c';
 
 const DPR_CAP = 1.5;
 
@@ -194,8 +176,9 @@ function frameCraft() {
     M3D.controls.target.copy(c);
     // scale-relative framing: the NASA kit is centimetre-scale, the fallback
     // bus metre-scale — a fixed floor would park the camera far away.
-    // Factor 1.9 fills the bay panel so tier/glyph differences read clearly.
-    M3D.distGoal = THREE.MathUtils.clamp(sizeV * 1.9, Math.max(sizeV * 1.2, 0.05), 30);
+    // Factor 1.9 fills the bay panel; wide-span heroes (MRO 15.75m arrays) use 2.35 so rotating wings do not crowd lens.
+    const mult = (M3D.heroInfo && M3D.heroInfo.assetId === 'MRO-A') ? 2.35 : 1.9;
+    M3D.distGoal = THREE.MathUtils.clamp(sizeV * mult, Math.max(sizeV * 1.2, 0.05), 30);
     M3D.home = { target: c.clone(), dist: M3D.distGoal };
     const dir = M3D.camera.position.clone().sub(c);
     if (dir.lengthSq() < 1e-8) dir.set(0.55, 0.35, 0.75);
@@ -223,6 +206,8 @@ function attachRoverPreview(craft, key) {
     try { lvl = (typeof S !== 'undefined') ? S.levelId : null; } catch (e) {}
     try { rv = (typeof S !== 'undefined') ? S.rover : null; } catch (e) {}
     if ((lvl !== 'l2' && lvl !== 'l3' && lvl !== 'sbx' && lvl !== 'sbx_moon') || !rv) return;
+    const pf = (typeof S !== 'undefined' && typeof activeProfile === 'function') ? activeProfile(S) : null;
+    if (pf && pf.hasRover === false) return; // Pure orbital profile: rover preview suppressed
     const isMars = (lvl === 'l3' || (lvl === 'sbx' && typeof S !== 'undefined' && S && S.body === 'mars'));
     loadRoverGltf(lvl, isMars).then((gltf) => {
       try {
@@ -382,7 +367,7 @@ function init() {
     M3D.canvas = renderer.domElement;
     M3D.canvas.className = 'v3canvas';
     M3D.canvas.setAttribute('role', 'img');
-    M3D.canvas.setAttribute('aria-label', 'Interactive 3D spacecraft preview — configured NASA spacecraft and subsystem hardware');
+    M3D.canvas.setAttribute('aria-label', 'Interactive 3D spacecraft preview displaying your configured NASA spacecraft and subsystem hardware');
     M3D.scene = new THREE.Scene();
     M3D.camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.01, 200);
     M3D.camera.position.set(3.2, 1.8, 4.2);
@@ -475,7 +460,7 @@ function describeSelection() {
   return { body: pickBody() + 1, wings: pickWings() + 1, radio: pickRadio() + 1 };
 }
 
-window.M3D = { sync, get ok() { return M3D.ok; }, describeSelection };
+window.M3D = { sync, get ok() { return M3D.ok; }, describeSelection, get craft() { return M3D.craft; }, get scene() { return M3D.scene; }, get camera() { return M3D.camera; }, get renderer() { return M3D.renderer; } };
 init();
 
 

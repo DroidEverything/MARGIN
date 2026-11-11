@@ -67,9 +67,8 @@ const TAN_V = Math.tan(FOV_DEG * Math.PI / 360);
 const PRESETS = [
   /* sunside limb (opening frame): camera mostly anti-sunward but sidestepped,
      aim nudged so Earth sits lower-right as a huge limb while the REAL Sun
-     burns upper-left, clear of the disc — side by side, verified numerically
-     (Sun NDC inside frame, disc-edge clearance positive in true-scale mode;
-     verified for true-scale mode). Same no-solver arithmetic as the rest. */
+     burns upper-left, clear of the disc — verified numerically in true-scale mode.
+     Same no-solver arithmetic as the rest. */
   { dir: [0.90, -0.44, 0.18], dist: 3.20, tgt: [0.20, -0.20, -0.60] },
   { dir: [0.30, 0.90, 0.30], dist: 3.20, tgt: [0, 0, 0] },            // terminator side
   { dir: [-1.00, 0.25, 0.40], dist: 5.00, tgt: [0, 0, 0] },           // blue marble

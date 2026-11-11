@@ -7,8 +7,8 @@
 
    Scales: UTC -> TAI (leap table) -> TT (+32.184 s) -> TDB (3-term series).
    Gameplay epochs (Julian years, game.js bodyState/porkchop) are uniform
-   365.25-day years counts — an APPROXIMATION of TDB (offset ~69 s in 2026:
-   leap seconds + TT-TAI, 69.184 s).
+   365.25-day years counts — an APPROXIMATION of TDB (offset ~69.184 s in 2026:
+   leap seconds + TT-TAI).
    Centralizing documents the offset; converting gameplay to TDB is dynamics-
    boundary work and must change porkchop numbers explicitly, not silently. */
 (function (root) {

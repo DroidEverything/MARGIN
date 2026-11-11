@@ -36,19 +36,18 @@ const SRC = {
        simp:"Vendored static GLBs from NASA 3D Resources and PDS: Aqua, LRO, MRO, MESSENGER, OSIRIS-REx, Voyager, Apollo LM, Perseverance, RASSOR, Bennu shape model, and LC-39B Mobile Launcher. Launch vehicles render as procedural reconstructions scaled to published vehicle dimensions; performance uses the selected LV's LSP curve."}
 };
 
-/* ── Phase 12 provenance surface: built ONLY from SRC records above + SOURCES.md §§2–5,7.
-   No new citations. Classes: REAL NASA/JPL DATA / NASA-DERIVED PARAMETER / GAMEPLAY ABSTRACTION. */
+/* Provenance table backing the in-game NASA Data modal (aligned with SOURCES.md & THIRD_PARTY_NOTICES.md). */
 function provClassOf(k){
   if(["lsp","horizons","sbdb","models"].includes(k)) return "REAL NASA/JPL DATA";
   return "NASA-DERIVED PARAMETER";
 }
 const PROV_EXTRA=[
- {cls:"REAL NASA/JPL DATA",t:"JPL DE441 ephemeris (vendored)",d:"Planetary + satellite Chebyshev vectors evaluated aboard, frame ECLIPTIC_J2000 / SSB / TDB. Validated against JPL reference vectors, with explicit FALLBACK_KEPLER when outside kernel bounds."},
- {cls:"REAL NASA/JPL DATA",t:"Bennu radar shape model",d:"Nolan et al. (Icarus 226, 2013), NASA PDS Small Bodies Node. DOI 10.26033/33ba-s419. Rendered flat-shaded; no published texture."},
- {cls:"REAL NASA/JPL DATA",t:"NASA texture set",d:"NASA GIBS Blue Marble Earth fallback, outer-planet satellite maps (Io, Europa, Ganymede, Callisto, Pluto, Phobos, Deimos), and MRO HiRISE Jezero crater ortho/DTE micro-detail maps."},
+ {cls:"REAL NASA/JPL DATA",t:"JPL DE441 ephemeris (vendored)",d:"Planetary and satellite Chebyshev state vectors evaluated locally in ECLIPTIC_J2000 / SSB / TDB, with explicit FALLBACK_KEPLER labeling when outside kernel bounds."},
+ {cls:"REAL NASA/JPL DATA",t:"Bennu radar shape model",d:"Nolan et al. (Icarus 226, 2013), NASA PDS Small Bodies Node. DOI 10.26033/33ba-s419."},
+ {cls:"REAL NASA/JPL DATA",t:"NASA planetary & lunar maps",d:"NASA GIBS Blue Marble Earth fallback, outer-planet satellite maps (Io, Europa, Ganymede, Callisto, Pluto, Phobos, Deimos), and MRO HiRISE Jezero crater ortho/DTE micro-detail maps."},
  {cls:"REAL SKY DATA (NON-NASA)",t:"HYG star catalog v4.0",d:"Hipparcos / Yale Bright Star / Gliese bake (CC BY-SA 4.0), 5,070 stars to Vmag 6.0 as J2000 vectors."},
-  {cls:"REAL SKY DATA (NON-NASA)",t:"Planet textures: Solar System Scope, CC BY 4.0",d:"Earth day / night / cloud / land-sea roughness maps, Mercury, Venus, 8K Moon, Mars, Jupiter, Saturn (+ rings), Uranus, Neptune, and the Milky Way skybox (stars_8k.jpg). (c) 2010-2017 Solar System Scope, https://www.solarsystemscope.com/textures/, licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Surface appearance only; affects no ephemeris, lighting, exposure or gameplay value."},
- {cls:"REAL NASA/JPL DATA",t:"Mars Jezero Crater Surface Mosaic (NASA/JPL/MRO/ESA)",d:"Meter-scale albedo and digital elevation map of Jezero Crater baked from HiRISE (MRO) and HRSC (Mars Express) datasets. Powers the Mars landed diorama and Perseverance rover traverse."},
+ {cls:"REAL SKY DATA (NON-NASA)",t:"Planet & sky textures: Solar System Scope, CC BY 4.0",d:"Earth day / night / cloud / land-sea roughness maps, Mercury, Venus, 8K Moon, Mars, Jupiter, Saturn (+ rings), Uranus, Neptune, and the Milky Way skybox (stars_8k.jpg). (c) 2010-2017 Solar System Scope, https://www.solarsystemscope.com/textures/, licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Surface appearance only; affects no ephemeris, lighting, exposure or gameplay value."},
+ {cls:"REAL NASA/JPL DATA",t:"Mars Jezero Crater Surface Mosaic (NASA/JPL/MRO/ESA)",d:"Meter-scale albedo and digital elevation map of Jezero Crater baked from HiRISE (MRO) and MOLA (MGS) datasets. Powers the Mars landed diorama and Perseverance rover traverse."},
  {cls:"REAL NASA/JPL DATA",t:"NASA 3D Hardware Models (NASA 3D Resources / PDS)",d:"Official NASA 3D assets: LC-39B Mobile Launcher (assembled), Apollo Lunar Module, Mars 2020 Perseverance, NASA RASSOR excavation rover, Aqua, LRO, MRO, MESSENGER, OSIRIS-REx, Bennu shape model, and Voyager."},
  {cls:"REAL NASA/JPL DATA",t:"Historical NASA Mission Benchmarks",d:"PACE (Earth ocean biology), LRO (Lunar polar water ice), MRO (Mars high-resolution science), OSIRIS-REx (Bennu sample return), and Europa Clipper (habitability tour) serve as real-world baseline benchmarks for player report card evaluations."},
  {cls:"REAL NASA/JPL DATA",t:"NASA Space Apps Challenge 2026 Reference Alignment",d:"Built specifically for the Space Mission Design Game challenge. All orbital dynamics, payload capacities, power decay curves, and communications budgets reflect open-access NASA/JPL scientific standards."}
@@ -299,8 +298,8 @@ const BATTERY = [
    NOTE (2026-09-21, verified live against SBDB): Bennu M0 was 101.70 — that is
    the mean anomaly at the SBDB solution epoch (Feb 2011, ma=102), NOT J2000.
    M0@J2000 = -n*(tp - J2000) = 28.84 (n from a, tp=2455439.142 per SBDB).
-   Check: M(epoch 2455562.5) = 101.4 ≈ ma. This shifts l4 porkchop geometry;
-   3D views use the JPL_SBDB Chebyshev pack (ORX_merged_DE424, orbit_id 118); gameplay elements unchanged. Other bodies' M0 verified J2000 via L-ϖ. */
+   Check: M(epoch 2455562.5) = 101.4 ≈ ma. 3D views use the JPL_SBDB Chebyshev pack
+   (ORX_merged_DE424, orbit_id 118); gameplay elements unchanged. Other bodies' M0 verified J2000 via L-ϖ. */
 const BODY = {
   earth:{n:"Earth", a:1.00000011, e:0.01671022, M0:357.51716, peri:102.94719, mu:398600, rp:6578, au:1.0},
   moon: {n:"Moon",  mu:4902.8, rp:1838, au:1.0, dose:0.5,
@@ -404,14 +403,15 @@ const ROVER_COM=[
   d:"Direct plus orbiter relay. Works anywhere the orbiter flies.",her:"Electra relay class",p:SRC.dsn}
 ];
 const ROVER_PAY=[
- {id:"ry1",n:"Context imagers + APXS (MER class)",m:25,draw:30,sci:1.00,c:45,
+ {id:"ry1",n:"Context imagers + APXS (MER class)",m:25,draw:30,sci:1.00,c:45,tags:["surface","composition"],
   d:"Baseline field geology. Light, proven, limited.",her:"MER payload class",p:SRC.techport},
- {id:"ry2",n:"Mastcam-Z + SHERLOC/PIXL class",m:60,draw:70,sci:1.35,c:120,
+ {id:"ry2",n:"Mastcam-Z + SHERLOC/PIXL class",m:60,draw:70,sci:1.35,c:120,tags:["surface","composition","organics"],
   d:"Stand-off mineralogy. More mass, much more science per sol.",her:"MSL payload class",p:SRC.techport},
- {id:"ry3",n:"Drill + sample cache (MSL class)",m:110,draw:120,sci:1.70,c:210,
+ {id:"ry3",n:"Drill + sample cache (MSL class)",m:110,draw:120,sci:1.70,c:210,tags:["sample","organics","ice"],
   d:"Subsurface access and caching. The heavy science option.",her:"MSL/ExoMars class",p:SRC.techport}
 ];
 function roverKit(S){ if(!S||(S.levelId!=="l2"&&S.levelId!=="l3"&&S.levelId!=="sbx"&&S.levelId!=="sbx_moon")||!S.rover) return null;
+  const pf=(typeof activeProfile==="function")?activeProfile(S):null; if(pf&&pf.hasRover===false) return null;
   const r=S.rover, rm=byId(ROVER_MOB,r.mob), rp=byId(ROVER_PWR,r.pwr),
         rc=byId(ROVER_COM,r.com), ry=byId(ROVER_PAY,r.pay);
   return (rm&&rp&&rc&&ry)?{rm,rp,rc,ry}:null; }
@@ -849,7 +849,7 @@ function derive(S){
   }
 
   // margins
-  const massCap = capability||L.par.mass;
+  const pf=(typeof activeProfile==="function")?activeProfile(S):null, massCap = capability||(pf&&pf.par?pf.par.mass:L.par.mass);
   const powerCap = genEOL||1;
   /* D-16: the single effective cap. Everything downstream (rails, commit,
      report, score) reads this, never the raw LEVELS figure. */
@@ -900,10 +900,8 @@ const CAP_MULT = { cadet:1.15, fd:1.00 };
 const MODE_FREE = ["title","select"];
 function effCap(L, mode){
   if(!L) return 0;
-  /* An `uncapped` mission keeps its declared figure as the SCORING
-     REFERENCE (so the cost-margin bonus is still earned, A-14) but is never
-     scored as over budget — see isOverCap(). */
-  return L.capM * (L.uncapped ? 1 : (CAP_MULT[mode || S.mode] || 1));
+  const pf=(typeof activeProfile==="function")?activeProfile(S):null, baseCap=(pf&&pf.capM)?pf.capM:L.capM;
+  return baseCap * (L.uncapped ? 1 : (CAP_MULT[mode || S.mode] || 1));
 }
 function isOverCap(cost, L, mode){
   return !(L && L.uncapped) && cost > effCap(L, mode);
@@ -1968,33 +1966,28 @@ function cascade(prev){
 /* ══════════════════════════════════════════════════════════════
    SCREENS
    ══════════════════════════════════════════════════════════════ */
-let lastScreen=null;
-let selViewReady=false, selViewStarted=false;
-
-function selViewLoadEl(){
-  try{ return document.getElementById("selviewLoad"); }catch(e){ return null; }
-}
-function showSelViewLoading(){
-  const e=selViewLoadEl(); if(e) e.classList.remove("done");
-}
-function hideSelViewLoading(){
-  const e=selViewLoadEl(); if(e) e.classList.add("done");
-}
+let lastScreen=null, selViewReady=false, selViewStarted=false, selAttempts=0;
+function selViewLoadEl(){ try{ return document.getElementById("selviewLoad"); }catch(e){ return null; } }
+function showSelViewLoading(){ const e=selViewLoadEl(); if(e) e.classList.remove("done"); }
+function hideSelViewLoading(){ const e=selViewLoadEl(); if(e) e.classList.add("done"); }
 
 /* The select scene is heavy to build and compile. Paint the loading card
    first, then run the build; the card stays up through the first frame. */
 function scheduleSelViewStart(){
   if(typeof S==="undefined" || S.screen!=="select") return;
   if(selViewReady){ hideSelViewLoading(); return; }
+  if((location.protocol.indexOf("http")!==0)||/[?&]no3d/.test(location.search)){ selViewReady=true; hideSelViewLoading(); return; }
   if(selViewStarted) return;
-  selViewStarted=true;
-  showSelViewLoading();
+  selViewStarted=true; showSelViewLoading();
   requestAnimationFrame(()=>{ setTimeout(()=>{
     if(typeof S==="undefined" || S.screen!=="select"){ selViewStarted=false; return; }
-    if(!window.SelView){ selViewStarted=false; setTimeout(scheduleSelViewStart, 200); return; }
-    try{ if(window.SelView) SelView.sync(); }catch(e){}
-    selViewReady=true;
-    requestAnimationFrame(()=>requestAnimationFrame(hideSelViewLoading));
+    if(!window.SelView){
+      selViewStarted=false;
+      if(++selAttempts>10){ selViewReady=true; hideSelViewLoading(); return; }
+      setTimeout(scheduleSelViewStart, 200); return;
+    }
+    selAttempts=0; try{ if(window.SelView) SelView.sync(); }catch(e){}
+    selViewReady=true; requestAnimationFrame(()=>requestAnimationFrame(hideSelViewLoading));
   }, 30); });
 }
 
@@ -2173,17 +2166,19 @@ function scrSelect(){
       </details>
     </div>
     <div class="sel-bottom">
-    ${(()=>{ const dr=readDraft(), drL=dr?byId(LEVELS,dr.l):null;
-      if(!drL) return "";
-      const n=(dr.i||[]).length;
-      return `<div style="display:flex;justify-content:flex-end;margin:0 0 8px">
-        <button class="btn ghost sel-resume-btn" data-act="resume" title="Restore the design you last worked on">
-          RESUME LAST DESIGN &#183; ${String(drL.num).padStart(2,"0")} ${esc(drL.name.toUpperCase())} &#183; ${n} INSTRUMENT${n===1?"":"S"} &#8594;</button>
-        ${(()=>{ const ses=readSession(), sesL=ses?byId(LEVELS,ses.levelId):null;
-          if(!sesL||!ses.ops) return "";
-          return `<button class="btn ghost sel-resume-btn sel-resume-active" data-act="resumesession" style="border-color:var(--phosphor);color:var(--phosphor);margin-left:8px" title="Resume active flight in progress">
-            RESUME ACTIVE FLIGHT &#183; L+${ses.ops.day} (${esc(BODY[sesL.body].n.toUpperCase())}) &#8594;</button>`;
-        })()}</div>`;
+    ${(()=>{ const dr=readDraft(), drL=dr?byId(LEVELS,dr.l):null, ses=readSession(), sesL=ses?byId(LEVELS,ses.levelId):null;
+      if(!drL&&(!sesL||!ses.ops)) return "";
+      const n=drL?(dr.i||[]).length:0;
+      return `<div class="sel-resume-bar">
+        ${drL?`<button class="sel-resume-chip" data-act="resume" title="Restore the design you last worked on">
+          <span class="chip-dot blue"></span><span class="chip-tag">DRAFT</span>
+          <span class="chip-val">${String(drL.num).padStart(2,"0")} ${esc(drL.name.toUpperCase())}</span>
+          <span class="chip-detail">${n} INST</span><span class="chip-arr">&#8594;</span></button>`:""}
+        ${sesL&&ses.ops?`<button class="sel-resume-chip active-flight" data-act="resumesession" title="Resume active flight in progress">
+          <span class="chip-dot green"></span><span class="chip-tag">ACTIVE</span>
+          <span class="chip-val">L+${ses.ops.day}</span><span class="chip-detail">${esc(BODY[sesL.body].n.toUpperCase())}</span>
+          <span class="chip-arr">&#8594;</span></button>`:""}
+      </div>`;
     })()}
     <div class="strip-head" aria-hidden="true"><span>MISSION TIMELINE</span><i></i><span>DRAG OR SCROLL &#8594;</span></div>
     <div class="strip-wrap"><div class="lvstrip" role="list">${LEVELS.map((L,idx)=>{
@@ -2254,9 +2249,8 @@ function scrBrief(){
   const L=byId(LEVELS,S.levelId);
   const sel=S.objectives;
   const wmax=Math.max(...L.objs.map(o=>OBJ[o].w));
-  const auStr=L.mode==="leo"?L.altKm+" KM SSO":L.body==="moon"?"0.4M KM":BODY[L.body].au.toFixed(2)+" AU";
-  const ltStr=L.mode==="leo"?(L.altKm/299792.458*1000).toFixed(1)+" MS":L.body==="moon"?"1.3 S":(BODY[L.body].au*499/60).toFixed(1)+" MIN";
-  const isSurface = (L.body==="moon"||L.body==="mars");
+  const auStr=L.mode==="leo"?L.altKm+" KM SSO":L.body==="moon"?"0.4M KM":BODY[L.body].au.toFixed(2)+" AU", ltStr=L.mode==="leo"?(L.altKm/299792.458*1000).toFixed(1)+" MS":L.body==="moon"?"1.3 S":(BODY[L.body].au*499/60).toFixed(1)+" MIN";
+  const pf=(typeof activeProfile==="function")?activeProfile(S):null, isSurface=(L.body==="moon"||L.body==="mars")&&(pf?pf.hasRover!==false:true);
 
   const sitePanel = isSurface ? `
     <div class="panel glass mt"><span class="bracket tl"></span><span class="bracket br"></span>
@@ -2379,7 +2373,7 @@ function scrBrief(){
   <div id="briefview" aria-hidden="true" style="opacity:0.4"><div class="briefview-fallback"></div></div>
   ${challengeBanner()}
   <div class="brief">
-    <div class="brief-col">${dossierHtml}${briefPanel}</div>
+    <div class="brief-col">${dossierHtml}${(typeof profileSelectorHtml==="function")?profileSelectorHtml(S):""}${briefPanel}</div>
     <div class="brief-col">${objsPanel}${sitePanel}</div>
   </div></div>`;
 }
@@ -2434,7 +2428,7 @@ function tierList(list, cur){
   return list.filter(x=>x && (tierOk(x) || (cur && x.id===cur)));
 }
 function scrBuild(){
-  const L=byId(LEVELS,S.levelId), D=derive(S);
+  const L=byId(LEVELS,S.levelId), D=derive(S), pf=(typeof activeProfile==="function")?activeProfile(S):null;
   const groups={};
   /* Forced objectives are exempt from the tier filter: an instrument that is
      the only cover for a tag this mission forces stays visible in cadet, so
@@ -2649,7 +2643,7 @@ function scrBuild(){
                   <span class="ps"><span>${esc(t.d)}</span></span></button>`}).join("")}
             </div>
           </div>
-          ${L.body==="moon"||L.body==="mars"?roverPanels():""}
+          ${(L.body==="moon"||L.body==="mars")&&(pf?pf.hasRover!==false:true)?roverPanels():((L.body==="moon"||L.body==="mars")&&pf&&pf.hasRover===false?`<div class="panel mt"><div class="pad hint" style="font-size:12px;color:var(--dim)"><span class="g-icon" style="color:var(--phosphor);vertical-align:middle;margin-right:4px">check_circle</span><b>${esc(pf.name)}</b>: Pure orbital remote sensing architecture. Surface rover not required.</div></div>`:"")}
         </div>
         ${commsBottleneck?`
         <div class="panel mt" style="border-color:rgba(255,183,77,0.4);background:rgba(255,183,77,0.05)">
@@ -2917,6 +2911,7 @@ function initLaunch(){
     S.launch.c3=0; S.launch.vinf=0; S.launch.tof=0; S.launch.tDep=2029.0; S.launch.set=true;
   }
   renderLV();
+  try { import("./js/launch-view.js?v=20261108c").catch(()=>{}); } catch(e) {}
 }
 function applyPork(i,j,silent){
   const p=porkAt(PORK,i,j);
@@ -3730,10 +3725,8 @@ function stepDay(){
 
   // allocate delivered data to objectives that are covered and incomplete
   if(sent>0&&atTarget){
-    const open=S.objectives.filter(o=>{
-      if(O.delivered[o]>=needMb(L,o)) return false;
-      return OBJ[o].need.every(t=>live.some(i=>i.tags.includes(t)));
-    });
+    const rvT=(S.landing&&S.surface&&!S.surface.safed&&D.rv&&D.rv.ry.tags)?D.rv.ry.tags:[];
+    const open=S.objectives.filter(o=>O.delivered[o]<needMb(L,o)&&OBJ[o].need.every(t=>live.some(i=>i.tags.includes(t))||rvT.includes(t)));
     const wsum=open.reduce((s,o)=>s+OBJ[o].w,0);
     open.forEach(o=>{
       O.delivered[o]=Math.min(needMb(L,o),O.delivered[o]+sent*OBJ[o].w/wsum);
@@ -3922,7 +3915,7 @@ function endMission(reason){
     const Ld=S.landing, F=S.surface;
     const land=Math.max(0,Math.min(1,1-Ld.offsetKm/15))*(Ld.degraded?0.6:1);
     const trav=F.reached?1:Math.max(0,Math.min(1,1-surfDist(F)/Math.max(0.01,F.d0)))*0.8;
-    const data=Math.max(0,Math.min(1,F.returnedMb/20000));
+    const data=Math.max(0,Math.min(1,(F.returnedMb+F.science*10)/20000));
     const overall=(land+trav+data)/3;
     surf={land,trav,data,overall,bonus:overall*8,
       sols:F.sol,science:F.science,returnedMb:F.returnedMb,reached:F.reached,
@@ -5300,27 +5293,28 @@ function stepSurface(){
       }
       spend(pc.cost*(hz.slope>10?1.5:1));
       if(surfDist(F)<0.2&&!F.reached){
-        F.reached=true; F.science+=200;
-        logLine(O.day,`Prime target reached after ${F.sol} sols. +200 survey science. The plain is yours to work.`,"good");
+        F.reached=true; F.science+=Math.round(200*rv.ry.sci*st.sci);
+        logLine(O.day,`Prime target reached after ${F.sol} sols. +${Math.round(200*rv.ry.sci*st.sci)} survey science. The plain is yours to work.`,"good");
       }
     }
   } else if(o.mode==="dwell"){
-    const y=10*rv.ry.sci*st.sci*eff;
-    F.science+=y; F.dataMb+=400;
-    spend(10);
-    if(F.sol%10===0) logLine(O.day,`Survey dwell: +${y.toFixed(0)} science, 400 Mb cached (${fmtData(F.dataMb)} buffered).`,"");
+    const y=10*rv.ry.sci*st.sci*eff; F.science+=y; F.dataMb+=Math.round(400*rv.ry.sci); spend(10);
+    if(F.sol%10===0) logLine(O.day,`Survey dwell: +${y.toFixed(0)} science, ${fmtData(Math.round(400*rv.ry.sci))} cached (${fmtData(F.dataMb)} buffered).`,"");
   } else if(o.mode==="drill"){
     if(S.rover.pay!=="ry3"){ logLine(O.day,"No drill aboard — caching a surface sample instead (dwell).","warn"); o.mode="dwell"; }
-    else { const y=150*rv.ry.sci*st.sci*eff; F.science+=y; F.dataMb+=1500; spend(25); logLine(O.day,`Drill + cache: +${y.toFixed(0)} science, 1.5 Gb cached.`,"good"); }
+    else { const y=150*rv.ry.sci*st.sci*eff; F.science+=y; F.dataMb+=Math.round(1500*rv.ry.sci); spend(25); logLine(O.day,`Drill + cache: +${y.toFixed(0)} science, ${fmtData(Math.round(1500*rv.ry.sci))} cached.`,"good"); }
   } else if(o.mode==="recharge"){
-    const g=rv.rp.night===2?20:45*st.sun;
-    F.energy=Math.min(100,F.energy+g);
-    if(F.energy>=20) F.safed=false;
+    const g=rv.rp.night===2?20:45*st.sun; F.energy=Math.min(100,F.energy+g); if(F.energy>=20) F.safed=false;
   } else if(o.mode==="relay"){
     const link=SURF_LINKMB[rv.rc.gain]*((0.3+0.7*st.earth));
     const dump=Math.min(F.dataMb,link);
     F.dataMb-=dump; F.returnedMb+=dump;
-    if(dump>0) logLine(O.day,`Relay pass: ${fmtData(dump)} downlinked (${fmtData(F.returnedMb)} total this mission).`,"good");
+    if(dump>0){
+      logLine(O.day,`Relay pass: ${fmtData(dump)} downlinked (${fmtData(F.returnedMb)} total this mission).`,"good");
+      const L=byId(LEVELS,S.levelId), tags=rv.ry.tags||[];
+      const open=S.objectives.filter(k=>O.delivered[k]<needMb(L,k)&&(k==="o_relay"||OBJ[k].need.some(t=>tags.includes(t))));
+      if(open.length>0){ const sh=dump/open.length; open.forEach(k=>{ O.delivered[k]=Math.min(needMb(L,k),(O.delivered[k]||0)+sh); if(O.delivered[k]>=needMb(L,k)&&!O["done_"+k]){O["done_"+k]=1;logLine(O.day,`Objective complete via surface relay: ${OBJ[k].t}.`,"good");} }); }
+    }
   }
   F.trail.push([+F.e.toFixed(3),+F.n.toFixed(3)]);
   if(F.trail.length>600) F.trail.splice(0,F.trail.length-600);
@@ -7417,6 +7411,7 @@ document.addEventListener("click",e=>{
       if(!["cautious","standard","push"].includes(t.dataset.v)) break;
       S.surface.orders.pace=t.dataset.v; Audio_.click(); renderOpsSide(); break;
     }
+    case "profile": { S.profile=id; Audio_.click(); const prf=(typeof activeProfile==="function")?activeProfile(S):null; if(prf){ if(prf.objs&&prf.objs.length) S.objectives=[...prf.objs]; if(prf.hasRover===false){ S.site=null; S.rover=null; } } render(); break; }
     case "site": {
       const L2=byId(LEVELS,S.levelId);
       if(!L2||(L2.body!=="moon"&&L2.body!=="mars")) break;
@@ -7812,16 +7807,11 @@ document.addEventListener("keydown",e=>{
 
 /* ── Phase 2 launch reliability: single deterministic roll from LV rel + existing mulberry32.
    Failure mass = 1-rel; split deterministically: scrub 35% / partial 30% / catastrophic 35% of failures. */
-/* ── P2.1 launch REFERENCE data (NOT derive(S) engineering truth) ──
-   MOVED from js/launch-view.js LV_PROFILES (renderer must consume, never own).
-   Classification:
-   - derive(S) = engineering truth (mass/dv/power/data/cost/capability). It neither
-     consumes nor returns anything below; routing time-history through derive(S)
-     was judged architectural overreach (P2.1 decision: reference-data layer stays
-     a sibling of derive, not inside it).
-   - FLIGHT_KEYS = REFERENCE / VERIFIED-AT-KEYS (documented launch data, not a live
-     6-DOF simulation). Event METs (booster/meco/fairing/las/s2co/maxQMet/twr/endMet):
-     anchored to NASA/manufacturer sources.
+/* ── Launch REFERENCE flight profiles (NOT derive(S) engineering truth) ──
+   - derive(S) = engineering truth (mass/dv/power/data/cost/capability).
+   - FLIGHT_KEYS = reference timeline keys (documented launch milestones, not a live
+     6-DOF simulation). Event METs (booster/meco/fairing/las/s2co/maxQMet/twr/endMet)
+     are anchored to NASA/manufacturer sources.
    - flightStateAt inter-key alt/vel = ESTIMATE (piecewise-linear, honestly marked).
    - flightDownrangeAt = ESTIMATE (no published per-vehicle downrange exists (§8c);
      horizontal remainder of the reference speed: vh=sqrt(max(0,v²-vv²)), vv=dAlt/dt,
@@ -8029,9 +8019,8 @@ function liftoff(){
     '<div class="launch3d-body" id="launch3dBody"></div>';
   document.body.appendChild(ov);
   const cleanup = () => { try { ov.parentElement.removeChild(ov); } catch (e) {} };
-  /* Asset warm pass: preload ops/surface/descent assets through the session
-     caches during the countdown+ascent window so nothing pops mid-cinematic. */
-  try { import("./js/preload.js").then(m => { try { m.warmForLaunch(); } catch (e) {} }).catch(()=>{}); } catch (e) {}
+  /* Asset warm pass: preload ops/surface/descent assets deferred so ascent starts instantly without freeze. */
+  try { setTimeout(() => { import("./js/preload.js").then(m => { try { m.warmForLaunch(); } catch (e) {} }).catch(()=>{}); }, 3500); } catch (e) {}
   /* Resolve once, before any cinematic. Reload/redraw reuses S.launch.outcome. */
   const out0 = resolveLaunchOutcome();
   if(out0.type==="catastrophic"){ cleanup(); failLaunchCatastrophic(out0); return; }
@@ -8086,7 +8075,7 @@ function liftoff(){
   };
   try {
     /* Unified ?v= cache-busted specifier shared across lv-preview and launch-view */
-    import("./js/launch-view.js?v=20261107_v3").then((mod) => {
+    import("./js/launch-view.js?v=20261108c").then((mod) => {
       console.log("[LAUNCH] launch-view.js imported successfully", mod);
       const LV3 = (mod && mod.LaunchView) || window.LaunchView;
       if (!LV3 || !LV3.start) {
@@ -9041,11 +9030,22 @@ function applyTeamShortcut(){
    catches a silent shift while it is still findable.
 
    A FAIL is not a bug in the harness — either the change was unintended
-   (stop, fix it) or it was intended (re-emit and document the baseline diff). Never widen a tolerance to make it pass.
+   (stop, fix it) or it was intended (re-emit and document the baseline diff).
+   Never widen a tolerance to make it pass.
    ══════════════════════════════════════════════════════════════ */
 var GOLDEN_ACTIVE=false;
 const GOLDEN_V=3;
-/* Baseline v3 (2026-10-29 via ?golden=emit): deterministic snapshot baseline covering default builds, seeded event decks, and share links. */
+/* Baseline v3 (2026-10-29 via ?golden=emit): includes the `sbx_moon` and
+   `sbx_earth` sandbox presets (`uncapped` scoring reference) and zero-delta
+   baseline C&DH / ADCS subsystems.
+   v2 differed in 9 checks:
+   - 8 new checks added for `sbx_moon` and `sbx_earth` in cadet and fd
+     (4 derive + 4 event decks);
+   - 1 derive check moved: `sbx/cadet` m[3] moved from 0.792933 to 0.761873
+     because `uncapped: true` sets the scoring reference cap to L.capM * 1 for
+     both cadet and fd.
+   All 10 core mission derives (l1..l5 cadet & fd), all 10 core event decks,
+   and all 3 legacy share links remain 100% byte-identical. Total: 35 checks. */
 const GOLDEN={derive:{
     "l1/cadet": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.514435,38.000000]",
     "l1/fd": "wet=316.000000 dry=316.000000 pay=40.000000 prop=0.000000 cost=418.800000 cap=5440.000000 peak=128.960000 genEOL=658.834400 gen=0.000000 down=3211.120399 mo=34.000000 m=[0.941912,0.804260,1.000000,0.441600,38.000000]",
@@ -9245,8 +9245,8 @@ addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="
     if(!(t.getContext("webgl2")||t.getContext("webgl"))) return;
     import("./js/view3d.js?v=" + Date.now()).catch(function(){});
     import("./js/title-earth.js").catch(function(){});
-    import("./js/select-viewer.js?v=20261107b").catch(function(){});
+    import("./js/select-viewer.js?v=20261108c").catch(function(){});
     import("./js/brief-view.js").catch(function(){});
-    import("./js/ops-view.js?v=20261030j").catch(function(err){ console.error("[ops-view] import failed:", err); });
+    import("./js/ops-view.js?v=20261108n").catch(function(err){ console.error("[ops-view] import failed:", err); });
   }catch(e){}
 })();

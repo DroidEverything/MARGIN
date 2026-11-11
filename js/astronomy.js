@@ -19,7 +19,7 @@
    PROVIDER HIERARCHY:
      PRIMARY  JPLProvider  — Chebyshev evaluation of JPL Horizons vectors
               (DE441 planetary solution + JPL satellite theories, vendored in
-              JPL_EPHEM by JPL Horizons export). Label: "JPL_DE441".
+              JPL_EPHEM). Label: "JPL_DE441".
      FALLBACK KeplerFallbackProvider — JPL Table-1 approximate elements /
               SBDB elements / mean moon circles. Label: "FALLBACK_KEPLER".
               Never described as JPL. Never used silently: every state carries
@@ -133,9 +133,8 @@ var KEPLER_ELEMENTS = { // a AU, e, I deg, L deg, peri deg, node deg (JPL approx
   pluto:   { a: 39.48211675, e: 0.24882730, I: 17.14001206, L: 238.92903833, peri: 224.06891629, node: 110.30393684 },
   bennu:   { a: 1.12639, e: 0.20375, M0: 28.84, peri: 66.22, I: 6.03, node: 2.06, sbdb: true }
   // ^ Bennu fallback only (out-of-coverage cover): primary is the JPL_SBDB
-  // Chebyshev pack (JPL SBDB export, ORX_merged_DE424). M0@J2000 = 28.84
-  // derived from SBDB tp=2455439.142 (orbit_id 118, condition_code 0 — do NOT re-derive from the rounded
-  // display elements there). Values unchanged; provenance attached.
+  // Chebyshev pack (ORX_merged_DE424). M0@J2000 = 28.84 derived from
+  // SBDB tp=2455439.142 (orbit_id 118, condition_code 0).
 };
 var GM_SUN = (root.MARGIN_CONST && root.MARGIN_CONST.GM_SUN_KM3_S2) || 132712440041.27942;
 function keplerState(el, simDays) {
@@ -224,8 +223,7 @@ var PARENT = { moon: "earth", io: "jupiter", europa: "jupiter", ganymede: "jupit
 /* Vendored moon records are PARENT-BODY-RELATIVE (Moon 500@399, Charon 500@999,
    Io…Callisto 500@599, Titan 500@699, Triton 500@899), so each satellite state is
    parentAbsolute + relative. Earth is EMB − Q_E·moon(geo) and Pluto is
-   Pluto-bary − Q_P·charon(geo); validation checks validates both
-   compositions against direct JPL body-centre vectors. */
+   Pluto-bary − Q_P·charon(geo). */
 var SSB_KEYS = ["sun", "mercury", "venus", "emb", "earth", "mars", "jupiter", "saturn", "uranus", "neptune", "plutobary", "pluto", "moon", "io", "europa", "ganymede", "callisto", "titan", "triton", "charon", "bennu"];
 
 function add3(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }

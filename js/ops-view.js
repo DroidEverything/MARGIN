@@ -8,12 +8,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/DRACOLoader.js';
+import { mergeVertices, toCreasedNormals } from 'three/addons/BufferGeometryUtils.js';
 import {
   KIT, loadKitGltf, assembleKit, heroForLevel, normalizeHero,
   loadRoverGltf, calibrateRover,
   bodyTierOf, wingTierOf, radioTierOf, wingScaleOf, radioScaleOf,
   engineSpecOf, groupOfInstr, mountEngineRow, mountGlyphRow
-} from './kit-assembly.js?v=20261030b';
+} from './kit-assembly.js?v=20261108c';
 import { AU_KM, SOLAR_CONSTANT_W_M2 } from './solar-system-accuracy.js';
 import {
   DPR_CAP, WORLD_PER_AU, UNITS_PER_KM,
@@ -26,7 +27,7 @@ import {
   updateSurfaceCamera, updateSurfSky, updateSurfRover, disposeSurface,
   enterSurface as surfEnterSurface, exitSurface as surfExitSurface,
   surfDebugExposure, decodeSite, surfHeightAt
-} from './surface-view.js?v=20261030j';
+} from './surface-view.js?v=20261108n';
 import { STAR_VEC } from './stars-data.js';
 
 const V = {
@@ -510,12 +511,11 @@ function mountOpsCraft() {
               m.depthTest = true;
               m.depthWrite = true;
               if (m.alphaTest > 0.9) m.alphaTest = 0;
-              const isPlanar = /panel|wing|array|dish|solar|radiator|foil/i.test(m.name || '') ||
-                               /panel|wing|array|dish|solar|radiator|foil/i.test(o.name || '');
-              if (isPlanar) {
-                m.side = THREE.DoubleSide;
-              } else {
-                m.side = THREE.FrontSide;
+              const isPlanar = /panel|wing|array|dish|solar|radiator|foil|default #2/i.test(m.name || '') ||
+                               /panel|wing|array|dish|solar|radiator|foil|proxy7_1/i.test(o.name || '');
+              m.side = isPlanar ? THREE.DoubleSide : THREE.FrontSide;
+              if (m.name === 'default #2' || o.name === 'mro_proxy7_1') {
+                m.side = THREE.DoubleSide; m.transparent = false; m.opacity = 1.0; m.depthWrite = true;
               }
               if (m.needsUpdate !== undefined) m.needsUpdate = true;
             } catch (e3) {}
@@ -1283,8 +1283,8 @@ function start(hostEl, config, kind) {
       }
     }
 
-    // Sky sphere: render equirectangular star map on the INSIDE of a giant sphere.
-    // This preserves 100% source resolution — no cubemap conversion, no downsampling.
+    // Sky sphere: render the equirectangular star map on the inside of a giant sphere.
+    // Preserves source resolution without cubemap conversion or downsampling.
     // BackSide flips normals so the texture is visible from inside the sphere.
     scene.background = new THREE.Color(0x010208);
     new THREE.TextureLoader().load('assets/textures/stars_8k.jpg', (hTex) => {
@@ -1752,9 +1752,10 @@ function animate(now) {
       // Artifact fix (C): gate fill by nightF — vacuum day shadows stay black.
       // Day: fixed ~0.5% sun bounce; night: exposure-compensated ramp as before.
       try {
-        const nf = Math.max(0, Math.min(1, (V.surf && V.surf.nightF) || 0));
-        const nightAmb = Math.min(75, 0.22 * inv);
-        if (V.surf.amb) V.surf.amb.intensity = nightAmb * nf + 0.005 * SOLAR_CONSTANT_W_M2 * (1 - nf);
+        const nf = Math.max(0, Math.min(1, (V.surf && V.surf.nightF) || 0)), nightAmb = Math.min(75, 0.22 * inv);
+        const m = V.surf && V.surf.isMars;
+        if (V.surf.amb) V.surf.amb.intensity = m ? (nightAmb * nf + 25.0 * (1 - nf)) : (nightAmb * nf + 0.005 * SOLAR_CONSTANT_W_M2 * (1 - nf));
+        if (V.surf.hemi) V.surf.hemi.intensity = m ? 115.0 * (1 - nf) : 0;
       } catch (e) { if (V.surf.amb) V.surf.amb.intensity = Math.min(75, 0.22 * inv); }
       if (V.surf.marker) {
         const d = V.camera.position.distanceTo(V.surf.marker.position);
@@ -3288,6 +3289,295 @@ function makeSmokeTexture() {
   return t;
 }
 
+/* ── Procedural Regolith Textures & Terrain Utilities (Zero-asset Moon Surface) ── */
+function dzHash(x, y) {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function dzVnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  return dzHash(xi, yi) * (1 - u) * (1 - v) + dzHash(xi + 1, yi) * u * (1 - v) +
+         dzHash(xi, yi + 1) * (1 - u) * v + dzHash(xi + 1, yi + 1) * u * v;
+}
+function dzFbm(x, y) {
+  let a = 0.5, f = 1, s = 0;
+  for (let o = 0; o < 4; o++) { s += a * dzVnoise(x * f, y * f); f *= 2; a *= 0.5; }
+  return s - 0.5;
+}
+
+function makeRegolithTextures(renderer) {
+  if (typeof document === 'undefined') return { map: null, normalMap: null };
+  const N = 512;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = N; return c; };
+
+  // Diffuse: grain
+  const dc = mk(), dctx = dc.getContext('2d');
+  const img = dctx.createImageData(N, N);
+  for (let i = 0; i < N * N; i++) {
+    const g = 140 + Math.random() * 40 + (Math.random() < 0.02 ? -30 : 0);
+    img.data.set([g, g, g * 1.01, 255], i * 4);
+  }
+  dctx.putImageData(img, 0, 0);
+
+  // Normal: derive from a height field
+  const hgt = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      hgt[y * N + x] = dzFbm(x * 0.08, y * 0.08) * 1.0 + dzFbm(x * 0.5, y * 0.5) * 0.4;
+    }
+  }
+
+  const nc = mk(), nctx = nc.getContext('2d');
+  const nimg = nctx.createImageData(N, N);
+  const S = 6.0; // bump strength
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const l = hgt[y * N + (x - 1 + N) % N], r = hgt[y * N + (x + 1) % N];
+      const u = hgt[((y - 1 + N) % N) * N + x], d = hgt[((y + 1) % N) * N + x];
+      let nx = (l - r) * S, ny = (u - d) * S, nz = 1;
+      const len = Math.hypot(nx, ny, nz);
+      const i = (y * N + x) * 4;
+      nimg.data[i]     = (nx / len * 0.5 + 0.5) * 255;
+      nimg.data[i + 1] = (ny / len * 0.5 + 0.5) * 255;
+      nimg.data[i + 2] = (nz / len * 0.5 + 0.5) * 255;
+      nimg.data[i + 3] = 255;
+    }
+  }
+  nctx.putImageData(nimg, 0, 0);
+
+  const setup = (canvas, repeat, srgb) => {
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeat, repeat);
+    try {
+      if (renderer && renderer.capabilities && typeof renderer.capabilities.getMaxAnisotropy === 'function') {
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      } else {
+        t.anisotropy = 8;
+      }
+    } catch (e) { t.anisotropy = 8; }
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  return { map: setup(dc, 400, true), normalMap: setup(nc, 400, false) };
+}
+
+function makeGroundMaterial(renderer) {
+  const { map, normalMap } = makeRegolithTextures(renderer);
+  return new THREE.MeshStandardMaterial({
+    color: 0x78787a, // authentic Apollo ~12% reflectance basaltic regolith
+    map: map || undefined,
+    normalMap: normalMap || undefined,
+    normalScale: new THREE.Vector2(0.8, 0.8),
+    vertexColors: true,
+    roughness: 0.95,
+    metalness: 0.02,
+    side: THREE.DoubleSide
+  });
+}
+
+function makeFarMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0x8f8f91,
+    roughness: 1.0,
+    metalness: 0.0,
+    side: THREE.DoubleSide
+  });
+}
+
+function fitSunShadow(sun, target, sunDir, half = 60) {
+  if (!sun || !target) return;
+  sun.position.copy(target).addScaledVector(sunDir, 450);
+  if (sun.target) {
+    sun.target.position.copy(target);
+    sun.target.updateMatrixWorld();
+  }
+  if (sun.shadow && sun.shadow.camera) {
+    const c = sun.shadow.camera;
+    c.left = -half; c.right = half; c.top = half; c.bottom = -half;
+    c.near = 10; c.far = 1000;
+    c.updateProjectionMatrix();
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.bias = -0.0002;
+    sun.shadow.normalBias = 0.04;
+  }
+}
+
+function buildContinuousLunarTerrain(patch, h0, outerHeightAt) {
+  const N = 180;
+  const geo = new THREE.PlaneGeometry(1, 1, N, N);
+  const pos = geo.attributes.position;
+  const totalVerts = pos.count;
+  const colArr = new Float32Array(totalVerts * 3);
+  const radiusAt = (rho) => 360000 * (0.008 * rho + 0.035 * Math.pow(rho, 2) + 0.957 * Math.pow(rho, 3.5));
+  const R_MOON = 1737000;
+  const D2G = 180 / Math.PI;
+  const clamp1 = (v) => v < -1 ? -1 : v > 1 ? 1 : v;
+
+  let hmn = 1e9, hmx = -1e9;
+  for (let k = 0; k < totalVerts; k++) {
+    const u = pos.getX(k) * 2;
+    const v = pos.getY(k) * 2;
+    // Shirley-Chiu disc mapping: orthogonal quad mesh in center -> perfect circular perimeter
+    const xP = u * Math.sqrt(Math.max(0, 1 - v * v / 2));
+    const zP = v * Math.sqrt(Math.max(0, 1 - u * u / 2));
+    const rho = Math.min(1, Math.hypot(xP, zP));
+    let x = 0, z = 0, r = 0;
+    if (rho >= 1e-7) {
+      r = radiusAt(rho);
+      x = (xP / rho) * r;
+      z = (zP / rho) * r;
+    }
+
+    const sphereDrop = Math.sqrt(Math.max(0, R_MOON * R_MOON - r * r)) - R_MOON;
+
+    let relief = 0;
+    if (patch) {
+      if (r <= 1500) {
+        relief = surfHeightAt(patch, x, z) - h0;
+      } else if (r < 2300) {
+        const w = (r - 1500) / 800, s = w * w * (3 - 2 * w);
+        relief = (surfHeightAt(patch, x, z) - h0) * (1 - s) + (outerHeightAt ? outerHeightAt(x, z) : 0) * s;
+      } else if (r <= 18000) {
+        relief = outerHeightAt ? outerHeightAt(x, z) : 0;
+      } else if (r < 24000) {
+        const w = (r - 18000) / 6000, s = w * w * (3 - 2 * w);
+        const k1 = 0.00007, k2 = 0.00019, k3 = 0.00045;
+        const n1 = Math.sin(x * k1 + 1.2) * Math.cos(z * k1 + 0.8);
+        const n2 = Math.sin(x * k2 * 0.7 - z * k2 * 0.7 + 2.1) * Math.cos(x * k2 * 0.7 + z * k2 * 0.7);
+        const n3 = Math.sin(x * k3 + 3.7) * Math.sin(z * k3 + 1.4);
+        const distantTopo = Math.abs(n1) * 850 + n2 * 450 + n3 * 200;
+        relief = (outerHeightAt ? outerHeightAt(x, z) : 0) * (1 - s) + distantTopo * s;
+      } else {
+        const k1 = 0.00007, k2 = 0.00019, k3 = 0.00045;
+        const n1 = Math.sin(x * k1 + 1.2) * Math.cos(z * k1 + 0.8);
+        const n2 = Math.sin(x * k2 * 0.7 - z * k2 * 0.7 + 2.1) * Math.cos(x * k2 * 0.7 + z * k2 * 0.7);
+        const n3 = Math.sin(x * k3 + 3.7) * Math.sin(z * k3 + 1.4);
+        const fade = Math.max(0, 1 - (r - 24000) / 300000);
+        relief = (Math.abs(n1) * 850 + n2 * 450 + n3 * 200) * fade;
+      }
+    } else {
+      const k1 = 0.00007, k2 = 0.00019, k3 = 0.00045;
+      const n1 = Math.sin(x * k1 + 1.2) * Math.cos(z * k1 + 0.8);
+      const n2 = Math.sin(x * k2 * 0.7 - z * k2 * 0.7 + 2.1) * Math.cos(x * k2 * 0.7 + z * k2 * 0.7);
+      const n3 = Math.sin(x * k3 + 3.7) * Math.sin(z * k3 + 1.4);
+      relief = Math.abs(n1) * 600 + n2 * 300 + n3 * 150;
+    }
+
+    const flat = Math.min(1, Math.max(0, (r - 12) / 30));
+    const microH = (dzFbm(x * 0.05, z * 0.05) * 0.5 + dzFbm(x * 0.3, z * 0.3) * 0.1) * flat;
+
+    const y = sphereDrop + relief + microH;
+    pos.setXYZ(k, x, y, z);
+    if (y < hmn) hmn = y;
+    if (y > hmx) hmx = y;
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+
+  // Apollo regolith grading: dark basalt base + slope-dependent anorthosite highlights + subtle mare tint
+  const norms = geo.attributes.normal;
+  for (let k = 0; k < totalVerts; k++) {
+    const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k);
+    const ny = Math.max(0, norms.getY(k));
+    const sl = Math.acos(clamp1(ny)) * D2G;
+
+    const s1 = Math.sin(x * 0.00004 + z * 0.00006) * 43758.5453;
+    const mareVal = Math.sin(x * 0.000012 + 0.5) * Math.cos(z * 0.000012 + 1.2);
+    const mareTint = mareVal > 0.2 ? -0.03 : 0.02;
+    const mNoise = (s1 - Math.floor(s1)) * 0.03 - 0.015;
+    const slopeBright = Math.min(40, sl) / 40 * 0.10;
+
+    let g = 0.54 + mareTint + mNoise + slopeBright;
+    g = Math.max(0.35, Math.min(0.82, g));
+    colArr[k * 3]     = g;
+    colArr[k * 3 + 1] = g;
+    colArr[k * 3 + 2] = g * 1.01;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+  return geo;
+}
+
+function makeBoulderGeo(seedOffset = 0) {
+  let geo = new THREE.IcosahedronGeometry(1, 3);
+  try {
+    geo.deleteAttribute('normal');
+    geo.deleteAttribute('uv');
+    if (typeof mergeVertices === 'function') {
+      geo = mergeVertices(geo);
+    }
+  } catch (e) {}
+  const p = geo.attributes.position;
+  for (let k = 0; k < p.count; k++) {
+    const x = p.getX(k), y = p.getY(k), z = p.getZ(k);
+    const n = 0.7 + dzFbm(x * 2.3 + 11 + seedOffset, z * 2.3 + y * 2.1) * 0.9 + 0.3;
+    p.setXYZ(k, x * n, y * n * 0.6, z * n);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function scatterBoulders(group, groundHeightAt, count = 100, maxR = 90) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x77777a, roughness: 1.0, metalness: 0.0 });
+  const geos = [makeBoulderGeo(0), makeBoulderGeo(37), makeBoulderGeo(83)];
+
+  for (let ri = 0; ri < count; ri++) {
+    // bias toward the near field; keep far boulders rare and small
+    const r = 10 + Math.pow(Math.random(), 1.6) * (maxR - 10);
+    const a = Math.random() * Math.PI * 2;
+    const s = (0.2 + Math.random() * 0.7) * (1 - r / (maxR * 1.4));
+
+    const geo = geos[ri % geos.length];
+    const m = new THREE.Mesh(geo, mat);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    m.position.set(x, groundHeightAt(x, z) - s * 0.15, z); // sunk in, not floating
+    m.scale.setScalar(s);
+    m.rotation.set(Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    group.add(m);
+  }
+}
+
+function fixLanderMaterials(root, envMap) {
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    try {
+      if (o.geometry && typeof toCreasedNormals === 'function') {
+        o.geometry = toCreasedNormals(o.geometry, THREE.MathUtils.degToRad(35));
+      }
+    } catch (e) {}
+
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => {
+      if (!m || !m.color) return;
+      const hsl = {}; m.color.getHSL(hsl);
+      const isGold = hsl.s > 0.35 && hsl.h > 0.08 && hsl.h < 0.18;
+      const isGrey = hsl.s < 0.12;
+
+      if (isGold) {
+        m.metalness = 0.85;
+        m.roughness = 0.40;
+      } else if (isGrey) {
+        // Ascent stage: satin Mylar/aluminum look instead of chrome shards
+        m.metalness = 0.35;
+        m.roughness = 0.60;
+        m.color.setScalar(0.80);
+      }
+      if (envMap) {
+        m.envMap = envMap;
+        m.envMapIntensity = 0.70; // was 1.2
+      }
+      m.flatShading = false;
+      m.needsUpdate = true;
+    });
+    if (o.geometry && !o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+  });
+}
+
 /* Own metre-unit descent scene (built once per 3D descent from the preloaded
    raw; disposed in dzCleanup so memory returns to baseline). Camera shots:
    A high-chase 0–35%, B low-lateral 35–80%, C footpad cam 80–100%. */
@@ -3295,6 +3585,7 @@ function dzBuildScene(prof, land) {
   dzDisposeScene();
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x010206); // Pitch-black cosmic vacuum
+  scene.fog = null; // No atmosphere on Moon — distant terrain stays fully lit
   const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.8, 800000);
   try {
     if (V.canvas) {
@@ -3307,24 +3598,23 @@ function dzBuildScene(prof, land) {
   // 1. High-contrast Apollo solar illumination: 1361 W/m² direct airless sunlight + subtle 3.5 ambient fill
   try {
     const sun = new THREE.DirectionalLight(0xfffcf8, SOLAR_CONSTANT_W_M2);
-    sun.position.set(300, 500, 200);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 1200;
-    sun.shadow.camera.left = -16;
-    sun.shadow.camera.right = 16;
-    sun.shadow.camera.top = 16;
-    sun.shadow.camera.bottom = -16;
-    sun.shadow.bias = -0.0003;
+    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.bias = -0.0002;
+    sun.shadow.normalBias = 0.04;
     scene.add(sun);
     scene.add(sun.target);
     DZ3D.sun = sun;
+    const sunDirInit = new THREE.Vector3(0.55, 0.65, -0.45).normalize();
+    fitSunShadow(sun, new THREE.Vector3(0, 0, 0), sunDirInit, 60);
 
-    const amb = new THREE.AmbientLight(0x1a2636, 3.5);
+    const amb = new THREE.AmbientLight(0x283444, 4.5);
     scene.add(amb);
     DZ3D.amb = amb;
+
+    const fill = new THREE.HemisphereLight(0x353538, 0x222226, 0.85); // regolith ground bounce
+    scene.add(fill);
+    DZ3D.hemi = fill;
 
     // 2. Sun Disc and Glare Billboard at astronomical distance (650 km, subtends 0.53 deg)
     const sunDir = new THREE.Vector3(0.55, 0.65, -0.45).normalize();
@@ -3477,180 +3767,52 @@ function dzBuildScene(prof, land) {
         return g00 * (1 - fx) * (1 - fz) + g10 * fx * (1 - fz) + g01 * (1 - fx) * fz + g11 * fx * fz;
       };
 
-      // 1. SINGLE UNIFIED CONTINUOUS PLANETARY TERRAIN (0 m -> 360 km)
-      // Completely eliminates square borders, circular boundaries, seams, and multi-mesh overlaps.
-      // Concentric radial geometry with high-density vertices at landing center (~15 m spacing)
-      // smoothly expanding outward to 360 km, curving naturally over the lunar horizon.
-      // 1. SINGLE UNIFIED CONTINUOUS PLANETARY TERRAIN (0 m -> 360 km)
-      // Completely eliminates square borders, circular boundaries, seams, and multi-mesh overlaps.
-      // Concentric radial geometry with high-density vertices at landing center (~15 m spacing)
-      // smoothly expanding outward to 360 km, curving naturally over the lunar horizon.
-      const rings = 180, segs = 180;
-      const geo = new THREE.RingGeometry(0, 360000, segs, rings);
-      const pos = geo.attributes.position;
-      let hmn = 1e9, hmx = -1e9;
+      const terrainGroup = new THREE.Group();
+      terrainGroup.name = 'descent_terrain';
 
-      for (let k = 0; k <= rings; k++) {
-        const uNorm = k / rings;
-        const r = (k === 0) ? 0 : 360000 * (0.008 * uNorm + 0.04 * uNorm * uNorm + 0.952 * Math.pow(uNorm, 3.2));
-        const sphereDrop = Math.sqrt(Math.max(0, R_MOON * R_MOON - r * r)) - R_MOON;
-
-        for (let j = 0; j <= segs; j++) {
-          const idx = k * (segs + 1) + j;
-          const th = (j / segs) * Math.PI * 2;
-          const x = r * Math.cos(th), z = -r * Math.sin(th);
-
-          let relief = 0;
-          if (r <= 1500) {
-            relief = surfHeightAt(patch, x, z) - h0;
-          } else if (r < 2300) {
-            const w = (r - 1500) / 800;
-            const s = w * w * (3 - 2 * w);
+      const groundHeightAt = (x, z) => {
+        let relief = 0;
+        const r = Math.hypot(x, z);
+        if (patch) {
+          if (r <= 1500) relief = surfHeightAt(patch, x, z) - h0;
+          else if (r < 2300) {
+            const w = (r - 1500) / 800, s = w * w * (3 - 2 * w);
             relief = (surfHeightAt(patch, x, z) - h0) * (1 - s) + outerHeightAt(x, z) * s;
-          } else if (r <= 18000) {
-            relief = outerHeightAt(x, z);
-          } else if (r < 24000) {
-            const w = (r - 18000) / 6000;
-            const s = w * w * (3 - 2 * w);
-            const k1 = 0.00007, k2 = 0.00019, k3 = 0.00045;
-            const n1 = Math.sin(x * k1 + 1.2) * Math.cos(z * k1 + 0.8);
-            const n2 = Math.sin(x * k2 * 0.7 - z * k2 * 0.7 + 2.1) * Math.cos(x * k2 * 0.7 + z * k2 * 0.7);
-            const n3 = Math.sin(x * k3 + 3.7) * Math.sin(z * k3 + 1.4);
-            const distantTopo = Math.abs(n1) * 850 + n2 * 450 + n3 * 200;
-            relief = outerHeightAt(x, z) * (1 - s) + distantTopo * s;
-          } else {
-            const k1 = 0.00007, k2 = 0.00019, k3 = 0.00045;
-            const n1 = Math.sin(x * k1 + 1.2) * Math.cos(z * k1 + 0.8);
-            const n2 = Math.sin(x * k2 * 0.7 - z * k2 * 0.7 + 2.1) * Math.cos(x * k2 * 0.7 + z * k2 * 0.7);
-            const n3 = Math.sin(x * k3 + 3.7) * Math.sin(z * k3 + 1.4);
-            const fade = Math.max(0, 1 - (r - 24000) / 300000);
-            relief = (Math.abs(n1) * 850 + n2 * 450 + n3 * 200) * fade;
-          }
-
-          const y = sphereDrop + relief;
-          pos.setXYZ(idx, x, y, z);
-          if (y < hmn) hmn = y;
-          if (y > hmx) hmx = y;
+          } else relief = outerHeightAt(x, z);
         }
-      }
-      pos.needsUpdate = true;
-      geo.computeVertexNormals();
+        const flat = Math.min(1, Math.max(0, (r - 15) / 40));
+        const microH = (dzFbm(x * 0.05, z * 0.05) * 0.6 + dzFbm(x * 0.4, z * 0.4) * 0.12) * flat;
+        const sphereDrop = Math.sqrt(Math.max(0, R_MOON * R_MOON - r * r)) - R_MOON;
+        return sphereDrop + relief + microH;
+      };
 
-      // Ensure center landing apex normals point cleanly upward
-      const norms = geo.attributes.normal;
-      for (let j = 0; j <= segs; j++) norms.setXYZ(j, 0, 1, 0);
-
-      // Continuous Apollo Regolith Color Grading across the entire planetary surface
-      const hspan = Math.max(1, hmx - hmn);
-      const totalVerts = (rings + 1) * (segs + 1);
-      const colArr = new Float32Array(totalVerts * 3);
-
-      for (let k = 0; k <= rings; k++) {
-        for (let j = 0; j <= segs; j++) {
-          const idx = k * (segs + 1) + j;
-          const x = pos.getX(idx), y = pos.getY(idx), z = pos.getZ(idx);
-          const t = (y - hmn) / hspan;
-          const ny = Math.max(0, norms.getY(idx));
-          const sl = Math.acos(clamp1(ny)) * D2G;
-
-          // Planetary mare and highlands albedo variation
-          const s1 = Math.sin(x * 0.00004 + z * 0.00006) * 43758.5453;
-          const mareVal = Math.sin(x * 0.000012 + 0.5) * Math.cos(z * 0.000012 + 1.2);
-          const mareTint = mareVal > 0.2 ? -0.04 : 0.02;
-          const mNoise = (s1 - Math.floor(s1)) * 0.04 - 0.02;
-
-          // Micro-texture mottling
-          const s2 = Math.sin(k * 12.9898 + j * 78.233) * 43758.5453;
-          const mottling = (s2 - Math.floor(s2)) * 0.04 - 0.02;
-
-          let g = (0.54 + mareTint + mNoise) * (1.0 - Math.min(45, sl) / 45 * 0.32) + mottling;
-          g = Math.max(0.35, Math.min(0.85, g));
-          colArr[idx * 3] = g;
-          colArr[idx * 3 + 1] = g;
-          colArr[idx * 3 + 2] = g;
-        }
-      }
-      geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
-
-      const tm = new THREE.MeshStandardMaterial({
-        color: 0x78787a,
-        vertexColors: true,
-        roughness: 1.0,
-        metalness: 0.0,
-        side: THREE.DoubleSide
-      });
-      const terrain = new THREE.Mesh(geo, tm);
-      terrain.position.y = 0;
-      terrain.receiveShadow = true;
-      scene.add(terrain);
-      DZ3D.ground = terrain;
-      DZ3D.outer = null;
-      DZ3D.globe = null;
+      // 1. UNIFIED CONTINUOUS LUNAR PLANETARY TERRAIN (0 m -> 360 km)
+      // Single continuous mesh without seams, square borders, or concentric rings.
+      // Orthogonal quad mesh in landing center transitioning to 360 km spherical horizon.
+      const terrainGeo = buildContinuousLunarTerrain(patch, h0, outerHeightAt);
+      const terrainMat = makeGroundMaterial(V.renderer);
+      const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+      terrainMesh.receiveShadow = true;
+      scene.add(terrainMesh);
+      DZ3D.ground = terrainMesh;
       DZ3D.siteId = siteId;
 
-      // 3. Boulders & Rocks on the lunar soil (illustrated ejecta field)
+      // 2. REGOLITH BOULDER FIELD (Smooth normals via mergeVertices, half-buried, albedo matched)
       try {
-        const rockGeo = new THREE.IcosahedronGeometry(1, 1);
-        const rPos = rockGeo.attributes.position;
-        for (let k = 0; k < rPos.count; k++) {
-          const vx = rPos.getX(k), vy = rPos.getY(k), vz = rPos.getZ(k);
-          const s = 1 + (Math.sin(vx * 7.1 + vy * 5.3 + vz * 9.7) * 0.25);
-          rPos.setXYZ(k, vx * s, vy * s, vz * s);
-        }
-        rockGeo.computeVertexNormals();
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x48494c, roughness: 1.0, metalness: 0 });
-        const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, 120);
-        const dummy = new THREE.Object3D();
-        let rSeed = 4242;
-        const rRnd = () => { rSeed = (rSeed * 1664525 + 1013904223) >>> 0; return rSeed / 4294967296; };
-        for (let ri = 0; ri < 120; ri++) {
-          const rx = (rRnd() - 0.5) * 600;
-          const rz = (rRnd() - 0.5) * 600;
-          const ry = surfHeightAt(patch, rx, rz) - h0;
-          const sc = 0.3 + rRnd() * 1.4;
-          dummy.position.set(rx, ry + sc * 0.4, rz);
-          dummy.rotation.set(rRnd() * 6.28, rRnd() * 6.28, rRnd() * 6.28);
-          dummy.scale.set(sc, sc * (0.6 + rRnd() * 0.5), sc);
-          dummy.updateMatrix();
-          rockMesh.setMatrixAt(ri, dummy.matrix);
-        }
-        rockMesh.instanceMatrix.needsUpdate = true;
-        scene.add(rockMesh);
-        DZ3D.rocks = rockMesh;
+        const boulderGroup = new THREE.Group();
+        boulderGroup.name = 'descent_boulders';
+        scatterBoulders(boulderGroup, groundHeightAt, 120, 110);
+        scene.add(boulderGroup);
+        DZ3D.rocks = boulderGroup;
       } catch (e) {}
     } else {
-      // Seamless Fallback Globe (when no site patch is selected)
-      const rings = 128, segs = 128;
-      const gg = new THREE.RingGeometry(0, 360000, segs, rings);
-      const gp = gg.attributes.position;
-      const gcol = new Float32Array((rings + 1) * (segs + 1) * 3);
-      for (let k = 0; k <= rings; k++) {
-        const u = k / rings;
-        const r = (k === 0) ? 0 : 360000 * Math.pow(u, 2.5);
-        const sphereDrop = Math.sqrt(Math.max(0, R_MOON * R_MOON - r * r)) - R_MOON;
-        for (let j = 0; j <= segs; j++) {
-          const idx = k * (segs + 1) + j;
-          const th = (j / segs) * Math.PI * 2;
-          const x = r * Math.cos(th), z = -r * Math.sin(th);
-          const s1 = Math.sin(x * 0.0001 + z * 0.0001) * 43758.5453;
-          const g = 0.50 + (s1 - Math.floor(s1)) * 0.08 - 0.04;
-          gp.setXYZ(idx, x, sphereDrop, z);
-          gcol[idx * 3] = g; gcol[idx * 3 + 1] = g; gcol[idx * 3 + 2] = g;
-        }
-      }
-      gp.needsUpdate = true;
-      gg.computeVertexNormals();
-      const gnorms = gg.attributes.normal;
-      for (let j = 0; j <= segs; j++) gnorms.setXYZ(j, 0, 1, 0);
-      gg.setAttribute('color', new THREE.BufferAttribute(gcol, 3));
-      const gm = new THREE.MeshStandardMaterial({
-        color: 0x78787a, vertexColors: true, roughness: 1.0, metalness: 0, side: THREE.DoubleSide
-      });
-      const ground = new THREE.Mesh(gg, gm);
-      ground.position.y = 0;
-      ground.receiveShadow = true;
-      scene.add(ground);
-      DZ3D.ground = ground;
+      // Seamless Fallback Continuous Globe (when no site patch is selected)
+      const terrainGeo = buildContinuousLunarTerrain(null, 0, null);
+      const terrainMat = makeGroundMaterial(V.renderer);
+      const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+      terrainMesh.receiveShadow = true;
+      scene.add(terrainMesh);
+      DZ3D.ground = terrainMesh;
       DZ3D.globe = null;
       DZ3D.siteId = null;
     }
@@ -3666,6 +3828,7 @@ function dzBuildScene(prof, land) {
     DZ3D.box = box.clone();
     inner.position.y = -box.min.y;
     inner.add(DZ3D.raw.clone(true));
+    try { fixLanderMaterials(inner, DZ3D.envTex); } catch (e) {}
     inner.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     wrap.add(inner);
   } catch (e) {}
@@ -3711,20 +3874,8 @@ function dzBuildScene(prof, land) {
     }
   } catch (e) { DZ3D.smokePool = []; }
 
-  // Off-centre target marker
-  try {
-    const offM = (land && isFinite(land.offsetKm)) ? Math.max(-40, Math.min(40, land.offsetKm * 1000)) : 0;
-    if (Math.abs(offM) > 2) {
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 6),
-        new THREE.MeshBasicMaterial({ color: 0x5ef6a0 }));
-      pole.position.set(offM, 1.5, 0);
-      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.02),
-        new THREE.MeshBasicMaterial({ color: 0x5ef6a0 }));
-      flag.position.set(offM + 0.45, 2.6, 0);
-      scene.add(pole); scene.add(flag);
-      DZ3D.marker = [pole, flag];
-    } else DZ3D.marker = null;
-  } catch (e) { DZ3D.marker = null; }
+  // Fix 4: No stray target marker mesh in the lunar wilderness (eliminated horizon notch artifact)
+  DZ3D.marker = null;
 
   DZ3D.scene = scene;
   DZ3D.camera = camera;
@@ -3784,10 +3935,9 @@ function dzDrive3D(dt) {
   try {
     DZ3D.wrap.position.y = h;
     // Track sun position and direction to spacecraft to maintain crisp, high-contrast illumination & footpad shadows
-    if (DZ3D.sun && DZ3D.sun.target) {
-      DZ3D.sun.position.set(DZ3D.wrap.position.x + 80, DZ3D.wrap.position.y + 140, DZ3D.wrap.position.z + 65);
-      DZ3D.sun.target.position.copy(DZ3D.wrap.position);
-      DZ3D.sun.target.updateMatrixWorld();
+    if (DZ3D.sun) {
+      const sunDir = new THREE.Vector3(0.55, 0.65, -0.45).normalize();
+      fitSunShadow(DZ3D.sun, DZ3D.wrap.position, sunDir, 60);
     }
     // Realistic lunar descent pitch angle: retro-braking (55 deg) -> pitchover -> vertical touchdown
     let pitchDeg = 0;
@@ -4433,7 +4583,7 @@ const OpsView = {
   cruiseLegibilityDur
 };
 
-try { window.OpsView = OpsView; window.__opsV = V; } catch (e) {}
+try { window.OpsView = OpsView; window.__opsV = V; window.__dz3d = DZ3D; window.__dz = DZ; } catch (e) {}
 try { sync(); } catch (e) {}
 
 export { OpsView };

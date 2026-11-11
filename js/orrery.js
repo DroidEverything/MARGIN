@@ -8,21 +8,21 @@
    True scale is the default (?phys=1 / ?mode=physical kept as explicit aliases).
    Planetary and sky textures combine Solar System Scope 8K/2K maps (CC BY 4.0)
    with NASA planetary satellite maps (see assets/ASSET_SOURCES.md and
-   THIRD_PARTY_NOTICES.md); the Sun, Saturn ring profile, and atmospheric
-   limb shells render procedurally with physical radii.
+   THIRD_PARTY_NOTICES.md); the Sun, Saturn ring profile, Uranus narrow rings,
+   and atmospheric limb shells render procedurally with physical radii.
    - Sun: procedural granulation + limb-darkening shader with UnrealBloomPass
      corona (no texture, no 2D sprite flares)
    - Physical rig: SORCE/TIM-derived sunlight (I = 1361 × 1.35² ≈ 2480, exact
      at 1 AU) with inverse-square falloff at real JPL-ephemeris distances,
      dim cool fill, PCFSoft shadows
-   - Earth: physical material under the real sun + injected Blue Marble day /
-     Black Marble emissive night blend + MODIS cloud-deck ground shadows
+   - Earth: physical material under the real sun + injected day / emissive night
+     blend + cloud-deck ground shadows
    - Scattering-look limb shells (day blue / night dim / warm terminator band)
-   - Saturn procedural rings with real Cassini division; Uranus thin rings at
-     real 1.49–2.0 R_eq proportions
-   - Phobos & Deimos: real NASA maps on real-radius spheres with real orbits
+   - Saturn rings + Uranus thin rings at real proportions
+   - Phobos & Deimos: NASA maps on real-radius spheres with real orbits
    - Jupiter Galilean moons: NASA Io/Europa/Ganymede/Callisto maps, real orbits
-   - Milky Way star-map skybox (Solar System Scope, CC BY 4.0) + HYG v4.0 catalog star points
+   - Milky Way star-map skybox (Solar System Scope, CC BY 4.0) + HYG v4.0
+     catalog star points (CC BY-SA 4.0)
    - Orbit path lines for each body, each tagged with its real mean
      heliocentric distance (AU + km, JPL elements)
    - Full PLANET_DATA educational facts database
@@ -128,40 +128,34 @@ export const ORRERY_SETTINGS = {
 };
 
 export const BODY_STYLE = {
-  earth:   { tex:'earth',   tint:0xa8b8cc, spin:0.10,   tilt:0.4084, dist:2.08 },
-  moon:    { tex:'moon',    tint:0xffffff, spin:0.05,   dist:0.78 },
-  mars:    { tex:'mars',    tint:0xb8a89c, spin:0.0972, tilt:0.4398, dist:1.24 },
-  bennu:   { spin:0.25,     dist:0.40 },
-  jupiter: { tex:'jupiter', tint:0xcbb894, spin:0.2411, tilt:0.0541, dist:0 },
-  europa:  { tex:'europa',  tint:0xf2ede4, spin:0.05,   tilt:-0.05, dist:0.45 },
+  earth:   { tex:'earth',   tint:0xa8b8cc, spin:0.10,   tilt:0.4084, dist:1.10 },
+  moon:    { tex:'moon',    tint:0xffffff, spin:0.05,   dist:0.42 },
+  mars:    { tex:'mars',    tint:0xb8a89c, spin:0.0972, tilt:0.4398, dist:0.70 },
+  bennu:   { spin:0.25,     dist:0.35 },
+  jupiter: { tex:'jupiter', tint:0xcbb894, spin:0.2411, tilt:0.0541, dist:1.80 },
+  europa:  { tex:'europa',  tint:0xf2ede4, spin:0.05,   tilt:-0.05, dist:0.32 },
   io:      { tex:'io',      tint:0xf7df97, spin:0.06,   tilt:0.00,  dist:0.40 },
   ganymede:{ tex:'ganymede',tint:0xd2c6b4, spin:0.04,   tilt:0.01,  dist:0.55 },
   callisto:{ tex:'callisto',tint:0xa5998a, spin:0.03,   tilt:0.02,  dist:0.55 },
-  mercury: { tex:'mercury', tint:0xb0a294, spin:0.0017, tilt:0.0006 },
-  venus:   { tex:'venus',   tint:0xd8b48f, spin:-0.0004, tilt:3.0960 },
-  saturn:  { tex:'saturn',  tint:0xd8c2a0, spin:0.2245, tilt:0.4660 },
-  uranus:  { tex:'uranus', tint:0x9fd4d8, spin:-0.1388, tilt:1.7069 },
-  neptune: { tex:'neptune', tint:0x7fa8d8, spin:0.1485, tilt:0.4940 },
-  pluto:   { tex:'pluto',   tint:0xc8b8a8, spin:-0.0156, tilt:2.0857, dist:0.45 },
+  mercury: { tex:'mercury', tint:0xb0a294, spin:0.0017, tilt:0.0006, dist:0.38 },
+  venus:   { tex:'venus',   tint:0xd8b48f, spin:-0.0004, tilt:3.0960, dist:0.95 },
+  saturn:  { tex:'saturn',  tint:0xd8c2a0, spin:0.2245, tilt:0.4660, dist:1.90 },
+  uranus:  { tex:'uranus', tint:0x9fd4d8, spin:-0.1388, tilt:1.7069, dist:1.40 },
+  neptune: { tex:'neptune', tint:0x7fa8d8, spin:0.1485, tilt:0.4940, dist:1.40 },
+  pluto:   { tex:'pluto',   tint:0xc8b8a8, spin:-0.0156, tilt:2.0857, dist:0.32 },
   phobos:  { tex:'phobos',  tint:0x888078, spin:0.08, dist:0.20 },
   deimos:  { tex:'deimos',  tint:0x8a857c, spin:0.05, dist:0.20 }
 };
 
-/* Planet surface maps: Earth stays on its vetted SSS-derived set (see note
-   below); mercury/venus/mars/jupiter/saturn/uranus/neptune load the vendored
-   Solar System Scope 8K/2K maps in models/8K_textures (CC BY 4.0,
-   solarsystemscope.com/textures — same source as the Earth SSS set, surface
-   appearance only, no ephemeris/lighting/gameplay effect). Moon runs the 8K map (assets/textures/moon_8k.jpg). Sun stays procedural,
-   sky uses Solar System Scope stars_8k.jpg (CC BY 4.0). See ASSET_SOURCES.md. */
-
-/* Earth surface extras. Solar System Scope 2D textures, CC BY 4.0
-   (solarsystemscope.com/textures). Non-NASA, unlike the rest of this map set:
-   see assets/ASSET_SOURCES.md + SOURCES.md §7 for the full attribution.
-   - earthRough gives land/sea material contrast only. It is remapped matte on
-     purpose (sea 0.55) so the ocean does not mirror the Sun — a near-mirror sea
-     reflects a hard bright disc and reads as plastic. See createEarthMaterial.
-   - earthSpecularSSS is kept for provenance/verification only (see ASSET_SOURCES).
-   Data maps must stay linear: loaded through dataTex(), never tex(). */
+/* Planet & sky surface maps:
+   - Solar System Scope (CC BY 4.0, solarsystemscope.com/textures): Earth
+     day/night/clouds/roughness, Moon (moon_8k.jpg), Mercury, Venus, Mars,
+     Jupiter, Saturn (+ ring alpha), Uranus, Neptune, and skybox (stars_8k.jpg).
+     Surface appearance only; affects no ephemeris, lighting, or gameplay.
+   - NASA 3D Resources / Planetary Fact Sheets (public domain): Io, Europa,
+     Ganymede, Callisto, Pluto, Phobos, Deimos.
+   Data maps must stay linear: loaded through dataTex(), never tex().
+   See assets/ASSET_SOURCES.md and THIRD_PARTY_NOTICES.md for full attribution. */
 export const BODY_TEX = {
   earth:           'models/8K_textures/earth/8k_earth_daymap.jpg',
   earthNight:      'models/8K_textures/earth/8k_earth_nightmap.jpg',
@@ -262,30 +256,16 @@ export function bennuModel(tag){
   return BENNU_MODEL[key];
 }
 
-const BODY_TEX_LOW = {
-  earth:           'assets/textures/earth_day.jpg',
-  earthNight:      'assets/textures/earth_night.jpg',
-  earthClouds:     'assets/textures/earth_clouds.png',
-  moon:            'assets/textures/lroc_color_2k.jpg',
-  mars:            'assets/textures/mars.jpg',
-  mercury:         'assets/textures/mercury.jpg',
-  venus:           'assets/textures/venus.jpg',
-  jupiter:         'assets/textures/jupiter.jpg',
-  saturn:          'assets/textures/saturn.jpg'
-};
-
-export function tex(key, low){
-  const src = (low && BODY_TEX_LOW[key]) ? BODY_TEX_LOW[key] : BODY_TEX[key];
-  if(!src) return null;
-  const ck = (low && BODY_TEX_LOW[key]) ? key + ':low' : key;
-  if(!TEX_CACHE[ck]){
-    TEX_CACHE[ck]=new THREE.TextureLoader().load(src, undefined, undefined, ()=>{
-      try{ console.warn('[orrery] texture failed:', src); }catch(e){}
+export function tex(key){
+  if(!BODY_TEX[key]) return null;
+  if(!TEX_CACHE[key]){
+    TEX_CACHE[key]=new THREE.TextureLoader().load(BODY_TEX[key], undefined, undefined, ()=>{
+      try{ console.warn('[orrery] texture failed:', BODY_TEX[key]); }catch(e){}
     });
-    TEX_CACHE[ck].colorSpace=THREE.SRGBColorSpace;
-    TEX_CACHE[ck].anisotropy=16; // grazing-angle sharpness (max 16x anisotropic filtering)
+    TEX_CACHE[key].colorSpace=THREE.SRGBColorSpace;
+    TEX_CACHE[key].anisotropy=16; // grazing-angle sharpness (max 16x anisotropic filtering)
   }
-  return TEX_CACHE[ck];
+  return TEX_CACHE[key];
 }
 
 /* Linear (non-sRGB) loader for DATA maps — roughness/metalness/normal masks.
@@ -344,8 +324,8 @@ export function buildStars(){
   return {points:new THREE.Points(g,mat), mat};
 }
 
-/* Equirectangular starfield skybox backdrop (Solar System Scope, CC BY 4.0).
-   Point catalog stars (HYG/Hipparcos vectors) are drawn over it. */
+/* Skybox texture (Solar System Scope 8k_stars_milky_way, CC BY 4.0).
+   Point catalog stars (HYG v4.0 J2000 vectors, CC BY-SA 4.0) are drawn over it. */
 export function loadSpaceSkybox(){
   try{
     const t=tex('hipparcos');
@@ -601,11 +581,33 @@ export function nearForProximity(prox){
   return Math.max(PHYSICAL_NEAR_FLOOR, Math.min(0.01, p * 0.5));
 }
 
-export function frameDist(key,unitsPerKm){
+export const BODY_FRAME_MULT = {
+  sun: 7.5,
+  saturn: 5.2,
+  jupiter: 4.0,
+  uranus: 4.2,
+  neptune: 4.2,
+  bennu: 3.4,
+  moon: 3.5,
+  earth: 3.9,
+  mars: 3.8,
+  europa: 3.5,
+  io: 3.4,
+  ganymede: 3.6,
+  callisto: 3.6,
+  phobos: 2.8,
+  deimos: 2.8,
+  mercury: 3.4,
+  venus: 3.8,
+  pluto: 3.4
+};
+
+export function frameDist(key,unitsPerKm,opts){
   const u=unitsPerKm||UNITS_PER_KM;
   if(isPhysicalMode()){
     const r=radiusKmTrue(key)*u;
-    return Math.max(1e-9,r*8);
+    const mult=(opts&&opts.multiplier)||BODY_FRAME_MULT[key]||3.9;
+    return Math.max(1e-9,r*mult);
   }
   return Math.max(0.45,((BODY_STYLE[key]||{}).dist||1));
 }
@@ -631,10 +633,10 @@ export function approachMinDist(key,unitsPerKm){
      the shell rides 1.5% above the surface, so parallax is negligible).
    Responds to eclipses, terminator, and the Mercury-to-Pluto gradient
    exactly like every other body. */
-export function createEarthMaterial(sunPosVec, low){
+export function createEarthMaterial(sunPosVec){
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    map: tex('earth', low),
+    map: tex('earth'),
     /* Land/sea material contrast ONLY — deliberately NOT a mirror.
        The white-is-water specular mask is shipped pre-inverted as a roughnessMap,
        remapped to 0.62 (sea) .. 1.00 (land) so the GGX lobe is far too broad to
@@ -675,8 +677,8 @@ export function createEarthMaterial(sunPosVec, low){
   mat.userData.sunPos = { value: new THREE.Vector3(0, 0, 0) };
   const sunPosU = mat.userData.sunPos;
   mat.onBeforeCompile = (shader)=>{
-    shader.uniforms.nightTex = { value: tex('earthNight', low) };
-    shader.uniforms.cloudTex = { value: tex('earthClouds', low) };
+    shader.uniforms.nightTex = { value: tex('earthNight') };
+    shader.uniforms.cloudTex = { value: tex('earthClouds') };
     shader.uniforms.uNightBoost = nightBoost;
     shader.uniforms.uDayMeter = dayMeter;
     shader.uniforms.sunPos = sunPosU;
@@ -723,7 +725,7 @@ export function sphereMesh(key,opts){
        physical point-light/shadow path is intentionally not used for these
        sub-pixel moon discs: at this scale it made them disappear/break. */
     mat = new THREE.MeshBasicMaterial({
-      map: tex(def.tex, opts.lowRes),
+      map: tex(def.tex),
       color: 0xffffff,
       side: THREE.FrontSide,
       toneMapped: false,
@@ -734,13 +736,13 @@ export function sphereMesh(key,opts){
       depthWrite: true
     });
   } else if (key==='earth'&&opts.sunPos){
-    mat = createEarthMaterial(opts.sunPos, opts.lowRes);
+    mat = createEarthMaterial(opts.sunPos);
   } else if(def.tex){
     mat = new THREE.MeshStandardMaterial({
       color: def.tint,
       roughness: 0.85,
       metalness: 0.05,
-      map: tex(def.tex, opts.lowRes),
+      map: tex(def.tex),
       side: THREE.DoubleSide // bodies never cull to see-through (see Earth note)
     });
   } else {
@@ -875,12 +877,12 @@ function ringMesh(innerR, outerR, kind){
 /* Real MODIS cloud deck (see assets/ASSET_SOURCES.md): white shell textured
    by the vendored RGBA map — diffuse alpha carries the cloud fraction, so
    the Sun shades it like the surface (bright by day, dark by night). */
-export function createClouds(r, low){
+export function createClouds(r){
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(r*1.008, 128, 96),
     new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      map: tex('earthClouds', low),
+      map: tex('earthClouds'),
       transparent: true,
       opacity: 0.90,
       roughness: 1.0,
@@ -1061,23 +1063,16 @@ export function buildSolarSystem(scene,isAlive,opts){
   };
 
   /* Sun: procedural granulation shader (see createSunMaterial below) +
-     UnrealBloomPass corona. No equirect solar map is published in NASA
-     3D Resources (SDO frames are full-disc photos, no solar surface texture is draped), so no map is draped.
+     UnrealBloomPass corona. No solar surface texture is draped.
      Physical rig: inverse-square PointLight (decay 2) at the Sun's centre so
      inner planets blaze and outer planets fall off realistically, plus a dim
      cool ambient fill so night sides stay deep but readable. Sun mesh never
      casts (it surrounds the light). */
 /* Procedural Sun: animated granulation (fbm noise) + limb darkening in a
-   custom shader. No equirect solar map is published in NASA 3D Resources,
-   and no solar surface texture is draped, so the surface is
-   synthesized as pure rendering — brightness ~uIntensity keeps it above the
-   bloom threshold.
-   Glow architecture follows N3rson/Solar-System-3D (MIT ©2025 N3rson):
-   emissive-style disc + wide-radius UnrealBloom (theirs: strength 1,
-   radius 0.9, threshold 1). Adapted, not copied — procedural disc instead
-   of sun.jpg, our physical 2480 rig instead of their tuned light, tracked
-   thresholds instead of fixed. Their Earth sunPosition-uniform pattern
-   independently validates ours below. Textures never vendored. */
+   custom shader.
+   Glow architecture adapts N3rson/Solar-System-3D (MIT ©2025 N3rson):
+   emissive-style disc + wide-radius UnrealBloom with physical inverse-square
+   solar lighting and tracked exposure thresholds. */
 function createSunMaterial(){
   return new THREE.ShaderMaterial({
     /* DoubleSide like every other body: never a see-through hole. */
@@ -1263,7 +1258,7 @@ function coronaSprite(r, mult){
       const host = mesh.isGroup ? mesh.children[0] : mesh;
       host.add(fresnelShell(r));
       if(key==='earth'){
-        const clouds = createClouds(r, opts.lowRes);
+        const clouds = createClouds(r);
         host.add(clouds);
         out.atmospheres.earth = clouds;
       }
@@ -1437,7 +1432,8 @@ export function frameOf(key,simDays,out,outTgt,opts){
   const outward=(helioForDir||bp).clone(); outward.y=0;
   if(outward.lengthSq()<1e-12) outward.set(1,0,0);
   outward.normalize();
-  const off=outward.clone().multiplyScalar(-0.45).add(new THREE.Vector3(0.3,0.65,0.5)).normalize();
+  const pitchY = (key === 'saturn') ? 0.38 : 0.30;
+  const off=outward.clone().multiplyScalar(-0.42).add(new THREE.Vector3(0.36,pitchY,0.48)).normalize();
   if(key==='europa'||key==='io'||key==='ganymede'||key==='callisto'){
     const jPos=isPhys?bodyWorldPhysical('jupiter',_fw,simDays,originKm||[0,0,0],u):bodyWorld('jupiter',_fw,simDays);
     if(!jPos) return null;
@@ -1445,15 +1441,10 @@ export function frameOf(key,simDays,out,outTgt,opts){
     const sunDir=helioForDir.clone().multiplyScalar(-1).normalize();
     _fw3.copy(sunDir);
     off.copy(_fw3).multiplyScalar(0.55).addScaledVector(_fw2,0.45);
-    off.y+=0.35;
+    off.y+=0.28;
     off.normalize();
   }
-  /* Focus framing uses the legacy regional distances (BODY_STYLE.dist):
-     these frame the destination neighborhood (planet + moons + labels), not
-     the planetary disc — close-ups come from click-to-fly (flyToPlanetDirect).
-     A radius-aware fit was tried and rejected: it parks the camera on the
-     planet's face with every label out of frame. */
-  const dist=isPhys?frameDist(key,u):Math.max(0.45,((BODY_STYLE[key]||{}).dist||1));
+  const dist=opts.dist!=null?opts.dist:(isPhys?frameDist(key,u,opts):Math.max(0.45,((BODY_STYLE[key]||{}).dist||1)));
   const safeDist=isPhys?Math.max(dist,radiusKmTrue(key)*u*1.5):dist;
   out.copy(bp).addScaledVector(off,safeDist);
   outTgt.copy(bp);
@@ -1470,11 +1461,8 @@ export function flyDur(travel){
 export function wrap180(d){ d=d%360; if(d>180) d-=360; if(d<-180) d+=360; return d; }
 
 export async function verifyBennuEphem(){
-  /* Retired 2026-09-26: JPL SBDB sends no CORS headers, so every browser read
-     fails and the console fills with a CORS error for zero benefit — the
-     vendored elements always won. The badge now permanently reads from the
-     vendored solution (ORX_merged_DE424, orbit_id 118).
-     Kept as an async stub so callers are untouched; delete entirely if the
-     badge goes. */
+  /* Offline-first: reads from the vendored JPL SBDB/ORX solution (orbit_id 118)
+     without network calls that would violate CORS or offline operation.
+     Kept as an async stub so callers stay unchanged. */
   return {live:false,delta:null};
 }

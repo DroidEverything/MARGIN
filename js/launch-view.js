@@ -30,11 +30,11 @@ import {
   NASA_STAGING_FAIRING_B64,
   NASA_STAGING_PAYLOAD_B64,
   NASA_STAGING_THUMP_B64
-} from './launch-audio-data.js?v=20261107_v3';
+} from './launch-audio-data.js?v=20261108c';
 import { STAR_VEC, STAR_MAG, STAR_BV } from './stars-data.js'; // HYG v4.0 (leaf module, zero deps)
 import { helioKm, bvColor } from './orrery.js'; // P3: common astronomy authority (body states + B-V bins)
 import { J2000_JD } from './solar-system-accuracy.js'; // P3: single-owner epoch anchor (leaf module, zero deps)
-/* Custom plume: steep-cone + domain-warped ink edges (procedural GLSL shader). */
+/* Custom plume: steep-cone + domain-warped ink edges procedural GLSL shader. */
 
 /* Expert ascent tracks (launch-anim-data.js v1): monotone cubic
    (Fritsch-Carlson) interpolation with cut-aware camera segments, per the
@@ -314,7 +314,7 @@ function flightDownrangeAtLV(lvId, met) {
   } catch (e) {}
   return Math.pow(Math.max(0, met / Math.max(1, profileFor(lvId).endMet) - 0.12) / 0.88, 2.1) * 620;
 }
-/* Rise: pad-true-scale mapping (pad-true-scale kinematics).
+/* Rise: pad-true-scale mapping.
    Delegates to game.js single-implementation padParams/riseOfAlt/flightStateAt
    (globalThis — game.js is the classic script that owns them); legacy 0.55
    formula kept as degraded fallback only. Endpoints exact (0 at release via
@@ -1940,14 +1940,10 @@ function buildScene() {
   V.stars = starPts;
   V.env.push(starPts);
 
-  // Far-space photo layer (high altitude only): reuses the already-vendored
-  // stars_8k.jpg backdrop (same file ops-view uses — no new asset, no license
-  // risk). uMapF rides the star gate (see updateEnvironment), so the pad and
-  // early ascent stay pixel-identical. Async; missing texture = old behavior.
-  // Far-space photo layer (high altitude only): reuses the already-vendored
-  // stars_8k.jpg backdrop (same file ops-view uses — no new asset, no license
-  // risk). uMapF rides the star gate (see updateEnvironment), so the pad and
-  // early ascent stay pixel-identical. Async; missing texture = old behavior.
+  // Far-space photo layer (high altitude only): reuses the vendored
+  // stars_8k.jpg skybox (Solar System Scope, CC BY 4.0). uMapF rides the star
+  // gate (see updateEnvironment), so the pad and early ascent stay unaffected.
+  // Async; missing texture falls back gracefully.
   try {
     const tl = new THREE.TextureLoader();
     tl.load('assets/textures/stars_8k.jpg', (t) => {
@@ -2242,8 +2238,8 @@ const ENV_SCALE = 1 / 8.5;
    9.95 m/u, PAD_SCALE_AUDIT.md §2). The site NEVER rescales per vehicle. */
 /* True-scale NASA ground hardware (nasa/NASA-3D-Resources, Draco-compressed).
    Native units are arbitrary per author — each asset carries its own measured
-   metres-per-unit, reconciled once against NASA fact sheets against NASA fact sheets. Static site scale uses the FIXED site
-   conversion below (SLS canonical) — never the live rocket scale. */
+   metres-per-unit reconciled against NASA fact sheets. Static site scale uses
+   the FIXED site conversion below (SLS canonical) — never the live rocket scale. */
 const WORLD_M_PER_UNIT = 9.95; // 1 display unit = 9.95 m (SLS-canonical audit)
 const SITE_VK = 1 / WORLD_M_PER_UNIT; // fixed display-units-per-metre (~0.1005)
 const ML_URL = 'models/nasa/Mobile Launcher (assembled).glb';
@@ -3308,8 +3304,7 @@ function buildModularStack(lvId, payloadCraft) {
    HIGH-REALISM EXHAUST PLUMES (Core, Vacuum & Booster Plumes)
    ══════════════════════════════════════════════════════════════ */
 /* ══════════════════════════════════════════════════════════════
-   CUSTOM EXHAUST PLUMES — steep cone + lateral-space ragged edge
-   (procedural cone GLSL shader).
+   CUSTOM EXHAUST PLUMES — steep cone + lateral-space ragged edge.
    One hollow cone mesh + one axis-glued glow billboard per burn source.
    Edge threshold lives in LATERAL space r=sqrt(1-ndv²) with domain-warped
    near-isotropic FBM + travelling cauliflower vertex lobes; color comes
@@ -3381,7 +3376,7 @@ const PLUME_FRAG = [
   '  gl_FragColor = vec4(col, a);',
   '}'
 ].join('\n');
-/* ---- v2 plume vertex : exact lateral coordinate via
+/* ---- v2 plume vertex (expert patch v7): exact lateral coordinate via
    camera-in-mesh-local (no normal-based ndv, no front/back face mismatch).
    `inverse()` needs GLSL ES 3.00 — three r160 compiles ShaderMaterial for
    WebGL2; if the program fails to link, fall back to camera-uniform (see brief). */
@@ -3400,7 +3395,7 @@ const PLUME_VERT2 = [
   '}'
 ].join('\n');
 
-/* ---- v2 plume fragment : shape/brightness separated —
+/* ---- v2 plume fragment: shape/brightness separated —
    silhouette follows cone geometry, brightness only colors. MAX-blend-ready
    premultiplied output. */
 const PLUME_FRAG2 = [
@@ -3614,7 +3609,7 @@ function makeNozzleDisc(radius) {
    the FALLOFF is keyed to the plume axis (world-space lateral + axial),
    so the bright core stays glued to a tilted flame through the gravity
    turn. Child of the plume group/mesh, so visibility inherits automatically. */
-/* v2 GLOW_VS : camera-facing SQUARE centred on the visible
+/* v2 GLOW_VS (expert patch v7): camera-facing SQUARE centred on the visible
    flame segment (half-extent E = Lv/2 + reach) — fixes the old centre applying
    group y-scale twice (drift by sy²), lower-halo clipping, and sideways
    clipping on tilted flames. Any boundary point sits ≥ reach from the segment,
@@ -3639,7 +3634,7 @@ void main(){
   vAx  = ax;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;
-/* v2 GLOW_FS : heat segment is Lv = uLen·uVis (v2 plumes pass
+/* v2 GLOW_FS (expert patch v7): heat segment is Lv = uLen·uVis (v2 plumes pass
    0.85, so the halo ends where the visible flame dissolves, not the geometric
    tip). uVis = 1.0 reproduces the old falloff exactly (F9 path). */
 const GLOW_FS = `
@@ -3823,7 +3818,7 @@ function plumeTintFor(lvId) {
   }
 }
 
-/* Shared halo budget : N motors = N halos summing linearly
+/* Shared halo budget (expert patch v7): N motors = N halos summing linearly
    on the same pixels. Share ~1/(1+0.45(N−1)): SLS (3 sources) → 0.53 each
    (total 1.6× a single halo — still reads bigger than a lone core), Atlas 551
    (6) → 0.31 each. No-op on single-core stacks (F9 untouched). Zero allocation.
@@ -4400,7 +4395,7 @@ function updatePlumes(f, now, prof, dt) {
     }
   }
 
-  // Shared halo budget : applied after core+booster uGlow
+  // Shared halo budget (expert patch v7): applied after core+booster uGlow
   // writes, before vacuum (vac never co-burns with boosters — no-op there).
   applyGlowBudget();
 

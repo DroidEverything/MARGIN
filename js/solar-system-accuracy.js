@@ -1,6 +1,5 @@
-/* MARGIN physical body data — the SINGLE physical-body dataset (§53).
-   Implements JPL / NASA / IAU reference physical constants
-   (JPL/NASA/IAU reference values, §4/§8/§9/§10/§16-17).
+/* MARGIN physical body data — the single physical-body dataset.
+   Implements JPL / NASA / IAU reference physical constants.
 
    This module owns: radii, GM/mass, obliquity, rotation periods, moon
    metadata, ring geometry, region envelopes. It owns NO trajectory solver:
@@ -136,8 +135,7 @@ export const REGIONS_AU = {
   heliopause: [90, 120],
 };
 
-// --- §32 validation (physical constants only; trajectory truth is QA'd
-// against JPL reference vectors by validation checks) -----------
+// --- Validation helpers for physical constants (JPL/IAU reference values) ---
 export function validateScales(tol = 1e-9) {
   const fails = [];
   const check = (label, actual, expected, absTol) => {

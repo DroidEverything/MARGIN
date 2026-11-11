@@ -28,7 +28,7 @@ import {
   measureGlbGround, buildSiteGround, buildLampHousings,
   buildPadSpotLights, buildFieldLights, buildTowerLampsFromML,
   buildLightShafts, buildSkyDome, buildRealStars, LAMP_HEADS,
-} from './launch-view.js?v=20261107_v3';
+} from './launch-view.js?v=20261108c';
 
 const HOST_ID = 'lv3host';
 const FOG_DENSITY = 0.0035;      // cinematic pad-level FogExp2 density
@@ -868,7 +868,7 @@ function takeoff(done) {
     // Stop preview render loop first so WebGL context resources do not fight launch cinematic
     stop();
     try { if (done) done(); } catch (e) { }
-  }, 300);
+  }, 60);
 }
 
 const LVPreview = { sync, start, setVehicle, stop, takeoff };

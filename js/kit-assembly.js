@@ -1,24 +1,13 @@
 /* MARGIN shared spacecraft composer (js/kit-assembly.js).
    The ONE authoritative builder of the player's craft, used by both the build
-   bay (js/view3d.js: renderer + highlight + framing) and ops (js/ops-view.js:
-   fixed symbolic size + label + scan beam). No second implementation.
+   bay (js/view3d.js) and ops (js/ops-view.js). No second implementation.
    Side-effect-free module: no renderer, no DOM at import, no globals.
    Selection is an explicit object — never reads game state:
      sel = { n, power, comms, prop, instr[] }.
-   Sources (vendored static, NASA-only):
-     NASA 3D Resources hero models (aqua, lro, mro, osiris_rex, voyager)
-     Procedural aerospace subsystem assemblies
-     Per-level rover assets (perseverance, rassor)
-   Origin: NASA 3D Resources (public domain per NASA media guidelines).
-   All 9 kit GLBs use KHR_draco_mesh_compression — decoded by the vendored
-   static three r160 decoder (vendor/draco/, no network). Parsed GLBs are
-   cached per URL; every assembly clones (shares geometry, own transforms).
-   Tiers: body 1/2/3 by instrument count (<=2 / 3-5 / 6+); wings 1/2/3 by
-   power class; radio 1/2/3 by comms class. Within-tier size factors keep
-   every option visually distinct (representative illustration).
-   Instruments have no per-unit NASA CAD: generic procedural glyphs shaped by
-   instrument group (representative, never flight hardware). Propulsion maps
-   to a procedural engine block (kit ships no engine parts). */
+   Uses vendored NASA 3D Resources hero models (aqua, lro, mro, osiris_rex,
+   voyager, perseverance, rassor) with procedural aerospace subsystems built in
+   module. GLBs compressed with KHR_draco_mesh_compression are decoded locally
+   via vendor/draco/. */
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/GLTFLoader.js';
@@ -103,12 +92,27 @@ export function heroForLevel(levelId) {
 export function normalizeHero(group) {
   const out = (group && group.isObject3D) ? group : new THREE.Group();
   try {
+    // Multi-stage NASA models: in MRO, remove stowed launch proxy states 2..6 and flight covers completely
+    // from the scene graph so they cannot render, cannot be tagged, and cannot expand the framing bbox.
+    const toRemove = [];
+    out.traverse(o => {
+      const nm = (o.name || '');
+      const matNames = (Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []))
+        .map(m => (m && m.name) || '').join(' ');
+      if (/(?:mro_)?proxy[2-6]|shroud|fairing/i.test(nm) || /cover/i.test(nm) || /cover/i.test(matNames)) {
+        toRemove.push(o);
+      }
+    });
+    for (const o of toRemove) {
+      o.visible = false;
+      if (o.parent) o.parent.remove(o);
+    }
     let meshes = 0;
     out.traverse(o => {
       if (!o.isMesh) return;
       // Hide jettisoned flight launch covers (e.g. MRO launch protective aero shroud)
       const matsCheck = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
-      if (matsCheck.some(m => m && (m.name === 'cover' || /cover/i.test(m.name)))) {
+      if (matsCheck.some(m => m && (m.name === 'cover' || /cover/i.test(m.name))) || o.name.includes('cover')) {
         o.visible = false;
         return;
       }
@@ -138,18 +142,37 @@ export function normalizeHero(group) {
           if (m.alphaTest > 0.9) m.alphaTest = 0;
           // Only double-side planar sheets (solar arrays, antenna dishes, radiator wings).
           // Keep 3D volumetric bodies FrontSide to prevent internal backface clipping/hollow hulls:
-          const isPlanar = /panel|wing|array|dish|solar|radiator|foil/i.test(m.name || '') ||
-                           /panel|wing|array|dish|solar|radiator|foil/i.test(o.name || '');
+          const isPlanar = /panel|wing|array|dish|solar|radiator|foil|default #2/i.test(m.name || '') ||
+                           /panel|wing|array|dish|solar|radiator|foil|proxy7_1/i.test(o.name || '');
           if (isPlanar) {
             m.side = THREE.DoubleSide;
           } else {
             m.side = THREE.FrontSide;
           }
           if (m.color && !m.map && m.color.r < 0.02 && m.color.g < 0.02 && m.color.b < 0.02) m.color.setHex(0x232830);
-          // MRO High-Gain Antenna dish polish: soften the harsh 2005 baked specular swirl into realistic satin carbon composite
-          if (m.name === 'default #2') {
+          // MRO High-Gain Antenna dish polish: make solid DoubleSide satin carbon composite
+          if (m.name === 'default #2' || o.name === 'mro_proxy7_1') {
+            m.side = THREE.DoubleSide;
+            m.transparent = false;
+            m.opacity = 1.0;
+            m.depthWrite = true;
             m.roughness = 0.65;
             m.metalness = 0.15;
+          }
+          // MRO solar arrays: replace fake glossy orange-copper baked tint with authentic
+          // Spectrolab multi-junction photovoltaic dark navy-slate finish and carbon composite trim
+          if (m.name === 'solar_L' || m.name === 'solar_R') {
+            m.color = new THREE.Color(0x161f2e);
+            m.map = null;
+            m.roughness = 0.45;
+            m.metalness = 0.25;
+            m.side = THREE.DoubleSide;
+          } else if (m.name === 'solar_edge') {
+            m.color = new THREE.Color(0x282c34);
+            m.map = null;
+            m.roughness = 0.70;
+            m.metalness = 0.10;
+            m.side = THREE.DoubleSide;
           }
           if (m.needsUpdate !== undefined) m.needsUpdate = true;
           /* MRO-class heroes carry WebP base-color textures: three r160's
@@ -178,16 +201,11 @@ export function normalizeHero(group) {
   } catch (e) { /* never throw out of the presentation path */ }
   return out;
 }
-/* --- rover: vendored NASA Perseverance hero for L2 surface phases ---
-   Raw NASA-export units are arbitrary per model (audit table:
-   Perseverance spans 175.63 raw units for a 3 m
-   rover; MRO 89.74 for 13.6 m; MAVEN 13.46 for 11.43 m). calibrateRover
-   measures the bounding box and normalizes max extent to ROVER_TRUE_SPAN_M
-   (Bennu pattern: measure Box3, center, scale from the measured maximum
-   extent), so Phase-5 terrain placement is true-scale. Material repairs reuse
-   normalizeHero (shared path, geometry untouched). Lazy: fetched on first L2
-   preview compose only — never at boot, never headless (?no3d safe: view3d
-   only calls this inside the live-renderer compose path). */
+/* --- rover: vendored NASA rovers (RASSOR / Perseverance) for surface phases ---
+   Raw NASA-export units are calibrated via bounding box measurements
+   (Perseverance spans 175.63 raw units for a 3.0 m rover; RASSOR calibrated to
+   1.66 m true span). calibrateRover measures the bounding box and normalizes
+   max extent to ROVER_TRUE_SPAN_M so terrain placement is true-scale. */
 export const ROVER_BY_LEVEL = {
   l2: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },
   sbx_moon: { url: 'models/nasa/rassor.glb', spanM: 1.66, name: 'NASA RASSOR (Lunar Regolith Excavator)' },

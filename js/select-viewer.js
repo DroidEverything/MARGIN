@@ -13,7 +13,7 @@ import {
   frameOf, easeSmoother, flyDur, verifyBennuEphem,
   PLANET_DATA, ORRERY_SETTINGS, exposureForBody, wideExposure,
   providerOf, statusOf, moonPathOf, helioDistKm, applySunPosition,
-  approachMinDist, nearForProximity
+  approachMinDist, nearForProximity, BODY_FRAME_MULT
 } from './orrery.js';
 
 /* Live ephemeris-status badge (Phase 2.1 verification harness): maps focus
@@ -729,9 +729,10 @@ function flyToPlanetDirect(bodyKey) {
   const r = radiusWorld(bodyKey, { physical: V.isPhys, unitsPerKm: UNITS_PER_KM });
   /* Floor is the per-body clamp (r*1.6), not a global: the old 2e-4 floor
      parked the camera 100000× too far from Bennu and the Martian moons —
-     sub-pixel dots, reported "invisible". Framing lands at r*4.5 regardless. */
+     sub-pixel dots, reported "invisible". Framing lands at cinematic mult regardless. */
   const floorD = V.isPhys ? approachMinDist(bodyKey, UNITS_PER_KM) * 1.5 : 0.35;
-  let offsetDist = Math.max(r * 4.5, floorD);
+  const mult = (typeof BODY_FRAME_MULT !== 'undefined' && BODY_FRAME_MULT[bodyKey]) ? BODY_FRAME_MULT[bodyKey] : 3.9;
+  let offsetDist = Math.max(r * mult, floorD);
   /* Same-planet selection: already there and framed — show the card, refresh
      the clamp, skip the absurd re-flight swoop. */
   if (bodyKey === (V.selectedPlanet || V.toKey) &&
@@ -747,13 +748,13 @@ function flyToPlanetDirect(bodyKey) {
     if ((!isFinite(km) || !(km > 0)) && MOON_PARENT[bodyKey]) km = helioDistKm(MOON_PARENT[bodyKey], V.simDays);
     V.exposure = (isFinite(km) && km > 0) ? exposureForBody(bodyKey, km * UNITS_PER_KM) : wideExposure();
   } catch (e) { }
-  if (bodyKey === 'sun') offsetDist = V.isPhys ? Math.max(r * 8, 0.02) : 2.4;
-  if (bodyKey === 'saturn') offsetDist = Math.max(offsetDist, r * 5.0);
-  if (bodyKey === 'uranus') offsetDist = Math.max(offsetDist, r * 4.5);
-  if (bodyKey === 'jupiter') offsetDist = Math.max(offsetDist, r * 4.5);
+  if (bodyKey === 'sun') offsetDist = V.isPhys ? Math.max(r * 7.5, 0.02) : 2.4;
+  if (bodyKey === 'saturn') offsetDist = Math.max(offsetDist, r * 5.2);
+  if (bodyKey === 'uranus') offsetDist = Math.max(offsetDist, r * 4.2);
+  if (bodyKey === 'jupiter') offsetDist = Math.max(offsetDist, r * 4.0);
 
   const dir = V.camera.position.clone().sub(targetPos);
-  if (dir.lengthSq() < 1e-4) dir.set(0.3, 0.5, 1.0);
+  if (dir.lengthSq() < 1e-4) dir.set(0.36, (bodyKey === 'saturn' ? 0.38 : 0.30), 0.48);
   dir.normalize();
   /* Dayside-biased arrival: landing on the night side reads as "pitch black"
      (dark rock, no fill) and users report it as broken lighting. If the
