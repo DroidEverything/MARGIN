@@ -16,7 +16,8 @@ recorded in [`SOURCES.md`](SOURCES.md) and [`assets/ASSET_SOURCES.md`](assets/AS
 
 - **Files:** `vendor/three.module.min.js`, `vendor/addons/**` (including
   `vendor/addons/BufferGeometryUtils.js`, `GLTFLoader.js`, `DRACOLoader.js`,
-  `OrbitControls.js`, and post-processing passes/shaders)
+  `OrbitControls.js`, and post-processing passes/shaders), and
+  `vendor/utils/BufferGeometryUtils.js` (imported by `GLTFLoader.js`)
 - **Copyright:** © 2010–2023 three.js authors
 - **License text:** [`licenses/MIT-three.js.txt`](licenses/MIT-three.js.txt)
 - **Upstream:** <https://github.com/mrdoob/three.js>
