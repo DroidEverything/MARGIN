@@ -2109,7 +2109,14 @@ function scrTitle(){
       </span>
     </div>
     <p class="proto">NASA-DERIVED DATA &#183; INDEPENDENT SPACE APPS CHALLENGE PROTOTYPE</p>
-  </div></div>`;
+  </div>
+  <div id="title3dLoad" class="title-3d-status" aria-live="polite" hidden>
+    <span class="t3d-dot" aria-hidden="true"></span>
+    <span class="t3d-lbl" id="title3dTxt">STREAMING 3D EARTH TEXTURES</span>
+    <span class="t3d-bar" aria-hidden="true"><i id="title3dFill"></i></span>
+    <span class="t3d-pct" id="title3dPct">0%</span>
+  </div>
+  </div>`;
 }
 
 /* ── MISSION SELECT (fullscreen solar-system stage) ── */
@@ -9231,6 +9238,7 @@ try{
     el("btnSound").setAttribute("aria-pressed", "false");
   }
 }catch(e){}
+window.__bootDone&&window.__bootDone();
 if(!applySceneShortcut()) render();
 addEventListener("resize",()=>{ if(S.screen==="build")drawBay(); if(S.screen==="launch"&&PORK)drawPork();
   if(S.screen==="ops"){drawOrbit();drawTL();} });

@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Instrument+Sans:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="styles/nasa-theme.css?v=20261107c">
+<link rel="stylesheet" href="styles/boot-loader.css?v=20261111a">
 <script type="importmap">
 {"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/addons/"}}
 </script>
@@ -31,7 +32,47 @@
     <button class="tb-btn title-only" data-act="devjump" title="Quick jump to a mission or phase">JUMP</button>
     <button class="tb-btn select-only" data-act="gohome" title="Back to homescreen">HOME</button>
   </header>
-  <main id="screen" tabindex="-1"></main>
+  <main id="screen" tabindex="-1">
+    <div class="boot-loader" id="bootLoader" role="status" aria-live="polite" aria-label="Loading MARGIN telemetry and NASA ephemeris data">
+      <div class="boot-grid" aria-hidden="true"></div>
+      <div class="boot-card">
+        <div class="boot-top">
+          <div class="boot-eye"><span class="boot-pulse" aria-hidden="true"></span>DSN TELEMETRY // COLD BOOT</div>
+          <div class="boot-ver">NASA DE440 · DEM</div>
+        </div>
+        <div class="boot-hero">
+          <svg class="boot-orbit" viewBox="0 0 96 96" aria-hidden="true">
+            <circle class="ring-outer" cx="48" cy="48" r="42" />
+            <circle class="ring-mid" cx="48" cy="48" r="30" />
+            <circle class="ring-inner" cx="48" cy="48" r="17" />
+            <g class="orbit-sweep">
+              <circle class="ring-arc" cx="48" cy="48" r="36" />
+              <circle class="sat-glow" cx="48" cy="12" r="5" />
+              <circle class="sat-core" cx="48" cy="12" r="2.3" />
+            </g>
+            <circle class="planet-core" cx="48" cy="48" r="5.5" />
+          </svg>
+          <div class="boot-titles">
+            <div class="boot-mark">MARGIN</div>
+            <div class="boot-sub">INITIALIZING FLIGHT SIMULATION ENVIRONMENT</div>
+          </div>
+        </div>
+        <div class="boot-meta">
+          <span class="boot-stage" id="bootStage">FETCHING FLIGHT CONSTANTS…</span>
+          <span class="boot-readout"><span id="bootBytes">0.6 / 31.0 MB</span><span class="boot-pct" id="bootPct">2%</span></span>
+        </div>
+        <div class="boot-track" aria-hidden="true"><div class="boot-fill" id="bootFill" style="width:2%"></div></div>
+        <div class="boot-steps" id="bootSteps" aria-hidden="true">
+          <span class="bstep active" data-bstep="0"><i></i>EPHEMERIS</span>
+          <span class="bstep" data-bstep="1"><i></i>ASTEROIDS</span>
+          <span class="bstep" data-bstep="2"><i></i>TERRAIN DEM</span>
+          <span class="bstep" data-bstep="3"><i></i>HARDWARE</span>
+          <span class="bstep" data-bstep="4"><i></i>FLIGHT CORE</span>
+        </div>
+        <p class="boot-note">Downloading vendored JPL DE440 ephemerides &amp; planetary terrain grids — cached locally after first load.</p>
+      </div>
+    </div>
+  </main>
   <div id="dock" class="action-dock hidden"></div>
   <div id="hud" class="hidden"></div>
   <footer id="telem"><button id="btnTelemToggle" class="telem-btn" title="Toggle telemetry ticker">TICKER</button><div class="run" id="telemRun"></div></footer>
@@ -52,16 +93,64 @@
 </div>
 <div class="sr" id="live" role="status" aria-live="polite"></div>
 <audio id="marginBgm" src="assets/audio/margin_theme.mp3" loop preload="auto"></audio>
+<script>
+(function(){
+  var TOTAL_MB=31.0,disp=2,cap=27,timer=0;
+  var stageEl=document.getElementById('bootStage');
+  var fillEl=document.getElementById('bootFill');
+  var pctEl=document.getElementById('bootPct');
+  var bytesEl=document.getElementById('bootBytes');
+  var stepsEl=document.getElementById('bootSteps');
+  function paint(v){
+    var p=Math.max(0,Math.min(100,v));
+    if(fillEl) fillEl.style.width=p.toFixed(1)+'%';
+    if(pctEl) pctEl.textContent=Math.round(p)+'%';
+    if(bytesEl) bytesEl.textContent=(p/100*TOTAL_MB).toFixed(1)+' / '+TOTAL_MB.toFixed(1)+' MB';
+  }
+  window.__bootStep=function(pct,msg,nextCap,stepIdx){
+    if(pct>disp) disp=pct;
+    cap=Math.max(disp,nextCap||pct);
+    if(stageEl&&msg) stageEl.textContent=msg;
+    if(stepsEl&&typeof stepIdx==='number'){
+      var nodes=stepsEl.querySelectorAll('.bstep');
+      for(var i=0;i<nodes.length;i++){
+        nodes[i].classList.toggle('done',i<stepIdx);
+        nodes[i].classList.toggle('active',i===stepIdx);
+      }
+    }
+    paint(disp);
+  };
+  window.__bootDone=function(){
+    if(timer){clearInterval(timer);timer=0;}
+    disp=100;cap=100;paint(100);
+    try{delete window.__bootStep;delete window.__bootDone;}catch(e){window.__bootStep=window.__bootDone=null;}
+  };
+  paint(disp);
+  timer=setInterval(function(){
+    if(!document.getElementById('bootLoader')){window.__bootDone&&window.__bootDone();return;}
+    var ceil=Math.max(disp,cap-0.8);
+    if(disp<ceil){disp+=(ceil-disp)*0.045;paint(disp);}
+  },120);
+})();
+</script>
 <script src="js/constants.js"></script>
 <script src="js/time-service.js"></script>
+<script>window.__bootStep&&window.__bootStep(3,'DOWNLOADING JPL DE440 EPHEMERIS (EARTH & PLANETS)…',28,0);</script>
 <script src="js/astronomy-jpl-data.js"></script>
+<script>window.__bootStep&&window.__bootStep(29,'DOWNLOADING JPL DE440 LUNAR LIBRATION TABLES…',45,0);</script>
 <script src="js/astronomy-jpl-data-de440.js"></script>
+<script>window.__bootStep&&window.__bootStep(45,'DOWNLOADING BENNU EPHEMERIS & ASTEROID KERNELS…',84,1);</script>
 <script src="js/astronomy-jpl-data-bennu.js"></script>
+<script>window.__bootStep&&window.__bootStep(84,'COMPILING ORBITAL MECHANICS SOLVER…',86,1);</script>
 <script src="js/astronomy.js"></script>
+<script>window.__bootStep&&window.__bootStep(86,'DOWNLOADING LRO LUNAR TERRAIN DEM…',93,2);</script>
 <script src="js/surface-data.js"></script>
+<script>window.__bootStep&&window.__bootStep(93,'DOWNLOADING MGS MARS TERRAIN DEM…',98,2);</script>
 <script src="js/mars-surface-data.js"></script>
+<script>window.__bootStep&&window.__bootStep(98,'LOADING NASA LAUNCH HARDWARE CATALOG…',99,3);</script>
 <script src="js/nasa-hardware-data.js?v=20261108c"></script>
 <script src="js/mission-profiles.js"></script>
-<script src="game.js?v=20261108n"></script>
+<script>window.__bootStep&&window.__bootStep(99,'INITIALIZING FLIGHT SIMULATION CORE…',100,4);</script>
+<script src="game.js?v=20261111a"></script>
 </body>
 </html>

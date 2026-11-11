@@ -87,7 +87,8 @@ const V = {
   dir: new THREE.Vector3(1, 0.4, 0), o: new THREE.Vector3(1, 0, 0),
   s: new THREE.Vector3(0, 0, 1), u: new THREE.Vector3(1, 0.4, 0),
   goodE: new THREE.Vector3(1.35, 0, 0),
-  raf: 0, W: 0, H: 0, last: 0, failed: false, graded: false
+  raf: 0, W: 0, H: 0, last: 0, failed: false, graded: false,
+  loadDone: false, loadHideTimer: 0, mgrPending: 0, mgrSave: null, mgrHooks: null
 };
 const UP = new THREE.Vector3(0, 1, 0);
 const _E = new THREE.Vector3(), _C = new THREE.Vector3(), _T = new THREE.Vector3(),
@@ -193,9 +194,101 @@ function dispose() {
     V.starMat = V.sunMat = null;
 }
 
+function setTitleStreamUI(pct, label, done) {
+  const el = document.getElementById('title3dLoad');
+  if (!el) return;
+  if (V.loadHideTimer) { clearTimeout(V.loadHideTimer); V.loadHideTimer = 0; }
+  const txt = document.getElementById('title3dTxt');
+  const fill = document.getElementById('title3dFill');
+  const pEl = document.getElementById('title3dPct');
+  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  if (txt && label) txt.textContent = label;
+  if (fill) fill.style.width = clamped + '%';
+  if (pEl) pEl.textContent = clamped + '%';
+  if (done) {
+    el.classList.add('done');
+    V.loadHideTimer = setTimeout(() => {
+      V.loadHideTimer = 0;
+      const cur = document.getElementById('title3dLoad');
+      if (cur && V.loadDone) cur.hidden = true;
+    }, 520);
+  } else {
+    el.hidden = false;
+    el.classList.remove('done');
+  }
+}
+
+function restoreMgrHooks() {
+  const s = V.mgrSave, h = V.mgrHooks;
+  const mgr = THREE.DefaultLoadingManager;
+  if (!s || !h || !mgr) return;
+  if (mgr.onStart === h.onStart) mgr.onStart = s.onStart;
+  if (mgr.onProgress === h.onProgress) mgr.onProgress = s.onProgress;
+  if (mgr.onLoad === h.onLoad) mgr.onLoad = s.onLoad;
+  if (mgr.onError === h.onError) mgr.onError = s.onError;
+  V.mgrSave = null; V.mgrHooks = null;
+}
+
+function finishTitleStream() {
+  if (V.loadDone) return;
+  V.loadDone = true;
+  restoreMgrHooks();
+  const el = document.getElementById('title3dLoad');
+  if (el && !el.hidden) setTitleStreamUI(100, '3D EARTH ONLINE', true);
+}
+
+function hookTitleStream() {
+  restoreMgrHooks();
+  V.loadDone = false;
+  V.mgrPending = 0;
+  const mgr = THREE.DefaultLoadingManager;
+  if (!mgr) return;
+  const prev = {
+    onStart: mgr.onStart, onProgress: mgr.onProgress,
+    onLoad: mgr.onLoad, onError: mgr.onError
+  };
+  const update = (loaded, total) => {
+    if (V.loadDone || !V.scene) return;
+    if (total > 0) {
+      V.mgrPending = Math.max(V.mgrPending, total);
+      const pct = Math.max(8, Math.min(96, Math.round((loaded / total) * 96)));
+      setTitleStreamUI(pct, `STREAMING 3D EARTH · ${loaded}/${total}`, false);
+    }
+  };
+  const hooks = {
+    onStart(url, loaded, total) {
+      try { if (prev.onStart) prev.onStart.call(mgr, url, loaded, total); } catch (e) {}
+      V.mgrPending++;
+      update(loaded, total);
+    },
+    onProgress(url, loaded, total) {
+      try { if (prev.onProgress) prev.onProgress.call(mgr, url, loaded, total); } catch (e) {}
+      update(loaded, total);
+      if (total > 0 && loaded >= total) finishTitleStream();
+    },
+    onLoad() {
+      try { if (prev.onLoad) prev.onLoad.call(mgr); } catch (e) {}
+      finishTitleStream();
+    },
+    onError(url) {
+      try { if (prev.onError) prev.onError.call(mgr, url); } catch (e) {}
+      finishTitleStream();
+    }
+  };
+  V.mgrSave = prev;
+  V.mgrHooks = hooks;
+  mgr.onStart = hooks.onStart;
+  mgr.onProgress = hooks.onProgress;
+  mgr.onLoad = hooks.onLoad;
+  mgr.onError = hooks.onError;
+}
+
 function stop() {
   if (V.raf) cancelAnimationFrame(V.raf);
   V.raf = 0;
+  if (V.loadHideTimer) { clearTimeout(V.loadHideTimer); V.loadHideTimer = 0; }
+  restoreMgrHooks();
+  V.loadDone = false; V.mgrPending = 0;
   dispose();
   V.canvas = null; V.W = 0; V.H = 0; V.failed = false; V.graded = false;
   V.dist = 0; V.preset = 0; V.cycleT = 0; V.exposure = 0;
@@ -377,10 +470,13 @@ function start(cv) {
   } catch (e) {}
   /* the live solar system — same assembly the select/brief views fly,
      REAL Sun included. */
+  hookTitleStream();
   const built = buildSolarSystem(V.scene, () => !!V.scene, {
     simDays: todayDays(), physical: V.isPhys,
     unitsPerKm: UNITS_PER_KM, focusKey: null, originKm: [0, 0, 0]
   });
+  if (V.mgrPending === 0) finishTitleStream();
+  else if (!V.loadDone) setTitleStreamUI(8, 'STREAMING 3D EARTH TEXTURES', false);
   V.sys = built;
   V.bodies = built.bodies;
   V.ambient = built.ambient || null;
