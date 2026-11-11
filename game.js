@@ -1746,7 +1746,7 @@ function renderDock(){
     backAct="select"; backLabel="← MISSIONS";
     const req=L?L.req:2;
     const selCount=S.objectives.length;
-    const isSurface=(L&&(L.body==="moon"||L.body==="mars"));
+    const pf=(typeof activeProfile==="function")?activeProfile(S):null, isSurface=(L&&(L.body==="moon"||L.body==="mars"))&&(pf?pf.hasRover!==false:true);
     const hasSite=!isSurface||!!S.site;
     const objMet=selCount>=req;
     primaryAct="tobuild"; primaryLabel="BUILD THE SPACECRAFT →";
@@ -2910,7 +2910,8 @@ function initLaunch(){
   }else{
     S.launch.c3=0; S.launch.vinf=0; S.launch.tof=0; S.launch.tDep=2029.0; S.launch.set=true;
   }
-  renderLV();
+  if((!S.launch.lv||!L.lvs.includes(S.launch.lv))&&L.lvs&&L.lvs.length){ S.launch.lv=L.lvs[0]; S.launch.outcome=null; S.launch.acked=false; }
+  renderLV(); renderHUD();
   try { import("./js/launch-view.js?v=20261108c").catch(()=>{}); } catch(e) {}
 }
 function applyPork(i,j,silent){
@@ -7269,7 +7270,7 @@ function startLevel(id){
      deck (G5 / D-12 — new features never draw from the event stream). */
   S.seed=DEFAULT_SEED; S.challenge=null;
   S.levelId=id; S.objectives=def.objectives; S.instruments=def.instruments;
-  S.launch=null; S.ops=null; S.result=null; S.pmode="c3"; S.bstep="payload";
+  S.profile=null; S.launch=null; S.ops=null; S.result=null; S.pmode="c3"; S.bstep="payload";
   S.commit=null; S.phases={levelId:id,plan:phasePlanFor(id),done:{build:true}};
   S.power=def.power; S.comms=def.comms; S.prop=def.prop; S.shield=def.shield;
   S.cdh=def.cdh; S.adcs=def.adcs; S.bat=def.bat; S.missionName=def.missionName; S.targetSci=def.targetSci;
@@ -7380,7 +7381,7 @@ document.addEventListener("click",e=>{
         const codeEl = document.getElementById("objCountCode") || document.querySelector(".brief h3 .code");
         if(codeEl) codeEl.textContent = `${S.objectives.length} / ${L.req} SELECTED`;
         const toBuild = document.querySelector('[data-act="tobuild"]');
-        if(toBuild) toBuild.disabled = S.objectives.length < L.req || ((L.body==="moon"||L.body==="mars") && !S.site);
+        if(toBuild){ const pf=(typeof activeProfile==="function")?activeProfile(S):null; toBuild.disabled = S.objectives.length < L.req || ((L.body==="moon"||L.body==="mars") && (pf?pf.hasRover!==false:true) && !S.site); }
         renderHUD();
         renderDock();
         break;
@@ -7411,7 +7412,7 @@ document.addEventListener("click",e=>{
       if(!["cautious","standard","push"].includes(t.dataset.v)) break;
       S.surface.orders.pace=t.dataset.v; Audio_.click(); renderOpsSide(); break;
     }
-    case "profile": { S.profile=id; Audio_.click(); const prf=(typeof activeProfile==="function")?activeProfile(S):null; if(prf){ if(prf.objs&&prf.objs.length) S.objectives=[...prf.objs]; if(prf.hasRover===false){ S.site=null; S.rover=null; } } render(); break; }
+    case "profile": { S.profile=id; Audio_.click(); const prf=(typeof activeProfile==="function")?activeProfile(S):null; if(prf){ if(prf.objs&&prf.objs.length) S.objectives=[...prf.objs]; if(prf.hasRover===false){ S.site=null; S.rover=null; } else if(!S.rover){ S.rover=defaultBuild(byId(LEVELS,S.levelId)).rover; } } render(); break; }
     case "site": {
       const L2=byId(LEVELS,S.levelId);
       if(!L2||(L2.body!=="moon"&&L2.body!=="mars")) break;
