@@ -1,7 +1,6 @@
 # MARGIN — NASA Space Mission Design Game
 
-[![Play Live](https://img.shields.io/badge/PLAY_LIVE-droideverything.github.io%2FMARGIN-2ea043?style=for-the-badge)](https://droideverything.github.io/MARGIN/)
-[![2D Fallback Mode](https://img.shields.io/badge/2D_FALLBACK-%3Fno3d-1f2937?style=for-the-badge)](https://droideverything.github.io/MARGIN/?no3d)
+> **Live Demo:** **[Launch MARGIN in Browser →](https://droideverything.github.io/MARGIN/)**
 
 MARGIN is an offline-first, browser-based space mission design game built for the
 **NASA Space Apps Challenge**. Pick a mission, engineer a spacecraft under real
