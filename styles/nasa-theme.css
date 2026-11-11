@@ -138,10 +138,8 @@
   padding: 0
 }
 
-html,
-body {
-  height: 100%
-}
+html, body { height: 100%; user-select: none; -webkit-user-select: none; }
+input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; }
 
 body {
   background: var(--void);
