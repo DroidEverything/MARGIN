@@ -1966,7 +1966,7 @@ function cascade(prev){
 /* ══════════════════════════════════════════════════════════════
    SCREENS
    ══════════════════════════════════════════════════════════════ */
-let lastScreen=null, selViewReady=false, selViewStarted=false, selAttempts=0;
+let lastScreen=null, lastBstep=null, selViewReady=false, selViewStarted=false, selAttempts=0;
 function selViewLoadEl(){ try{ return document.getElementById("selviewLoad"); }catch(e){ return null; } }
 function showSelViewLoading(){ const e=selViewLoadEl(); if(e) e.classList.remove("done"); }
 function hideSelViewLoading(){ const e=selViewLoadEl(); if(e) e.classList.add("done"); }
@@ -1994,13 +1994,15 @@ function scheduleSelViewStart(){
 function render(){
   renderSteps();
   const s=el("screen");
+  const sameView = lastScreen===S.screen && (S.screen!=="build" || lastBstep===S.bstep);
+  const scSnap = (sameView && window.UI_SCROLL) ? UI_SCROLL.capture(s) : null;
   s.innerHTML = ({title:scrTitle,select:scrSelect,brief:scrBrief,build:scrBuild,
                   launch:scrLaunch,ops:scrOps,report:scrReport})[S.screen]();
   /* same-screen repaints (toggles) must not replay entrance animations —
      only fresh navigation earns the cinematic */
   if(lastScreen===S.screen) s.classList.add("noanim");
   else s.classList.remove("noanim");
-  lastScreen=S.screen;
+  lastScreen=S.screen; lastBstep=S.bstep;
   renderHUD();
   renderDock();
   const telemEl=el("telem");
@@ -2058,7 +2060,8 @@ function render(){
   /* Phase 2: seat badge + hot-seat hand-off. Both are DOM-only, so the 2D
      fallback, `?no3d` and `file://` are untouched. */
   try{ renderTeamBadge(); maybeTeamHandoff(); }catch(e){}
-  s.scrollTop=0;
+  if(scSnap && window.UI_SCROLL) UI_SCROLL.restore(s, scSnap);
+  else s.scrollTop=0;
 }
 function go(screen){
   /* Golden gate (dev, ?golden): the harness drives levels without rendering. */
@@ -3034,6 +3037,7 @@ function renderPorkOut(){
 function renderLV(){
   const L=byId(LEVELS,S.levelId), D=derive(S);
   const box=el("lvList"); if(!box)return;
+  const lvSnap = window.UI_SCROLL ? UI_SCROLL.capture(box) : null;
   const list=L.lvs.map(id=>byId(LV,id)).filter(Boolean);
   box.innerHTML=list.map(v=>{
     const cap = L.mode==="leo" ? v.leo*0.34 : lvCapability(v,S.launch?S.launch.c3:0);
@@ -3059,6 +3063,7 @@ function renderLV(){
       </div>
     </button>`;
   }).join("");
+  if(lvSnap && window.UI_SCROLL) UI_SCROLL.restore(box, lvSnap);
   renderGo();
   renderDock();
   syncLVPreview();
@@ -3963,6 +3968,11 @@ function posAt(el2,dtSec){
   const r=el2.a*(1-el2.e*Math.cos(E)), th=nu+el2.argp;
   return [r*Math.cos(th),r*Math.sin(th)];
 }
+/* Keplerian TLI radial progress s(u) = (1 - cos E)/2 (e = 0.966: 200 km LEO -> 384,400 km Moon). */
+function tliFrac(u){ if(u<=0||u>=1) return u<=0?0:1;
+  const e=0.966, M=Math.PI*u; let lo=0, hi=Math.PI, E=u<0.2?Math.min(hi,Math.cbrt(6*M)):Math.min(hi,M+e*Math.sin(M));
+  for(let i=0;i<16;i++){ const f=E-e*Math.sin(E)-M; if(Math.abs(f)<1e-13) break; if(f<0) lo=E; else hi=E; const n=E-f/(1-e*Math.cos(E)); E=(n>lo&&n<hi)?n:(lo+hi)*0.5; }
+  return (1-Math.cos(E))*0.5; }
 function drawOrbit(paint2D){
   const cv=el("orbit"); if(!cv)return;
   const L=byId(LEVELS,S.levelId), D=derive(S), O=S.ops;
@@ -4131,7 +4141,7 @@ function drawOrbit(paint2D){
   }else if(L.body==="moon" && (!O || (O.day + Math.min(0.999, Math.max(0, acc))) < O.cruise)){
     // Translunar Injection (TLI) — Earth to Moon Satellite Travel Phase
     const smoothDay = (O ? (O.day + Math.min(0.999, Math.max(0, acc))) : 0);
-    const frac = clamp(smoothDay / Math.max(1, (O ? O.cruise : 1)), 0, 1);
+    const frac = tliFrac(clamp(smoothDay / Math.max(1, (O ? O.cruise : 1)), 0, 1));
     const ex = cx - W * 0.28, ey = cy + 12;
     const mx = cx + W * 0.28, my = cy - 22;
     const rE = 26, rM = 14;
@@ -5530,7 +5540,8 @@ function renderOpsSide(force){
       ${btn("spce","cautious",op==="cautious","CAUTIOUS")}${btn("spce","standard",op==="standard","STANDARD")}${btn("spce","push",op==="push","PUSH")}</div></div>
     <div class="hint" style="font-size:10px">Traverse display ×${cxz.toFixed(2)} compressed · sol-delayed commands, no joystick</div>${nrgWarn}`;
   }
-  el("sciBox").innerHTML=S.objectives.map(o=>{
+  const sb=el("sciBox"), lb=el("logbox"), sbs=sb?sb.scrollTop:0, lbs=lb?lb.scrollTop:0;
+  if(sb) sb.innerHTML=S.objectives.map(o=>{
     const f=clamp(O.delivered[o]/needMb(L,o),0,1);
     const covered=OBJ[o].need.every(t=>live.some(i=>i.tags.includes(t)));
     return `<div style="margin-bottom:9px">
@@ -5538,7 +5549,8 @@ function renderOpsSide(force){
       <span class="num hint">${(f*100).toFixed(0)}% <span style="color:var(--dimmer)">of ${fmtData(needMb(L,o))}</span></span></div>
       <div class="mini"><i style="width:${f*100}%;background:${f>=1?'var(--phosphor)':covered?'var(--blue-lift)':'var(--red)'}"></i></div></div>`}).join("")+
     (O.dead.size?`<div class="ghost-note">Lost: ${[...O.dead].map(i=>byId(INSTR,i).n).join(", ")}</div>`:"");
-  el("logbox").innerHTML=O.log.map(l=>`<div class="logline ${l.cls}"><span class="d">${dayLabel(l.day)} <i style="font-style:normal;opacity:0.6;font-size:9px">${l.timeSub||""}</i></span><span>${esc(l.txt)}</span></div>`).join("");
+  if(lb) lb.innerHTML=O.log.map(l=>`<div class="logline ${l.cls}"><span class="d">${dayLabel(l.day)} <i style="font-style:normal;opacity:0.6;font-size:9px">${l.timeSub||""}</i></span><span>${esc(l.txt)}</span></div>`).join("");
+  if(sb) sb.scrollTop=sbs; if(lb) lb.scrollTop=lbs;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -7688,38 +7700,26 @@ document.addEventListener("click",e=>{
   if(S.screen==="brief"||S.screen==="build"||S.screen==="launch") saveDraft();
 });
 function refreshBuild(prev){
-  const s=el("screen"), sc=s.scrollTop;
-  const catEl = s ? s.querySelector(".cat") : null;
-  const catScroll = catEl ? catEl.scrollTop : 0;
+  const s=el("screen"), scSnap=window.UI_SCROLL ? UI_SCROLL.capture(s) : null;
   if(s) s.classList.add("noanim");
-  /* Build-screen option clicks must not flash the 3D models white: full
-     innerHTML rebuild destroys the #v3 host, so M3D.stop() tears down and
-     re-appends the canvas (context resize + animation restart = white pop).
-     Detach the live host, repaint around it, then put it back with its
-     canvas untouched. Falls back to a full repaint when no live 3D. */
-  try {
-    const liveHost = s.querySelector ? (s.querySelector("#v3"+S.bstep)||s.querySelector(".v3host")) : null;
-    const liveCanvas = (window.M3D && window.M3D.ok && liveHost) ? liveHost.querySelector("canvas") : null;
-    if(liveHost && liveCanvas){
-      const parent=liveHost.parentNode, next=liveHost.nextSibling;
-      try{ parent.removeChild(liveHost); }catch(e){}
-      s.innerHTML=scrBuild(); drawBay(); renderHUD(); renderDock(); cascade(prev);
-      const back=s.querySelector("#"+liveHost.id)||s.querySelector(".v3host");
-      if(back&&back.parentNode){
-        try{ back.parentNode.replaceChild(liveHost,back); }catch(e){ try{back.appendChild(liveCanvas);}catch(e2){} }
-      }
-      try{ if(window.M3D&&window.M3D.canvas===liveCanvas) window.M3D.host=liveHost; }catch(e){}
-      s.scrollTop=sc;
-      const newCat = s.querySelector(".cat");
-      if(newCat) newCat.scrollTop = catScroll;
-      if(window.M3D)M3D.sync();
-      return;
+  /* Detach and reattach live 3D #v3 host across innerHTML repaint so M3D keeps its canvas without flashing white. */
+  let liveHost=null, liveCanvas=null;
+  try{
+    liveHost=s.querySelector?(s.querySelector("#v3"+S.bstep)||s.querySelector(".v3host")):null;
+    liveCanvas=(window.M3D&&window.M3D.ok&&liveHost)?liveHost.querySelector("canvas"):null;
+    if(liveHost&&liveCanvas&&liveHost.parentNode) liveHost.parentNode.removeChild(liveHost);
+    else { liveHost=null; liveCanvas=null; }
+  }catch(e){ liveHost=null; liveCanvas=null; }
+  s.innerHTML=scrBuild(); drawBay(); renderHUD(); renderDock(); cascade(prev);
+  if(liveHost&&liveCanvas){
+    const back=s.querySelector("#"+liveHost.id)||s.querySelector(".v3host");
+    if(back&&back.parentNode){
+      try{ back.parentNode.replaceChild(liveHost,back); }catch(e){ try{back.appendChild(liveCanvas);}catch(e2){} }
     }
-  }catch(e){}
-  s.innerHTML=scrBuild(); drawBay(); renderHUD(); renderDock(); cascade(prev); s.scrollTop=sc;
-  const newCat2 = s ? s.querySelector(".cat") : null;
-  if(newCat2) newCat2.scrollTop = catScroll;
-  if(window.M3D)M3D.sync();
+    try{ if(window.M3D&&window.M3D.canvas===liveCanvas) window.M3D.host=liveHost; }catch(e){}
+  }
+  if(scSnap&&window.UI_SCROLL) UI_SCROLL.restore(s, scSnap);
+  if(window.M3D) M3D.sync();
 }
 
 /* Delta preview hover listeners */

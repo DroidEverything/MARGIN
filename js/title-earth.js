@@ -201,20 +201,78 @@ function shortAssetName(url) {
   } catch (e) { return ''; }
 }
 
-function waitTexReady(t) {
-  if (!t || !t.image) return Promise.resolve();
+const TITLE_TEX_KEYS = [
+  'earth', 'earthClouds', 'earthNight', 'moon', 'mars',
+  'mercury', 'venus', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto', 'hipparcos'
+];
+const _failedTexUrls = new Set();
+let _mgrIdle = false;
+
+function criticalTextures() {
+  return [tex('earth'), tex('earthClouds'), tex('earthNight'), dataTex('earthRough')].filter(Boolean);
+}
+function solarTextures() {
+  const out = TITLE_TEX_KEYS.map((k) => tex(k));
+  out.push(dataTex('earthRough'));
+  return out.filter(Boolean);
+}
+function isTexFailed(t) {
+  if (!_failedTexUrls.size || !t) return false;
   const img = t.image;
-  const loadP = img.complete ? Promise.resolve() : new Promise((resolve) => {
-    let done = false;
-    const fin = () => { if (!done) { done = true; resolve(); } };
-    img.addEventListener('load', fin, { once: true });
-    img.addEventListener('error', fin, { once: true });
-    setTimeout(fin, 4500);
-  });
-  return loadP.then(() => {
-    if (img.naturalWidth > 0 && typeof img.decode === 'function') {
-      return Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 2500))]);
+  if (img && img.src) {
+    for (const u of _failedTexUrls) {
+      if (img.src.endsWith(u) || u.endsWith(img.src)) return true;
     }
+  }
+  return false;
+}
+function isTexSettled(t) {
+  if (!t) return true;
+  if (isTexFailed(t)) return true;
+  const img = t.image;
+  return !!(img && img.complete && img.naturalWidth > 0);
+}
+function waitTexReady(t) {
+  if (!t) return Promise.resolve();
+  return new Promise((resolve) => {
+    let done = false;
+    let hookedImg = null;
+    let idleSince = 0;
+    const finish = (img) => {
+      if (done) return;
+      done = true;
+      if (img && img.naturalWidth > 0) {
+        t.needsUpdate = true;
+        if (typeof img.decode === 'function') {
+          Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 8000))]).then(resolve, resolve);
+          return;
+        }
+      }
+      resolve();
+    };
+    const check = () => {
+      if (done || !V.scene) return finish(null);
+      if (isTexFailed(t)) return finish(null);
+      const img = t.image;
+      if (img) {
+        if (img.complete) return finish(img);
+        if (hookedImg !== img) {
+          hookedImg = img;
+          const onLoad = () => { if (!done) check(); };
+          const onErr = () => finish(null);
+          img.addEventListener('load', onLoad, { once: true });
+          img.addEventListener('error', onErr, { once: true });
+        }
+        idleSince = 0;
+      } else if (_mgrIdle) {
+        if (!idleSince) idleSince = performance.now();
+        else if (performance.now() - idleSince > 1500) return finish(null);
+      } else {
+        idleSince = 0;
+      }
+      setTimeout(check, 60);
+    };
+    check();
   });
 }
 
@@ -245,26 +303,49 @@ async function prepareGpuAndReveal() {
   if (V.loadDone || !V.scene || !V.renderer) return;
   V.loadDone = true;
   if (V.bootMaxTimer) { clearTimeout(V.bootMaxTimer); V.bootMaxTimer = 0; }
-  restoreMgrHooks();
   const boot = window.__MARGIN_BOOT;
-  if (boot) boot.step(95, 'DECODING 8K EARTH & CLOUD LAYERS…', 98, 3, 'DECODING');
+  if (boot) boot.step(95, 'DECODING 8K EARTH & CLOUD LAYERS…', 97, 3, 'DECODING');
   try {
-    const critical = [tex('earth'), tex('earthClouds'), tex('earthNight'), dataTex('earthRough')].filter(Boolean);
-    await Promise.all(critical.map(waitTexReady));
-    for (const t of critical) {
+    const texList = solarTextures();
+    await Promise.all(texList.map(waitTexReady));
+    for (const t of texList) {
       if (t.image && t.image.naturalWidth > 0) t.needsUpdate = true;
+    }
+  } catch (e) {}
+  restoreMgrHooks();
+  if (!V.scene || !V.renderer || !V.camera) return;
+  if (boot) boot.step(97, 'WAITING FOR TYPOGRAPHY & FONTS…', 99, 3, 'FONTS');
+  try {
+    if (document.fonts && document.fonts.ready) {
+      await Promise.race([document.fonts.ready.catch(() => {}), new Promise((r) => setTimeout(r, 2000))]);
     }
   } catch (e) {}
   if (!V.scene || !V.renderer || !V.camera) return;
   if (boot) boot.step(98, 'COMPILING WEBGL SHADERS & ATMOSPHERE…', 100, 3, 'SHADERS');
   try { V.renderer.compile(V.scene, V.camera); } catch (e) {}
-  try { V.renderer.render(V.scene, V.camera); } catch (e) {}
+  // Activate earth3d before sizing & rendering so #earthCanvas has full viewport dimensions behind #bootGate
   syncEarthGraded();
+  try {
+    size();
+    applyFixedFrame();
+    applyIris(1);
+    V.renderer.render(V.scene, V.camera);
+  } catch (e) {}
   await new Promise((resolve) => {
     let settled = false;
     const fin = () => { if (!settled) { settled = true; resolve(); } };
-    requestAnimationFrame(() => requestAnimationFrame(fin));
-    setTimeout(fin, 260);
+    requestAnimationFrame(() => {
+      try {
+        if (V.scene && V.renderer && V.camera) {
+          size();
+          applyFixedFrame();
+          applyIris(1);
+          V.renderer.render(V.scene, V.camera);
+        }
+      } catch (e) {}
+      requestAnimationFrame(fin);
+    });
+    setTimeout(fin, 400);
   });
   syncEarthGraded();
   if (boot) boot.finish('ALL TELEMETRY LOCKED · READY');
@@ -294,28 +375,32 @@ function hookTitleStream() {
       boot.step(pct, nm ? `STREAMING ${nm}…` : 'STREAMING 8K PLANETARY TEXTURES…', nextCap, 2, `${Math.min(V.mgrSettled, total)} / ${total} ASSETS`);
     }
   };
+  _mgrIdle = false;
+  _failedTexUrls.clear();
   const hooks = {
     onStart(url, loaded, total) {
       try { if (prev.onStart) prev.onStart.call(mgr, url, loaded, total); } catch (e) {}
+      _mgrIdle = false;
       V.mgrPending = Math.max(V.mgrPending + 1, total || 0);
       report(url, Math.max(V.mgrPending, total || 0));
     },
     onProgress(url, loaded, total) {
       try { if (prev.onProgress) prev.onProgress.call(mgr, url, loaded, total); } catch (e) {}
+      _mgrIdle = false;
       V.mgrSettled = Math.max(V.mgrSettled, loaded || 0);
+      V.mgrPending = Math.max(V.mgrPending, total || 0);
       report(url, Math.max(V.mgrPending, total || 0));
-      if (total > 0 && V.mgrSettled >= total) prepareGpuAndReveal();
     },
     onLoad() {
       try { if (prev.onLoad) prev.onLoad.call(mgr); } catch (e) {}
+      _mgrIdle = true;
       prepareGpuAndReveal();
     },
     onError(url) {
       try { if (prev.onError) prev.onError.call(mgr, url); } catch (e) {}
-      V.mgrSettled++;
+      if (url) _failedTexUrls.add(url);
       const total = Math.max(V.mgrPending, V.mgrSettled);
       report(url, total);
-      if (total > 0 && V.mgrSettled >= total) prepareGpuAndReveal();
     }
   };
   V.mgrSave = prev;
@@ -324,7 +409,7 @@ function hookTitleStream() {
   mgr.onProgress = hooks.onProgress;
   mgr.onLoad = hooks.onLoad;
   mgr.onError = hooks.onError;
-  V.bootMaxTimer = setTimeout(() => { V.bootMaxTimer = 0; prepareGpuAndReveal(); }, 26000);
+  V.bootMaxTimer = 0;
 }
 
 function stop() {
@@ -558,9 +643,22 @@ function start(cv) {
   publishHandoff();
   V.last = performance.now();
   if (!V.raf) V.raf = requestAnimationFrame(frame);
-  if (V.mgrPending === 0) prepareGpuAndReveal();
-  else if (!V.loadDone && window.__MARGIN_BOOT) {
-    window.__MARGIN_BOOT.step(58, 'STREAMING 8K EARTH & SOLAR MAPS…', 68, 2, `0 / ${V.mgrPending} ASSETS`);
+  criticalTextures();
+  const solar = solarTextures();
+  const pendingTex = solar.filter((t) => !isTexSettled(t));
+  if (V.mgrPending === 0 && pendingTex.length === 0) {
+    _mgrIdle = true;
+    prepareGpuAndReveal();
+  } else {
+    if (V.mgrPending === 0 && pendingTex.length > 0) {
+      Promise.all(solar.map(waitTexReady)).then(() => {
+        if (!V.loadDone && V.scene && V.renderer) prepareGpuAndReveal();
+      });
+    }
+    if (!V.loadDone && window.__MARGIN_BOOT) {
+      const totalShow = Math.max(V.mgrPending, pendingTex.length);
+      window.__MARGIN_BOOT.step(58, 'STREAMING 8K EARTH & SOLAR MAPS…', 68, 2, `0 / ${totalShow} ASSETS`);
+    }
   }
 }
 
@@ -571,7 +669,10 @@ function sync() {
   try { cv = document.getElementById('earthCanvas'); } catch (e) { cv = null; }
   if (!cv) {
     if (V.raf || V.canvas) stop();
-    try { if (window.__MARGIN_BOOT) window.__MARGIN_BOOT.finish('FLIGHT SYSTEM READY'); } catch (e) {}
+    try {
+      const scr = (typeof S !== 'undefined' && S) ? S.screen : '';
+      if (scr && scr !== 'title' && window.__MARGIN_BOOT) window.__MARGIN_BOOT.finish('FLIGHT SYSTEM READY');
+    } catch (e) {}
     return;
   }
   if (V.canvas === cv && V.raf) return;

@@ -1112,6 +1112,8 @@ function stop() {
   V.orbitEllipse = null;
   V.cockpitUp = null; V.prevRelPos = null;
   V.glide = null;
+  V.craftDrag = false;
+  V.craftHoldUntil = 0;
   if (V.cockpitLook) V.cockpitLook.drag = false;
   V.camInitialized = false;
   V.sceneKind = null;
@@ -1268,6 +1270,11 @@ function start(hostEl, config, kind) {
     controls.addEventListener('start', () => {
       V.glide = null;
       V.userInteracted = true;
+      V.craftDrag = true;
+    });
+    controls.addEventListener('end', () => {
+      V.craftDrag = false;
+      V.craftHoldUntil = performance.now() + 240;
     });
     V.controls = controls;
 
@@ -1840,44 +1847,41 @@ function getTrackedSubjectPos() {
   }
 }
 
+function craftTargetOffset(dist, out) {
+  const craft = V.craftWorldPos, target = V.targetWorldPos;
+  if (V.targetKey === 'moon' && target && craft) {
+    _t2.subVectors(target, craft);
+    if (_t2.lengthSq() > 1e-18) {
+      _t2.normalize();
+      _v1.crossVectors(_t2, _UP_Y);
+      if (_v1.lengthSq() < 1e-6) _v1.set(1, 0, 0); else _v1.normalize();
+      _v2.crossVectors(_v1, _t2).normalize();
+      return out.copy(_t2).multiplyScalar(-dist * 0.96)
+        .addScaledVector(_v2, dist * 0.12).addScaledVector(_v1, dist * 0.10);
+    }
+  }
+  return null;
+}
+
 function getIdealFraming(mode) {
   const craft = V.craftWorldPos;
   const target = V.targetWorldPos;
-  /* Close-ups frame the showroom size (see showroomSize): true ~10 m scale is
-     9e-8u, which is sub-pixel and below float32/near-plane comfort at 0.05u
-     working distance — that was the "invisible craft" bug in craft/cockpit
-     views. Both the per-frame lift and the framing math target 0.02u there.
-     Target/system/free views keep the capped far-zoom lift. */
   const closeSize = trueCraftSpan();
 
   if (mode === 'craft') {
-    // Sunward framing: park the camera BETWEEN the Sun and the craft (see the
-    // -away offset below) so the Sun is behind the lens, the sunlit face is
-    // toward the camera and the 0.5-unit disc + bloom never wash the frame.
-    // Position stays simulation-true — only the viewpoint moves.
-    // True NASA physical scale: camera stands off at ~5.5x true craft span.
-    // This frames the craft cleanly in the center with comfortable breathing room
-    // while the target planet naturally looms in true scale in the background.
+    const dist = Math.max(closeSize * 5.5, 1e-13);
+    const moonOff = craftTargetOffset(dist, new THREE.Vector3());
+    if (moonOff) return { target: craft.clone(), offset: moonOff };
+    // Sunward framing: keep the Sun behind the lens for heliocentric deep-space cruise.
     const away = _tmp.copy(craft);
     if (away.lengthSq() < 1e-6) away.set(0, 0, 1);
     away.normalize();
-    const up = new THREE.Vector3(0, 1, 0);
-    const right = new THREE.Vector3().crossVectors(away, up).normalize();
+    const right = new THREE.Vector3().crossVectors(away, _UP_Y).normalize();
     if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
     const upTilt = new THREE.Vector3().crossVectors(right, away).normalize();
-
-    const dist = Math.max(closeSize * 5.5, 1e-13);
-    /* -away (SUNWARD side): `away` points Sun→craft, so offsetting by -away
-       parks the camera between the Sun and the craft — Sun BEHIND the camera,
-       sunlit face toward the lens. */
     const offset = away.clone().multiplyScalar(-dist * 0.90)
-      .addScaledVector(upTilt, dist * 0.38)
-      .addScaledVector(right, dist * 0.30);
-
-    return {
-      target: craft.clone(),
-      offset: offset
-    };
+      .addScaledVector(upTilt, dist * 0.38).addScaledVector(right, dist * 0.30);
+    return { target: craft.clone(), offset: offset };
   } else if (mode === 'cockpit') {
     // First-person eye: radial perch above the craft (cockpitPerch —
     // zenith-relative, pole-safe), gaze locked on the planet, roll from the
@@ -2011,15 +2015,25 @@ function updateCamera(dt) {
     }
   } else if (V.camMode === 'craft' && subjectPos) {
     const delta = _tmp.subVectors(subjectPos, V.controls.target);
-    if (delta.lengthSq() > 1e-12 && delta.lengthSq() < 2500) {
-      V.controls.target.add(delta);
+    if (delta.lengthSq() < 2500) {
+      V.controls.target.copy(subjectPos);
       V.camera.position.add(delta);
     } else {
       V.controls.target.copy(subjectPos);
     }
+    if (V.targetKey === 'moon' && !V.craftDrag && performance.now() >= (V.craftHoldUntil || 0)) {
+      const curOff = _t.subVectors(V.camera.position, V.controls.target);
+      const curDist = curOff.length();
+      if (curDist > 1e-15 && craftTargetOffset(curDist, _tmp)) {
+        if (curOff.dot(_tmp) < -0.99 * curDist * curDist) curOff.addScaledVector(_v1, curDist * 0.05);
+        const a = Math.min(1, 1 - Math.exp(-Math.max(0.001, dt) * 4.5));
+        curOff.lerp(_tmp, a).normalize().multiplyScalar(curDist);
+        V.camera.position.copy(V.controls.target).add(curOff);
+      }
+    }
   } else {
     const delta = _tmp.subVectors(subjectPos, V.lastTrackedPos);
-    if (delta.lengthSq() > 1e-12 && delta.lengthSq() < 2500) {
+    if (delta.lengthSq() < 2500) {
       V.controls.target.add(delta);
       V.camera.position.add(delta);
     }
@@ -2199,6 +2213,24 @@ function orbitAngle(rate, simDay) {
    the surface sky all share one time base instead of disagreeing by up to
    a frame. Cheap Chebyshev + lerps only; trajectory rebuild stays per-tick.
    Allocation-free (scratch vectors); never breaks the frame. */
+/* Shared translunar transfer curve (Earth→Moon) scaled strictly by live Earth–Moon separation. */
+function translunarPoint(out, frac, phys) {
+  const dir = _t2.subVectors(V.targetWorldPos, V.earthWorldPos);
+  const dist = dir.length();
+  const normDir = (dist > 1e-6) ? _v1.copy(dir).multiplyScalar(1 / dist) : _v1.set(0, 0, 1);
+  const rE = (phys ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
+  const rM = (phys ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
+  const p0 = _v2.copy(V.earthWorldPos).addScaledVector(normDir, rE);
+  const p1 = _t.copy(V.targetWorldPos).addScaledVector(normDir, -rM);
+  out.lerpVectors(p0, p1, frac);
+  const s = Math.sin(frac * Math.PI);
+  out.y += s * (dist * 0.03);
+  const side = s * (dist * 0.07);
+  out.x += -normDir.z * side;
+  out.z += normDir.x * side;
+  return out;
+}
+
 function refreshDynamicFrame(nowMs) {
   const D = V._dyn;
   if (!V.active || !D || !isFinite(V.simDays)) return;
@@ -2228,19 +2260,7 @@ function refreshDynamicFrame(nowMs) {
           V.targetWorldPos.z + Math.sin(orbSpeed) * orbR
         );
       } else {
-        const dir = new THREE.Vector3().subVectors(V.targetWorldPos, V.earthWorldPos);
-        const dist = dir.length();
-        const normDir = (dist > 1e-6) ? dir.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
-        const rE = (phys ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
-        const rM = (phys ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
-        const p0 = new THREE.Vector3().copy(V.earthWorldPos).addScaledVector(normDir, rE);
-        const p1 = new THREE.Vector3().copy(V.targetWorldPos).addScaledVector(normDir, -rM);
-        const frac = D.frac || 0;
-        V.craftWorldPos.lerpVectors(p0, p1, frac);
-        V.craftWorldPos.y += Math.sin(frac * Math.PI) * 0.04;
-        const side = Math.sin(frac * Math.PI) * (dist * 0.07);
-        V.craftWorldPos.x += -normDir.z * side;
-        V.craftWorldPos.z += normDir.x * side;
+        translunarPoint(V.craftWorldPos, D.frac || 0, phys);
       }
     } else {
       if (D.arrived) {
@@ -2415,19 +2435,7 @@ function update(state) {
       );
       V.orbitEllipse = { key: 'moon', fx: 1, fy: 0, fz: 0, rx: orbR, ry: orbR * 0.35, rz: orbR };
     } else {
-      const dir = new THREE.Vector3().subVectors(V.targetWorldPos, V.earthWorldPos);
-      const dist = dir.length();
-      const normDir = (dist > 1e-6) ? dir.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
-      const rE = (isPhysicalMode() ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
-      const rM = (isPhysicalMode() ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
-      const p0 = new THREE.Vector3().copy(V.earthWorldPos).addScaledVector(normDir, rE);
-      const p1 = new THREE.Vector3().copy(V.targetWorldPos).addScaledVector(normDir, -rM);
-
-      V.craftWorldPos.lerpVectors(p0, p1, frac);
-      V.craftWorldPos.y += Math.sin(frac * Math.PI) * 0.04;
-      const side = Math.sin(frac * Math.PI) * (dist * 0.07);
-      V.craftWorldPos.x += -normDir.z * side;
-      V.craftWorldPos.z += normDir.x * side;
+      translunarPoint(V.craftWorldPos, frac, isPhysicalMode());
       V.orbitEllipse = null;
     }
   } else {
@@ -2589,28 +2597,10 @@ function updateTrajectoryGeometry(state) {
     V.plannedLine.geometry.setFromPoints(planPos);
     V.plannedLine.computeLineDistances();
   } else if ((state.mode === 'fixedC3' || state.targetKey === 'moon') && !V.arrived) {
-    const N = 80;
-    const histCount = Math.max(2, Math.floor(N * V.frac));
-    const histPos = [];
-    const planPos = [];
-
-    const dir = new THREE.Vector3().subVectors(V.targetWorldPos, V.earthWorldPos);
-    const dist = dir.length();
-    const normDir = (dist > 1e-6) ? dir.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
-    const rE = (isPhysicalMode() ? radiusKmTrue('earth') * UNITS_PER_KM : radiusOf('earth') || 0.0144) * 1.55;
-    const rM = (isPhysicalMode() ? radiusKmTrue('moon') * UNITS_PER_KM : radiusOf('moon') || 0.0039) * 2.2;
-
-    const p0 = new THREE.Vector3().copy(V.earthWorldPos).addScaledVector(normDir, rE);
-    const p1 = new THREE.Vector3().copy(V.targetWorldPos).addScaledVector(normDir, -rM);
-
+    const N = 80, histCount = Math.max(2, Math.floor(N * V.frac));
+    const histPos = [], planPos = [], phys = isPhysicalMode();
     for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      const pt = new THREE.Vector3().lerpVectors(p0, p1, t);
-      pt.y += Math.sin(t * Math.PI) * 0.04;
-      const side = Math.sin(t * Math.PI) * (dist * 0.07);
-      pt.x += -normDir.z * side;
-      pt.z += normDir.x * side;
-
+      const pt = translunarPoint(new THREE.Vector3(), i / N, phys);
       if (i <= histCount) histPos.push(pt);
       if (i >= histCount) planPos.push(pt);
     }
