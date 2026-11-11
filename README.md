@@ -19,8 +19,7 @@ No build step, no bundler, no runtime external API calls.
 Open **[https://droideverything.github.io/MARGIN/](https://droideverything.github.io/MARGIN/)** in Chrome, Edge, or Firefox.
 
 - **First visit:** Preloads vendored JPL DE440 ephemerides (~31 MB) and 8K planetary/cloud textures behind a telemetry boot screen so every 3D shader and surface map is ready before entry, then caches locally for fast repeat visits.
-- **2D fallback:** Append [`?no3d`](https://droideverything.github.io/MARGIN/?no3d) to bypass WebGL and play in Canvas2D mode.
-- **Mobile desktop mode:** Use the fullscreen button in the top-left corner of the header bar.
+- **Smartphone & tablet browsers:** Switch to **Desktop site** in landscape and use the top-left **Fullscreen** toggle for a full cockpit view.
 
 ### Run Locally (Windows)
 
