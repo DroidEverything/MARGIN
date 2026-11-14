@@ -7798,10 +7798,10 @@ document.addEventListener("keydown",e=>{
   const tag=(e.target&&(e.target.tagName||"")).toLowerCase();
   if(tag==="input"||tag==="textarea"||e.target.isContentEditable) return;
   if((e.key==="m"||e.key==="M")&&!e.ctrlKey&&!e.metaKey){ el("btnSound").click(); }
+  if((e.key==="h"||e.key==="H")&&!e.ctrlKey&&!e.metaKey&&S.screen==="ops"){ const b=document.querySelector('[data-act="toggle-hud"]'); if(b) b.click(); }
   if(e.key===" "&&S.screen==="ops"&&S.ops&&!S.ops.ended&&!el("modal").classList.contains("on")){
     e.preventDefault();
-    const v=S.ops.running?"0":String(lastSpd);
-    const btn=document.querySelector('[data-act="spd"][data-v="'+v+'"]');
+    const v=S.ops.running?"0":String(lastSpd); const btn=document.querySelector('[data-act="spd"][data-v="'+v+'"]');
     if(btn) btn.click();
   }
 });
@@ -8943,17 +8943,17 @@ function seedDemoLaunch(lv){
   }
   return true;
 }
-function jumpToScene(s,m,lv){
+function jumpToScene(s,m,lv,comms){
   if(s==="title"||s==="select"){ S.ops=null; go(s); return true; }
   m=(m&&byId(LEVELS,m))?m:"l1";
+  const initM=()=>{ S.ops=null; startLevel(m); if(comms&&byId(COMMS,comms)) S.comms=comms; else if(m==="l3") S.comms="hga3"; };
   if(s==="brief"){ S.ops=null; startLevel(m); return true; }
   if(s==="build"){ S.ops=null; startLevel(m); S.bstep="payload"; go("build"); return true; }
-  if(s==="launch"){ S.ops=null; startLevel(m); if(!seedDemoLaunch(lv))return false; go("launch"); return true; }
-  if(s==="ascent"){ S.ops=null; startLevel(m); if(!seedDemoLaunch(lv))return false; go("launch"); liftoff(); return true; }
-  if(s==="ops"){ S.ops=null; startLevel(m); if(!seedDemoLaunch(lv))return false; ensurePhases().done.launch=true; go("ops"); return true; }
+  if(s==="launch"){ initM(); if(!seedDemoLaunch(lv))return false; go("launch"); return true; }
+  if(s==="ascent"){ initM(); if(!seedDemoLaunch(lv))return false; go("launch"); liftoff(); return true; }
+  if(s==="ops"){ initM(); if(!seedDemoLaunch(lv))return false; ensurePhases().done.launch=true; go("ops"); return true; }
   if(s==="surface"){
-    S.ops=null;
-    startLevel(m);
+    initM();
     if(!seedDemoLaunch(lv)) return false;
     ensurePhases().done.launch=true;
     if(!S.rover && (m==="l2"||m==="l3"||m==="sbx"||m==="sbx_moon")) { S.rover = {mob:"rm1",pwr:"rp1",com:"rc1",pay:"ry1"}; }
@@ -8998,7 +8998,7 @@ function applySceneShortcut(){
   const s=q.get("s");
   if(!s) return false;
   const m=(q.get("m")&&byId(LEVELS,q.get("m")))?q.get("m"):"l1";
-  return jumpToScene(s,m,q.get("lv")||null);
+  return jumpToScene(s,m,q.get("lv")||null,q.get("c")||q.get("comms")||null);
 }
 /* P2-8: `?team=4` beside the scene shortcuts. Configures the next mission —
    it never edits a run that is already in progress. */

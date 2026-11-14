@@ -218,22 +218,23 @@ function updateSurfaceCamera(V) {
           if (_t2.lengthSq() > 400 * 400) {
             /* Site change / re-entry: re-seed, closer follow cam framing (~7.4 m standoff). */
             V.surfCamAnchor.copy(F.roverPos);
-            V.camera.position.set(F.roverPos.x + 4.2, F.roverPos.y + 2.4, F.roverPos.z + 5.6);
-            if (V.controls) V.controls.target.set(F.roverPos.x, F.roverPos.y + 1.0, F.roverPos.z);
-            V.camera.lookAt(F.roverPos.x, F.roverPos.y + 1.0, F.roverPos.z);
+            V.camera.position.set(F.roverPos.x + 4.2, F.roverPos.y + 1.8, F.roverPos.z + 5.6);
+            if (V.controls) V.controls.target.set(F.roverPos.x, F.roverPos.y + (F._camTargetLift || 2.4), F.roverPos.z);
+            V.camera.lookAt(F.roverPos.x, F.roverPos.y + (F._camTargetLift || 2.4), F.roverPos.z);
           } else if (_t2.lengthSq() > 1e-10) {
             V.camera.position.add(_t2);
             V.surfCamAnchor.copy(F.roverPos);
           }
         } else {
           V.surfCamAnchor = F.roverPos.clone();
-          V.camera.position.set(F.roverPos.x + 4.2, F.roverPos.y + 2.4, F.roverPos.z + 5.6);
-          if (V.controls) V.controls.target.set(F.roverPos.x, F.roverPos.y + 1.0, F.roverPos.z);
-          V.camera.lookAt(F.roverPos.x, F.roverPos.y + 1.0, F.roverPos.z);
+          V.camera.position.set(F.roverPos.x + 4.2, F.roverPos.y + 1.8, F.roverPos.z + 5.6);
+          if (V.controls) V.controls.target.set(F.roverPos.x, F.roverPos.y + (F._camTargetLift || 2.4), F.roverPos.z);
+          V.camera.lookAt(F.roverPos.x, F.roverPos.y + (F._camTargetLift || 2.4), F.roverPos.z);
         }
       }
-      V.controls.target.set(F.roverPos.x, F.roverPos.y + 1.0, F.roverPos.z);
-      const gy = surfHeightAt(F.patch, V.camera.position.x, V.camera.position.z) + 0.5;
+      if (F._camTargetLift === undefined) F._camTargetLift = 2.4;
+      V.controls.target.set(F.roverPos.x, F.roverPos.y + F._camTargetLift, F.roverPos.z);
+      const gy = surfHeightAt(F.patch, V.camera.position.x, V.camera.position.z) + 0.45;
       if (V.camera.position.y < gy) V.camera.position.y = gy;
       // Leashed to the subject: walkaround never loses the rover (was 800 m).
       const d = V.camera.position.distanceTo(V.controls.target);
@@ -261,6 +262,12 @@ function updateSurfaceCamera(V) {
     V.camera.lookAt(_t2);
     const lk = V.cockpitLook;
     if (lk) {
+      if (!lk.drag && (lk.yaw !== 0 || lk.pitch !== 0)) {
+        lk.yaw *= 0.82;
+        lk.pitch *= 0.82;
+        if (Math.abs(lk.yaw) < 0.001) lk.yaw = 0;
+        if (Math.abs(lk.pitch) < 0.001) lk.pitch = 0;
+      }
       if (lk.yaw) V.camera.rotateY(lk.yaw);
       if (lk.pitch) V.camera.rotateX(lk.pitch);
     }
@@ -595,12 +602,12 @@ function buildRocks(scene, patch, isMars, siteId) {
       if (isMars) {
         const upF = Math.max(0, na[k * 3 + 1]);
         const dustF = Math.pow(upF, 1.3) * (0.8 + 0.4 * sstep(-0.4, 0.4, pa.getY(k)));
-        const contact = 0.55 + 0.45 * sstep(-0.6, 0.2, pa.getY(k));
+        const contact = 0.22 + 0.78 * sstep(-0.4, 0.3, pa.getY(k));
         ca[k * 3] = contact * (0.42 + 0.52 * dustF);
         ca[k * 3 + 1] = contact * (0.40 + 0.18 * dustF);
         ca[k * 3 + 2] = contact * (0.38 - 0.08 * dustF);
       } else {
-        const c = 0.55 + 0.45 * sstep(-0.6, 0.3, pa.getY(k));
+        const c = 0.25 + 0.75 * sstep(-0.4, 0.3, pa.getY(k));
         ca[k * 3] = c; ca[k * 3 + 1] = c; ca[k * 3 + 2] = c;
       }
     }
@@ -614,7 +621,7 @@ function buildRocks(scene, patch, isMars, siteId) {
   const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(),
     eu = new THREE.Euler(), sv = new THREE.Vector3(), pv = new THREE.Vector3(),
-    nv = new THREE.Vector3();
+    nv = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _q2 = new THREE.Quaternion();
   let seed = 0xC0FFEE;
   const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
   const half = patch.sizeM / 2 - 20;
@@ -664,11 +671,16 @@ function buildRocks(scene, patch, isMars, siteId) {
     const dtx = x - cx, dtz = z - cz;
     if (sc > 0.12 && dtx * dtx + dtz * dtz < 30.25) return false;
     const gy = surfHeightAt(patch, x, z);
-    eu.set(rnd() * Math.PI, rnd() * Math.PI * 2, rnd() * Math.PI);
-    q.setFromEuler(eu);
-    // Squashed + lightly sunk (Part-7: −0.15·r — −0.25 buried pebbles).
-    sv.set(sc * (0.7 + rnd() * 0.6), sc * (0.5 + rnd() * 0.4) * 0.6, sc * (0.7 + rnd() * 0.6));
-    pv.set(x, gy + sv.y * 0.15 - 0.15 * sc, z);
+    surfNormalAt(patch, x, z, nv);
+    q.setFromUnitVectors(_up, nv);
+    _q2.setFromAxisAngle(nv, rnd() * Math.PI * 2);
+    q.multiply(_q2);
+    eu.set((rnd() - 0.5) * 0.28, 0, (rnd() - 0.5) * 0.28);
+    _q2.setFromEuler(eu);
+    q.multiply(_q2);
+    // Embedded seating into sand/regolith: buried ~32% so downhill slopes never expose air gaps
+    sv.set(sc * (0.8 + rnd() * 0.5), sc * (0.45 + rnd() * 0.35) * 0.7, sc * (0.8 + rnd() * 0.5));
+    pv.set(x, gy - 0.32 * sc, z);
     m4.compose(pv, q, sv);
     return true;
   };
@@ -2335,10 +2347,10 @@ function surfPlaceRover(V) {
         F.roverQuat = cal.quaternion.clone();
         F.sun.target.position.copy(F.roverPos);
         F.sun.position.copy(F.roverPos).addScaledVector(F.sunDir, 600);
-        // Findability dot at the true touchdown point (marker convention).
+        // Findability dot at the true touchdown point (kept invisible on surface to avoid green wash).
         const dot = buildCraftMarker();
         dot.position.copy(F.roverPos);
-        dot.visible = true;
+        dot.visible = false;
         F.scene.add(dot);
         F.marker = dot;
         // Wheel-track ribbon + dust pool (capped, scene-owned → auto-disposed).
@@ -2645,13 +2657,8 @@ function updateSurfRover(V, dt) {
     dustUpdate(V, F, Math.min(0.1, Math.max(0, dt)), moving, shown.x, shown.z);
     if (F.marker) {
       F.marker.position.copy(F.roverPos);
-      // Close-up convention (mirrors orbital updateCraftMarker): within ~15 m
-      // the true-scale model fills the frame, so the findability beacon would
-      // sit on top of the rover as a green wash. Beacon only at range.
-      try {
-        const d = V.camera ? V.camera.position.distanceTo(F.roverPos) : 1e9;
-        F.marker.visible = d >= 15;
-      } catch (e) { F.marker.visible = false; }
+      // Surface marker kept invisible to eliminate green findability wash over the rover model.
+      F.marker.visible = false;
       F.sun.target.position.copy(F.roverPos);
       F.sun.position.copy(F.roverPos).addScaledVector(F.sunDir, 600);
       // Texel-snapped follow (world-axis, kills sub-texel crawl shimmer):
@@ -2900,6 +2907,15 @@ function disposeSurface(V) {
     if (F._dbgBasic) { try { F._dbgBasic.dispose(); } catch (e) {} F._dbgBasic = null; }
   } catch (e) {}
 }
+try {
+  window.addEventListener('keydown', (e) => {
+    if (typeof window !== 'undefined' && window.__opsV && window.__opsV.surf && window.__opsV.camMode === 'surface') {
+      const F = window.__opsV.surf;
+      if (e.key === 'ArrowUp') { F._camTargetLift = Math.min(8.0, (F._camTargetLift || 2.4) + 0.6); }
+      else if (e.key === 'ArrowDown') { F._camTargetLift = Math.max(0.6, (F._camTargetLift || 2.4) - 0.6); }
+    }
+  });
+} catch (e) {}
 export {
   decF32, decU8, decodeSite,
   surfHeightAt, surfNormalAt, surfDisplayXZ, surfDisplayDelta,

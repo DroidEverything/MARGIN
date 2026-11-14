@@ -1735,24 +1735,13 @@ body.ops-active #screen {
 }
 
 /* Hidden HUD state for pure cinema mode */
-.ops-viewport.hud-hidden .ops-hud-left {
-  transform: translateX(-110%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.ops-viewport.hud-hidden .ops-hud-right {
-  transform: translateX(110%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.ops-viewport.hud-hidden .ops-minimap {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(16px);
-  transition: opacity .2s ease, transform .2s ease;
-}
+.ops-viewport.hud-hidden .ops-hud-left { transform: translateX(-110%); opacity: 0; pointer-events: none; }
+.ops-viewport.hud-hidden .ops-hud-right { transform: translateX(110%); opacity: 0; pointer-events: none; }
+.ops-viewport.hud-hidden .ops-minimap { opacity: 0; pointer-events: none; transform: translateY(16px); transition: opacity .2s ease, transform .2s ease; }
+.ops-viewport.hud-hidden .rover-status-strip { opacity: 0 !important; pointer-events: none !important; }
+.ops-viewport.hud-hidden .ops-hud-top { background: transparent !important; border-color: transparent !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; pointer-events: none !important; }
+.ops-viewport.hud-hidden .ops-hud-top > *:not(.hud-toggle-btn) { opacity: 0 !important; pointer-events: none !important; transform: translateY(-20px); transition: opacity .2s ease, transform .2s ease; }
+.ops-viewport.hud-hidden .hud-toggle-btn { opacity: 0.85 !important; pointer-events: auto !important; margin-left: auto; background: rgba(15,23,42,0.85) !important; border-color: var(--phosphor) !important; color: var(--phosphor) !important; }
 
 /* Legacy & Component Styles */
 .opsgrid {
@@ -5114,11 +5103,9 @@ a:focus-visible {
   }
 }
 
-.ops-viewport.hud-hidden .ops-minimap {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(16px)
-}
+.ops-viewport.hud-hidden .ops-minimap,
+.ops-viewport.hud-hidden .rover-status-strip,
+.ops-viewport.hud-hidden .ops-hud-top > *:not(.hud-toggle-btn) { opacity: 0 !important; pointer-events: none !important; transform: translateY(16px); }
 
 /* ── Orrery nav: dim cluster until needed, scrim for legibility ── */
 .orrery-nav-bar {

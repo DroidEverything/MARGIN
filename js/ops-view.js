@@ -1244,28 +1244,26 @@ function start(hostEl, config, kind) {
     controls.maxDistance = 60;
     // Cockpit free-look: pointer drags rotate the view (orientation only —
     // the ride, tracking and gaze anchor are untouched). Offsets PERSIST after
-    // release so the player can watch the stars, the Sun, or aft while flying;
-    // double-click recenters on the planet. Attached per canvas; the old
-    // canvas is discarded on stop.
+    // release in orbit so the player can watch the stars; in surface mast mode,
+    // release smoothly springs back to forward gaze.
     if (!V.cockpitLook) V.cockpitLook = { yaw: 0, pitch: 0, drag: false, lx: 0, ly: 0 };
     const lk = V.cockpitLook;
+    const isFirstPerson = () => (V.camMode === 'cockpit' || V.camMode === 'mast');
     canvas.addEventListener('pointerdown', (e) => {
-      if (V.camMode !== 'cockpit' || !V.active) return;
+      if (!isFirstPerson() || !V.active) return;
       lk.drag = true; lk.lx = e.clientX; lk.ly = e.clientY;
       try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (!lk.drag || V.camMode !== 'cockpit' || !V.active) return;
-      lk.yaw = THREE.MathUtils.clamp(lk.yaw - (e.clientX - lk.lx) * 0.004, -Math.PI, Math.PI);
-      lk.pitch = THREE.MathUtils.clamp(lk.pitch - (e.clientY - lk.ly) * 0.004, -1.2, 1.2);
+      if (!lk.drag || !isFirstPerson() || !V.active) return;
+      lk.yaw = THREE.MathUtils.clamp(lk.yaw - (e.clientX - lk.lx) * 0.004, -Math.PI * 0.8, Math.PI * 0.8);
+      lk.pitch = THREE.MathUtils.clamp(lk.pitch - (e.clientY - lk.ly) * 0.004, -1.1, 1.1);
       lk.lx = e.clientX; lk.ly = e.clientY;
     });
     const lkEnd = () => { lk.drag = false; };
-    canvas.addEventListener('pointerup', lkEnd);
-    canvas.addEventListener('pointercancel', lkEnd);
+    canvas.addEventListener('pointerup', lkEnd); canvas.addEventListener('pointercancel', lkEnd);
     canvas.addEventListener('dblclick', () => {
-      if (V.camMode !== 'cockpit' || !V.active) return;
-      lk.yaw = 0; lk.pitch = 0; lk.drag = false;
+      if (isFirstPerson() && V.active) { lk.yaw = 0; lk.pitch = 0; lk.drag = false; }
     });
     controls.addEventListener('start', () => {
       V.glide = null;
@@ -4162,7 +4160,7 @@ function setCameraMode(mode) {
       try {
         if (V.controls) {
           V.controls.enabled = true;
-          V.controls.maxPolarAngle = 1.535;
+          V.controls.maxPolarAngle = 1.57;
         }
       } catch (e) {}
       /* Honest-timelapse entry (T3): keep the current view ray and distance

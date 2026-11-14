@@ -1046,11 +1046,6 @@ function createRocketSkinTexture(type = 'core', lvId = null) {
     for (let y = 0; y < H; y += 32) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
-    // Fairing logo accent
-    ctx.fillStyle = '#1e3c72';
-    ctx.fillRect(W * 0.5 - 24, H * 0.45, 48, 8);
-    ctx.fillStyle = '#b92a2a';
-    ctx.fillRect(W * 0.5 - 24, H * 0.45 + 10, 48, 4);
   } else {
     // Stage 1 / Core Stage:
     if (isSLS) {
@@ -1077,10 +1072,6 @@ function createRocketSkinTexture(type = 'core', lvId = null) {
       ctx.fillRect(W * 0.5, H * 0.28, W * 0.5, H * 0.28);
       ctx.fillRect(0, H * 0.72, W * 0.5, H * 0.14);
       ctx.fillRect(W * 0.5, H * 0.86, W * 0.5, H * 0.14);
-      // UNITED STATES lettering
-      ctx.fillStyle = '#1c2026';
-      ctx.font = 'bold 20px monospace';
-      ctx.fillText('UNITED STATES', W * 0.08, H * 0.60);
     } else {
       // Falcon 9 / Falcon Heavy: Clean aerospace satin white
       ctx.fillStyle = '#f4f6f9';
@@ -1120,31 +1111,6 @@ function createRocketSkinTexture(type = 'core', lvId = null) {
       ctx.fillRect(0, H - 32, W, 32);
       ctx.fillStyle = '#343a46';
       ctx.fillRect(0, H - 34, W, 2);
-
-      // Authentic aerospace stencils:
-      // American Flag stencil near upper section
-      const fx = W * 0.5 - 24, fy = H * 0.22, fw = 48, fh = 26;
-      for (let s = 0; s < 7; s++) {
-        ctx.fillStyle = s % 2 === 0 ? '#b22234' : '#ffffff';
-        ctx.fillRect(fx, fy + (s * fh) / 7, fw, fh / 7);
-      }
-      ctx.fillStyle = '#1e3c72';
-      ctx.fillRect(fx, fy, fw * 0.45, (fh * 4) / 7);
-
-      // NASA / FALCON insignia text
-      ctx.fillStyle = '#1c2026';
-      ctx.font = 'bold 15px monospace';
-      ctx.fillText(id.startsWith('fh') ? 'FALCON HEAVY' : 'FALCON 9', W * 0.5 - 46, H * 0.28);
-      ctx.font = 'bold 12px monospace';
-      ctx.fillText('UNITED STATES', W * 0.5 - 44, H * 0.31);
-
-      // Technical stencils & hazard placards
-      ctx.fillStyle = 'rgba(200, 80, 20, 0.85)';
-      ctx.font = 'bold 9px monospace';
-      ctx.fillText('LOX VENT', W * 0.72, H * 0.16);
-      ctx.fillText('RP-1 FILL', W * 0.72, H * 0.65);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.fillText('RESCUE -->', W * 0.72, H * 0.20);
     }
   }
 
